@@ -16,14 +16,13 @@
 
 /* Top bar with date and price */
 .iphone-top-bar {
-  background: linear-gradient(145deg, #3a7bd5, #00d2ff);
+  background: #2d4373;
   padding: 15px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 4px 20px rgba(0, 31, 92, 0.2);
-  position: relative;
   color: white;
+  position: relative;
 }
 
 .iphone-top-bar::before {
@@ -33,7 +32,7 @@
   left: 0;
   width: 100%;
   height: 5px;
-  background: linear-gradient(90deg, #00c6ff, #0072ff);
+  background: linear-gradient(90deg, #2c3e50, #4776E6);
   border-radius: 0;
 }
 
@@ -65,7 +64,8 @@
 
 .price-label {
   font-size: 12px;
-  color: #4a5568;
+  color: #6c5ce7;
+  font-weight: 600;
 }
 
 .price-breakdown {
@@ -95,29 +95,55 @@
 }
 
 /* Tabs */
-.iphone-tabs {
+.tabs {
   display: flex;
-  border-bottom: 1px solid #e2e8f0;
-  background: linear-gradient(to right, #6a11cb, #2575fc);
+  margin-bottom: 10px;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.tab-button {
+.tab {
   flex: 1;
-  padding: 15px;
+  padding: 10px;
   text-align: center;
-  background: transparent;
   border: none;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.7);
+  color: white;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.tab-button.active {
-  color: white;
-  border-bottom: 3px solid white;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+.tab:first-child {
+  background-color: #6c5ce7;
+}
+
+.tab:last-child {
+  background-color: #00b894;
+}
+
+.tab.active:first-child {
+  background-color: #6c5ce7;
+}
+
+.tab.active:last-child {
+  background-color: #00b894;
+}
+
+.tab span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab .tab-icon {
+  font-size: 18px;
+  margin-bottom: 4px;
+}
+
+.tab .tab-text {
+  font-size: 14px;
 }
 
 /* Tab content */
@@ -139,6 +165,8 @@
   color: #2d3748;
   margin-bottom: 8px;
   font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 /* Toggle buttons */
@@ -146,26 +174,42 @@
   display: flex;
   border-radius: 8px;
   overflow: hidden;
-  border: 1px solid #e2e8f0;
+  margin-bottom: 15px;
+  gap: 10px;
 }
 
 .toggle-buttons button {
   flex: 1;
   padding: 10px;
   border: none;
-  background-color: #f7fafc;
-  color: #4a5568;
+  background-color: #f1f2f6;
+  color: #2f3542;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
+  border-radius: 8px;
 }
 
 .toggle-buttons button.active {
-  background-color: #BDE0FE;
-  color: #000000;
-  font-weight: 700;
-  box-shadow: 0 4px 10px rgba(189, 224, 254, 0.35);
+  background-color: #6c5ce7;
+  color: white;
+  font-weight: 600;
+}
+
+.toggle-buttons.bed-type button.active {
+  background-color: #00b894;
+  color: white;
+}
+
+.toggle-buttons.payment button.active {
+  background-color: #00b894;
+  color: white;
+}
+
+.toggle-buttons.rate-type button.active {
+  background-color: #00b894;
+  color: white;
 }
 
 .toggle-buttons.bed-type button {
@@ -221,12 +265,11 @@
 
 /* Price summary */
 .price-summary {
-  background-color: #e6f7ff;
+  background: linear-gradient(135deg, #2d4373, #4a69bd);
   border-radius: 10px;
   padding: 15px;
   margin-top: 20px;
-  box-shadow: 0 2px 8px rgba(0, 114, 255, 0.1);
-  border: 1px solid #bae7ff;
+  color: white;
 }
 
 .price-row {
@@ -234,16 +277,16 @@
   justify-content: space-between;
   margin-bottom: 8px;
   font-size: 14px;
-  color: #0050b3;
+  color: #e2e8f0;
 }
 
 .price-row.total {
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px solid #91caff;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
   font-weight: 700;
   font-size: 16px;
-  color: #1890ff;
+  color: white;
 }
 
 /* Checkout time */
@@ -346,43 +389,53 @@
   }
 }
 
-/* Floating add button */
+/* Floating add button - hidden */
 .floating-add-button {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #4776E6, #8E54E9);
-  color: white;
-  border: none;
-  font-size: 30px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 4px 15px rgba(71, 118, 230, 0.4);
-  transition: all 0.2s ease;
-  z-index: 100;
-}
-
-.floating-add-button:hover {
-  transform: translateY(-3px) scale(1.05);
-  box-shadow: 0 6px 20px rgba(71, 118, 230, 0.5);
+  display: none;
 }
 
 /* Time display */
 .time-display {
   display: flex;
   justify-content: space-between;
-  background-color: #e6f7ff;
+  background: linear-gradient(135deg, #e6f7ff, #f0f7ff);
   padding: 10px 15px;
   border-radius: 8px;
   margin-bottom: 15px;
   box-shadow: 0 2px 8px rgba(0, 114, 255, 0.1);
   border: 1px solid #bae7ff;
+}
+
+/* Time display for short stay */
+.simple-time-display {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 15px 0;
+}
+
+.time-row {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: #f1f2f6;
+  border-radius: 8px;
+  padding: 10px;
+  border: 1px solid #dfe4ea;
+}
+
+.simple-time-display .time-label {
+  font-size: 12px;
+  color: #333;
+  font-weight: 500;
+  margin-bottom: 5px;
+}
+
+.simple-time-display .time-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2f3542;
+  text-align: center;
 }
 
 .time-item {
@@ -664,18 +717,25 @@
 
 /* Small clear button */
 .small-clear-button {
-  background-color: #ff3b30;
+  background-color: transparent;
   color: white;
   border: none;
-  border-radius: 4px;
-  padding: 5px 10px;
+  border-radius: 25px;
+  padding: 8px 15px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  margin: 5px auto;
-  display: block;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 5px rgba(255, 59, 48, 0.3);
+  flex: 0.3;
+  text-align: center;
+}
+
+.tab:first-child + .small-clear-button {
+  background-color: #6c5ce7;
+}
+
+.tab:last-child + .small-clear-button {
+  background-color: #00b894;
 }
 
 .small-clear-button:hover {
@@ -690,25 +750,46 @@
   gap: 10px;
   padding: 5px 10px;
   margin-bottom: 5px;
+  align-items: center;
 }
 
 .select-rooms-top-button {
-  flex: 1;
-  background: linear-gradient(135deg, #4776E6, #8E54E9);
+  flex: 0.7;
+  background-color: #6c5ce7;
   color: white;
   border: none;
-  border-radius: 4px;
-  padding: 8px 10px;
-  font-size: 14px;
+  border-radius: 25px;
+  padding: 8px 15px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 2px 5px rgba(71, 118, 230, 0.3);
+  box-shadow: 0 2px 5px rgba(108, 92, 231, 0.3);
   transition: all 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.select-rooms-top-button:hover {
+.add-stay-button {
+  flex: 0.7;
+  background-color: #00b894;
+  color: white;
+  border: none;
+  border-radius: 25px;
+  padding: 8px 15px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0, 184, 148, 0.3);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.select-rooms-top-button:hover, .add-stay-button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 3px 7px rgba(71, 118, 230, 0.4);
+  opacity: 0.9;
 }
 
 /* Floor tabs */
@@ -717,6 +798,8 @@
   border-bottom: 1px solid #e2e8f0;
   background-color: #f8f9fa;
   margin-bottom: 10px;
+  border-radius: 8px 8px 0 0;
+  overflow: hidden;
 }
 
 .floor-tab {
@@ -733,8 +816,9 @@
 }
 
 .floor-tab.active {
-  color: #4776E6;
-  border-bottom: 2px solid #4776E6;
+  color: #3a7bd5;
+  border-bottom: 2px solid #3a7bd5;
+  background-color: rgba(58, 123, 213, 0.05);
 }
 
 /* First floor rooms (initially hidden) */
@@ -749,4 +833,141 @@
 
 .first-floor-active .room-selector-card:not(.first-floor) {
   display: none;
+}
+
+/* Save Stay Button */
+.save-stay-button-container {
+  margin-top: 15px;
+  text-align: center;
+}
+
+.save-stay-button {
+  background: linear-gradient(135deg, #3a7bd5, #00d2ff);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0, 114, 255, 0.3);
+  transition: all 0.2s ease;
+}
+
+.save-stay-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 7px rgba(0, 114, 255, 0.4);
+}
+
+/* Saved Stays Section */
+.saved-stays-section {
+  margin-top: 20px;
+  padding: 15px;
+  background: linear-gradient(135deg, #f0f7ff, #f8f9fa);
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e6f0fa;
+}
+
+.saved-stays-section h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.saved-stay-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  margin-bottom: 10px;
+  background-color: white;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.saved-stay-details {
+  flex: 1;
+}
+
+.saved-stay-dates {
+  font-weight: 600;
+  margin-bottom: 3px;
+  display: flex;
+  align-items: center;
+}
+
+.date-separator {
+  margin: 0 5px;
+  color: #999;
+}
+
+.saved-stay-info {
+  font-size: 12px;
+  color: #666;
+  display: flex;
+  gap: 5px;
+}
+
+.saved-stay-price {
+  font-weight: 700;
+  color: #0077cc;
+  margin-right: 10px;
+}
+
+.remove-stay-button {
+  background-color: #ff3b30;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.remove-stay-button:hover {
+  background-color: #e02e24;
+}
+
+/* Extra hours buttons */
+.extra-hours-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin: 10px 0;
+}
+
+.extra-hour-button {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.extra-hour-button.decrease {
+  background-color: #e74c3c;
+  color: white;
+}
+
+.extra-hour-button.increase {
+  background-color: #00b894;
+  color: white;
+}
+
+.extra-hour-button:hover {
+  transform: translateY(-2px);
+  opacity: 0.9;
 }

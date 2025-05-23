@@ -10,6 +10,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   const [showRoomSelector, setShowRoomSelector] = useState(false);
   const [availableRooms, setAvailableRooms] = useState([]);
   const [activeFloor, setActiveFloor] = useState('ground'); // 'ground' or 'first'
+  
+  // State for saved stays
+  const [savedStays, setSavedStays] = useState([]);
   // State for active tab
   const [activeTab, setActiveTab] = useState('short');
   
@@ -70,11 +73,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     const extraHoursCost = extraHours * hourlyRate;
     const subtotal = baseRate + extraHoursCost;
     
-    // Apply credit card fee if applicable
-    const total = paymentMethod === 'credit' ? subtotal * 1.03 : subtotal;
+    // No credit card fee
+    const total = subtotal;
     
     setTotalPrice(total);
-  }, [hasJacuzzi, extraHours, extraHourRate, paymentMethod, shortStayPrices]);
+  }, [hasJacuzzi, extraHours, extraHourRate, shortStayPrices]);
   
   // Calculate overnight stay price
   const calculateOvernightPrice = useCallback(() => {
@@ -134,11 +137,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Calculate total
     let totalPrice = totalBasePrice + taxAmount + extraHoursCheckInCost + extraHoursCheckOutCost;
     
-    // Apply credit card fee if applicable
-    if (overnightPayment === 'credit') {
-      totalPrice *= 1.03; // 3% credit card fee
-    }
-    
     return {
       nights,
       daysBreakdown,
@@ -148,7 +146,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       extraHoursCheckOutCost,
       totalPrice
     };
-  }, [checkInDate, checkOutDate, hasJacuzziOvernight, overnightExtraHours, overnightCheckoutExtraHours, overnightRateType, overnightPayment, prices, shortStayPrices]);
+  }, [checkInDate, checkOutDate, hasJacuzziOvernight, overnightExtraHours, overnightCheckoutExtraHours, overnightRateType, prices, shortStayPrices]);
   
   // Handle extra hours change for short stay
   const handleExtraHoursChange = (change) => {
@@ -324,6 +322,35 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     setShowRoomSelector(!showRoomSelector);
   };
   
+  // Save current stay
+  const saveCurrentStay = () => {
+    // Create a new stay object
+    const newStay = {
+      checkInDate: checkInDate.toISOString(),
+      checkOutDate: checkOutDate.toISOString(),
+      nights: overnightPriceInfo.nights,
+      bedType: overnightBedType,
+      hasJacuzzi: hasJacuzziOvernight,
+      isSmoking: overnightSmoking,
+      totalPrice: overnightPriceInfo.totalPrice,
+      paymentMethod: overnightPayment,
+      extraHoursCheckIn: overnightExtraHours,
+      extraHoursCheckOut: overnightCheckoutExtraHours
+    };
+    
+    // Add to saved stays
+    setSavedStays([...savedStays, newStay]);
+    
+    // No confirmation popup
+  };
+  
+  // Remove a saved stay
+  const removeSavedStay = (index) => {
+    const updatedStays = [...savedStays];
+    updatedStays.splice(index, 1);
+    setSavedStays(updatedStays);
+  };
+  
   return (
     <div className="iphone-container">
       {/* Top bar with date and price */}
@@ -340,36 +367,51 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       
       {/* Button container for select rooms and clear */}
       <div className="top-buttons-container">
-        <button className="select-rooms-top-button" onClick={toggleRoomSelector}>
-          {selectedRooms.length > 0 ? `Selected Rooms (${selectedRooms.length})` : 'Select Rooms'}
-        </button>
-        <button 
-          className="small-clear-button" 
-          onClick={activeTab === 'short' ? clearShortStay : clearOvernightStay}
-        >
-          CLEAR
-        </button>
+        {activeTab === 'short' ? (
+          <>
+            <button className="select-rooms-top-button" onClick={toggleRoomSelector}>
+              {selectedRooms.length > 0 ? `Selected Rooms (${selectedRooms.length})` : 'Select Rooms'}
+            </button>
+            <button 
+              className="small-clear-button" 
+              onClick={clearShortStay}
+            >
+              clear
+            </button>
+          </>
+        ) : (
+          <>
+            <button className="add-stay-button" onClick={saveCurrentStay}>
+              + Add Stay
+            </button>
+            <button 
+              className="small-clear-button" 
+              onClick={clearOvernightStay}
+            >
+              clear
+            </button>
+          </>
+        )}
       </div>
       
       {/* Tabs */}
-      <div className="iphone-tabs">
+      <div className="tabs">
         <button 
-          className={`tab-button ${activeTab === 'short' ? 'active' : ''}`}
+          className={`tab ${activeTab === 'short' ? 'active' : ''}`}
           onClick={() => setActiveTab('short')}
         >
-          Short Stay
+          SHORT STAY
         </button>
         <button 
-          className={`tab-button ${activeTab === 'overnight' ? 'active' : ''}`}
+          className={`tab ${activeTab === 'overnight' ? 'active' : ''}`}
           onClick={() => setActiveTab('overnight')}
         >
-          Multiple Nights
+          MULTIPLE NIGHTS
         </button>
       </div>
       
       {/* Tab content */}
       <div className="tab-content">
-
         
         {/* Selected Rooms Component */}
         {selectedRooms.length > 0 && (
@@ -549,12 +591,12 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               </div>
             </div>
             
-            <div className="time-display">
-              <div className="time-item">
+            <div className="simple-time-display">
+              <div className="time-row">
                 <span className="time-label">Check-in:</span>
                 <span className="time-value">{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
               </div>
-              <div className="time-item">
+              <div className="time-row">
                 <span className="time-label">Checkout:</span>
                 <span className="time-value">{checkoutTime}</span>
               </div>
@@ -578,10 +620,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               </div>
             </div>
             
-            <div className="checkout-time">
-              <span>Checkout Time:</span>
-              <span>{checkoutTime}</span>
-            </div>
+
             
             <div className="price-summary">
               <div className="price-row">
@@ -592,12 +631,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                 <div className="price-row">
                   <span>Extra Hours ({extraHours} × ${extraHourRate}):</span>
                   <span>${extraHours * extraHourRate}</span>
-                </div>
-              )}
-              {paymentMethod === 'credit' && (
-                <div className="price-row">
-                  <span>Credit Card Fee (3%):</span>
-                  <span>${((hasJacuzzi ? shortStayPrices.baseRate.withJacuzzi : shortStayPrices.baseRate.withoutJacuzzi) + (extraHours * extraHourRate)) * 0.03}</span>
                 </div>
               )}
               <div className="price-row total">
@@ -767,26 +800,53 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                   <span>${overnightPriceInfo.extraHoursCheckOutCost?.toFixed(2)}</span>
                 </div>
               )}
-              {overnightPayment === 'credit' && (
-                <div className="price-row">
-                  <span>Credit Card Fee (3%):</span>
-                  <span>${((overnightPriceInfo.totalBasePrice + overnightPriceInfo.taxAmount + 
-                    overnightPriceInfo.extraHoursCheckInCost + overnightPriceInfo.extraHoursCheckOutCost) * 0.03).toFixed(2)}</span>
-                </div>
-              )}
+
               <div className="price-row total">
                 <span>Total:</span>
                 <span>${overnightPriceInfo.totalPrice?.toFixed(2)}</span>
               </div>
+              
+
             </div>
+            
+            {/* Saved Stays Section */}
+            {savedStays.length > 0 && (
+              <div className="saved-stays-section">
+                <h3>Saved Stays</h3>
+                {savedStays.map((stay, index) => (
+                  <div key={index} className="saved-stay-item">
+                    <div className="saved-stay-details">
+                      <div className="saved-stay-dates">
+                        <span>{new Date(stay.checkInDate).toLocaleDateString()}</span>
+                        <span className="date-separator">→</span>
+                        <span>{new Date(stay.checkOutDate).toLocaleDateString()}</span>
+                      </div>
+                      <div className="saved-stay-info">
+                        <span>{stay.nights} nights</span>
+                        <span>•</span>
+                        <span>{stay.bedType}</span>
+                        <span>•</span>
+                        <span>{stay.hasJacuzzi ? 'Jacuzzi' : 'No Jacuzzi'}</span>
+                      </div>
+                    </div>
+                    <div className="saved-stay-price">
+                      ${stay.totalPrice.toFixed(2)}
+                    </div>
+                    <button 
+                      className="remove-stay-button"
+                      onClick={() => removeSavedStay(index)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
       
-      {/* Floating add button */}
-      <button className="floating-add-button" onClick={toggleRoomSelector}>
-        +
-      </button>
+      {/* Floating add button removed */}
     </div>
   );
 }
