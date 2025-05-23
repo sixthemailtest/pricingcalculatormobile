@@ -9,6 +9,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   const [selectedRooms, setSelectedRooms] = useState([]);
   const [showRoomSelector, setShowRoomSelector] = useState(false);
   const [availableRooms, setAvailableRooms] = useState([]);
+  const [activeFloor, setActiveFloor] = useState('ground'); // 'ground' or 'first'
   // State for active tab
   const [activeTab, setActiveTab] = useState('short');
   
@@ -264,7 +265,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     if (availableRooms.length === 0) {
       const rooms = [];
       
-      // Generate room numbers 101-120
+      // Generate ground floor room numbers 101-120
       for (let i = 101; i <= 120; i++) {
         // Determine room characteristics based on room number
         const isSmoking = i % 2 === 0;
@@ -274,6 +275,25 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         rooms.push({
           id: `room-${i}`,
           number: i,
+          floor: 'ground',
+          isSmoking,
+          hasJacuzzi,
+          bedType,
+          isAvailable: true
+        });
+      }
+      
+      // Generate first floor room numbers 201-220
+      for (let i = 201; i <= 220; i++) {
+        // Determine room characteristics based on room number
+        const isSmoking = i % 2 === 0;
+        const hasJacuzzi = i > 210;
+        const bedType = i % 3 === 0 ? 'Queen2Beds' : (i % 3 === 1 ? 'Queen' : 'King');
+        
+        rooms.push({
+          id: `room-${i}`,
+          number: i,
+          floor: 'first',
           isSmoking,
           hasJacuzzi,
           bedType,
@@ -318,13 +338,18 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         </div>
       </div>
       
-      {/* Clear button under top bar */}
-      <button 
-        className="small-clear-button" 
-        onClick={activeTab === 'short' ? clearShortStay : clearOvernightStay}
-      >
-        CLEAR
-      </button>
+      {/* Button container for select rooms and clear */}
+      <div className="top-buttons-container">
+        <button className="select-rooms-top-button" onClick={toggleRoomSelector}>
+          {selectedRooms.length > 0 ? `Selected Rooms (${selectedRooms.length})` : 'Select Rooms'}
+        </button>
+        <button 
+          className="small-clear-button" 
+          onClick={activeTab === 'short' ? clearShortStay : clearOvernightStay}
+        >
+          CLEAR
+        </button>
+      </div>
       
       {/* Tabs */}
       <div className="iphone-tabs">
@@ -359,29 +384,73 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                 <h3>Select Rooms</h3>
                 <button className="close-button" onClick={toggleRoomSelector}>×</button>
               </div>
-              <div className="available-rooms-grid">
-                {availableRooms.map(room => {
-                  const isSelected = selectedRooms.some(r => r.id === room.id);
-                  const bedTypeClass = room.bedType === 'Queen' ? 'queen' : 
-                                     room.bedType === 'King' ? 'king' : 'queen-2-beds';
+              
+              <div className="floor-tabs">
+                <button 
+                  className={`floor-tab ${activeFloor === 'ground' ? 'active' : ''}`}
+                  onClick={() => setActiveFloor('ground')}
+                >
+                  Ground Floor
+                </button>
+                <button 
+                  className={`floor-tab ${activeFloor === 'first' ? 'active' : ''}`}
+                  onClick={() => setActiveFloor('first')}
+                >
+                  First Floor
+                </button>
+              </div>
+              
+              <div className={`available-rooms-grid ${activeFloor === 'first' ? 'first-floor-active' : ''}`}>
+                {availableRooms
+                  .filter(room => room.floor === 'ground')
+                  .map(room => {
+                    const isSelected = selectedRooms.some(r => r.id === room.id);
+                    const bedTypeClass = room.bedType === 'Queen' ? 'queen' : 
+                                       room.bedType === 'King' ? 'king' : 'queen-2-beds';
+                    
+                    const classes = `room-selector-card ${bedTypeClass} ${room.isSmoking ? 'smoking' : ''} ${room.hasJacuzzi ? 'jacuzzi' : ''} ${isSelected ? 'selected' : ''}`;
+                    
+                    return (
+                      <div 
+                        key={room.id} 
+                        className={classes}
+                        onClick={() => handleRoomSelect(room)}
+                      >
+                        <span className="room-number">{room.number}</span>
+                        <span className="room-type">
+                          {room.bedType === 'Queen' ? 'Queen' : 
+                           room.bedType === 'King' ? 'King' : 'Queen 2B'}
+                        </span>
+                        {isSelected && <div className="selected-checkmark">✓</div>}
+                      </div>
+                    );
+                  })}
                   
-                  const classes = `room-selector-card ${bedTypeClass} ${room.isSmoking ? 'smoking' : ''} ${room.hasJacuzzi ? 'jacuzzi' : ''} ${isSelected ? 'selected' : ''}`;
-                  
-                  return (
-                    <div 
-                      key={room.id} 
-                      className={classes}
-                      onClick={() => handleRoomSelect(room)}
-                    >
-                      <span className="room-number">{room.number}</span>
-                      <span className="room-type">
-                        {room.bedType === 'Queen' ? 'Queen' : 
-                         room.bedType === 'King' ? 'King' : 'Queen 2B'}
-                      </span>
-                      {isSelected && <div className="selected-checkmark">✓</div>}
-                    </div>
-                  );
-                })}
+                {/* First Floor Rooms - Initially hidden via CSS */}
+                {availableRooms
+                  .filter(room => room.floor === 'first')
+                  .map(room => {
+                    const isSelected = selectedRooms.some(r => r.id === room.id);
+                    const bedTypeClass = room.bedType === 'Queen' ? 'queen' : 
+                                       room.bedType === 'King' ? 'king' : 'queen-2-beds';
+                    
+                    const classes = `room-selector-card first-floor ${bedTypeClass} ${room.isSmoking ? 'smoking' : ''} ${room.hasJacuzzi ? 'jacuzzi' : ''} ${isSelected ? 'selected' : ''}`;
+                    
+                    return (
+                      <div 
+                        key={room.id} 
+                        className={classes}
+                        onClick={() => handleRoomSelect(room)}
+                      >
+                        <span className="room-number">{room.number}</span>
+                        <span className="room-type">
+                          {room.bedType === 'Queen' ? 'Queen' : 
+                           room.bedType === 'King' ? 'King' : 'Queen 2B'}
+                        </span>
+                        {isSelected && <div className="selected-checkmark">✓</div>}
+                      </div>
+                    );
+                  })}
               </div>
               <div className="room-selector-footer">
                 <button className="done-button" onClick={toggleRoomSelector}>Done</button>
@@ -714,9 +783,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         )}
       </div>
       
-      {/* Floating room selector button */}
-      <button className="floating-room-selector" onClick={toggleRoomSelector}>
-        {selectedRooms.length > 0 ? `${selectedRooms.length}` : 'Select Rooms'}
+      {/* Floating add button */}
+      <button className="floating-add-button" onClick={toggleRoomSelector}>
+        +
       </button>
     </div>
   );

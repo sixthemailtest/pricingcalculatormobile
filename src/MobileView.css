@@ -16,13 +16,14 @@
 
 /* Top bar with date and price */
 .iphone-top-bar {
-  background: linear-gradient(145deg, #ffffff, #f8f9fa);
+  background: linear-gradient(145deg, #3a7bd5, #00d2ff);
   padding: 15px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 4px 20px rgba(0, 31, 92, 0.08);
+  box-shadow: 0 4px 20px rgba(0, 31, 92, 0.2);
   position: relative;
+  color: white;
 }
 
 .iphone-top-bar::before {
@@ -32,7 +33,7 @@
   left: 0;
   width: 100%;
   height: 5px;
-  background: linear-gradient(90deg, #2c3e50, #4776E6);
+  background: linear-gradient(90deg, #00c6ff, #0072ff);
   border-radius: 0;
 }
 
@@ -44,12 +45,13 @@
 .day {
   font-size: 16px;
   font-weight: 600;
-  color: #2d3748;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .date {
   font-size: 14px;
-  color: #4a5568;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .time {
@@ -88,14 +90,15 @@
 .price-value {
   font-size: 16px;
   font-weight: 700;
-  color: #2d3748;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 /* Tabs */
 .iphone-tabs {
   display: flex;
   border-bottom: 1px solid #e2e8f0;
-  background-color: #fff;
+  background: linear-gradient(to right, #6a11cb, #2575fc);
 }
 
 .tab-button {
@@ -106,14 +109,15 @@
   border: none;
   font-size: 16px;
   font-weight: 600;
-  color: #718096;
+  color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .tab-button.active {
-  color: #4776E6;
-  border-bottom: 3px solid #4776E6;
+  color: white;
+  border-bottom: 3px solid white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 /* Tab content */
@@ -217,10 +221,12 @@
 
 /* Price summary */
 .price-summary {
-  background-color: #f8fafc;
+  background-color: #e6f7ff;
   border-radius: 10px;
   padding: 15px;
   margin-top: 20px;
+  box-shadow: 0 2px 8px rgba(0, 114, 255, 0.1);
+  border: 1px solid #bae7ff;
 }
 
 .price-row {
@@ -228,16 +234,16 @@
   justify-content: space-between;
   margin-bottom: 8px;
   font-size: 14px;
-  color: #4a5568;
+  color: #0050b3;
 }
 
 .price-row.total {
   margin-top: 10px;
   padding-top: 10px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid #91caff;
   font-weight: 700;
   font-size: 16px;
-  color: #2d3748;
+  color: #1890ff;
 }
 
 /* Checkout time */
@@ -340,18 +346,18 @@
   }
 }
 
-/* Floating room selector button */
-.floating-room-selector {
+/* Floating add button */
+.floating-add-button {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  min-width: 120px;
-  height: 50px;
-  border-radius: 25px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
   background: linear-gradient(135deg, #4776E6, #8E54E9);
   color: white;
   border: none;
-  font-size: 16px;
+  font-size: 30px;
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -360,11 +366,10 @@
   box-shadow: 0 4px 15px rgba(71, 118, 230, 0.4);
   transition: all 0.2s ease;
   z-index: 100;
-  padding: 0 20px;
 }
 
-.floating-room-selector:hover {
-  transform: translateY(-3px);
+.floating-add-button:hover {
+  transform: translateY(-3px) scale(1.05);
   box-shadow: 0 6px 20px rgba(71, 118, 230, 0.5);
 }
 
@@ -372,10 +377,12 @@
 .time-display {
   display: flex;
   justify-content: space-between;
-  background-color: #f8fafc;
+  background-color: #e6f7ff;
   padding: 10px 15px;
   border-radius: 8px;
   margin-bottom: 15px;
+  box-shadow: 0 2px 8px rgba(0, 114, 255, 0.1);
+  border: 1px solid #bae7ff;
 }
 
 .time-item {
@@ -386,14 +393,15 @@
 
 .time-label {
   font-size: 12px;
-  color: #4a5568;
+  color: #0050b3;
   margin-bottom: 4px;
+  font-weight: 500;
 }
 
 .time-value {
   font-size: 14px;
   font-weight: 600;
-  color: #2d3748;
+  color: #1890ff;
 }
 
 /* Clear button */
@@ -674,4 +682,71 @@
   background-color: #e02e24;
   transform: translateY(-1px);
   box-shadow: 0 3px 7px rgba(255, 59, 48, 0.4);
+}
+
+/* Top buttons container */
+.top-buttons-container {
+  display: flex;
+  gap: 10px;
+  padding: 5px 10px;
+  margin-bottom: 5px;
+}
+
+.select-rooms-top-button {
+  flex: 1;
+  background: linear-gradient(135deg, #4776E6, #8E54E9);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(71, 118, 230, 0.3);
+  transition: all 0.2s ease;
+}
+
+.select-rooms-top-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 7px rgba(71, 118, 230, 0.4);
+}
+
+/* Floor tabs */
+.floor-tabs {
+  display: flex;
+  border-bottom: 1px solid #e2e8f0;
+  background-color: #f8f9fa;
+  margin-bottom: 10px;
+}
+
+.floor-tab {
+  flex: 1;
+  padding: 10px;
+  text-align: center;
+  background: transparent;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: #718096;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.floor-tab.active {
+  color: #4776E6;
+  border-bottom: 2px solid #4776E6;
+}
+
+/* First floor rooms (initially hidden) */
+.room-selector-card.first-floor {
+  display: none;
+}
+
+/* When first floor tab is active */
+.first-floor-active .room-selector-card.first-floor {
+  display: flex;
+}
+
+.first-floor-active .room-selector-card:not(.first-floor) {
+  display: none;
 }
