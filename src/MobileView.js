@@ -49,6 +49,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     const checkoutDate = new Date(now.getTime() + ((4 + extraHours) * 60 * 60 * 1000));
     const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: true };
     setCheckoutTime(checkoutDate.toLocaleTimeString('en-US', timeOptions));
+    
+    // Also format current time
+    const checkinTime = now.toLocaleTimeString('en-US', timeOptions);
+    return { checkinTime, checkoutTime: checkoutDate.toLocaleTimeString('en-US', timeOptions) };
   }, [extraHours]);
   
   // Calculate short stay price
@@ -147,17 +151,35 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   
   // Handle extra hours change for short stay
   const handleExtraHoursChange = (change) => {
-    setExtraHours(prevHours => Math.max(0, prevHours + change));
+    setExtraHours(prevHours => {
+      const newValue = Math.max(0, prevHours + change);
+      // Calculate and update checkout time immediately
+      const now = new Date();
+      const checkoutDate = new Date(now.getTime() + ((4 + newValue) * 60 * 60 * 1000));
+      const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: true };
+      const checkinTime = now.toLocaleTimeString('en-US', timeOptions);
+      const checkoutTimeStr = checkoutDate.toLocaleTimeString('en-US', timeOptions);
+      setCheckoutTime(checkoutTimeStr);
+      return newValue;
+    });
   };
   
   // Handle extra hours change for overnight stay check-in
   const handleOvernightExtraHoursChange = (change) => {
     setOvernightExtraHours(prevHours => Math.max(0, prevHours + change));
+    // Update check-in time display
+    const newCheckInDate = new Date(checkInDate);
+    newCheckInDate.setHours(newCheckInDate.getHours() - (overnightExtraHours + change));
+    setCheckInDate(newCheckInDate);
   };
   
   // Handle extra hours change for overnight stay checkout
   const handleOvernightCheckoutExtraHoursChange = (change) => {
     setOvernightCheckoutExtraHours(prevHours => Math.max(0, prevHours + change));
+    // Update checkout time display
+    const newCheckOutDate = new Date(checkOutDate);
+    newCheckOutDate.setHours(newCheckOutDate.getHours() + (overnightCheckoutExtraHours + change));
+    setCheckOutDate(newCheckOutDate);
   };
   
   // Handle check-in date change
@@ -197,6 +219,39 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     calculateCheckoutTime();
     calculateShortStayPrice();
   }, [calculateCheckoutTime, calculateShortStayPrice]);
+  
+  // Clear short stay selections
+  const clearShortStay = () => {
+    setExtraHours(0);
+    setHasJacuzzi(false);
+    setPaymentMethod('cash');
+    setExtraHourRate(15);
+    setIsSmoking(false);
+    setBedType('Queen');
+    calculateCheckoutTime();
+  };
+  
+  // Clear overnight stay selections
+  const clearOvernightStay = () => {
+    // Reset to default check-in date (today at 3 PM)
+    const defaultCheckIn = new Date();
+    defaultCheckIn.setHours(15, 0, 0, 0);
+    
+    // Reset to default checkout date (tomorrow at 11 AM)
+    const defaultCheckOut = new Date(defaultCheckIn);
+    defaultCheckOut.setDate(defaultCheckOut.getDate() + 1);
+    defaultCheckOut.setHours(11, 0, 0, 0);
+    
+    setCheckInDate(defaultCheckIn);
+    setCheckOutDate(defaultCheckOut);
+    setOvernightExtraHours(0);
+    setOvernightCheckoutExtraHours(0);
+    setHasJacuzziOvernight(false);
+    setOvernightSmoking(false);
+    setOvernightPayment('cash');
+    setOvernightRateType('regular');
+    setOvernightBedType('Queen');
+  };
   
   // Calculate overnight price info
   const overnightPriceInfo = calculateOvernightPrice();
@@ -263,6 +318,14 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         </div>
       </div>
       
+      {/* Clear button under top bar */}
+      <button 
+        className="small-clear-button" 
+        onClick={activeTab === 'short' ? clearShortStay : clearOvernightStay}
+      >
+        CLEAR
+      </button>
+      
       {/* Tabs */}
       <div className="iphone-tabs">
         <button 
@@ -281,10 +344,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       
       {/* Tab content */}
       <div className="tab-content">
-        {/* Room selector button */}
-        <button className="room-selector-button" onClick={toggleRoomSelector}>
-          {selectedRooms.length > 0 ? `Selected Rooms (${selectedRooms.length})` : 'Select Rooms'}
-        </button>
+
         
         {/* Selected Rooms Component */}
         {selectedRooms.length > 0 && (
@@ -329,6 +389,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             </div>
           </div>
         )}
+
+        
         {activeTab === 'short' ? (
           <div className="short-stay-section">
             <div className="option-group">
@@ -412,9 +474,20 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             <div className="option-group">
               <label>Extra Hours</label>
               <div className="counter-control">
-                <button onClick={() => handleExtraHoursChange(-1)}>-</button>
+                <button className="minus-button" onClick={() => handleExtraHoursChange(-1)}>-</button>
                 <span>{extraHours}</span>
-                <button onClick={() => handleExtraHoursChange(1)}>+</button>
+                <button className="plus-button" onClick={() => handleExtraHoursChange(1)}>+</button>
+              </div>
+            </div>
+            
+            <div className="time-display">
+              <div className="time-item">
+                <span className="time-label">Check-in:</span>
+                <span className="time-value">{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+              </div>
+              <div className="time-item">
+                <span className="time-label">Checkout:</span>
+                <span className="time-value">{checkoutTime}</span>
               </div>
             </div>
             
@@ -472,8 +545,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                 <DatePicker
                   selected={checkInDate}
                   onChange={handleCheckInChange}
-                  showTimeSelect
-                  dateFormat="MMMM d, yyyy h:mm aa"
+                  dateFormat="MMMM d, yyyy"
                   className="date-picker"
                 />
               </div>
@@ -482,8 +554,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                 <DatePicker
                   selected={checkOutDate}
                   onChange={handleCheckOutChange}
-                  showTimeSelect
-                  dateFormat="MMMM d, yyyy h:mm aa"
+                  dateFormat="MMMM d, yyyy"
                   className="date-picker"
                   minDate={new Date(checkInDate.getTime() + (24 * 60 * 60 * 1000))}
                 />
@@ -571,18 +642,18 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             <div className="option-group">
               <label>Early Check-in Hours</label>
               <div className="counter-control">
-                <button onClick={() => handleOvernightExtraHoursChange(-1)}>-</button>
+                <button className="minus-button" onClick={() => handleOvernightExtraHoursChange(-1)}>-</button>
                 <span>{overnightExtraHours}</span>
-                <button onClick={() => handleOvernightExtraHoursChange(1)}>+</button>
+                <button className="plus-button" onClick={() => handleOvernightExtraHoursChange(1)}>+</button>
               </div>
             </div>
             
             <div className="option-group">
               <label>Late Check-out Hours</label>
               <div className="counter-control">
-                <button onClick={() => handleOvernightCheckoutExtraHoursChange(-1)}>-</button>
+                <button className="minus-button" onClick={() => handleOvernightCheckoutExtraHoursChange(-1)}>-</button>
                 <span>{overnightCheckoutExtraHours}</span>
-                <button onClick={() => handleOvernightCheckoutExtraHoursChange(1)}>+</button>
+                <button className="plus-button" onClick={() => handleOvernightCheckoutExtraHoursChange(1)}>+</button>
               </div>
             </div>
             
@@ -642,6 +713,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           </div>
         )}
       </div>
+      
+      {/* Floating room selector button */}
+      <button className="floating-room-selector" onClick={toggleRoomSelector}>
+        {selectedRooms.length > 0 ? `${selectedRooms.length}` : 'Select Rooms'}
+      </button>
     </div>
   );
 }
