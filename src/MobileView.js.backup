@@ -16,6 +16,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   // State for active tab
   const [activeTab, setActiveTab] = useState('short');
   
+  // State for editing saved stays
+  const [editingStayIndex, setEditingStayIndex] = useState(-1);
+  
   // Short stay state
   const [checkoutTime, setCheckoutTime] = useState('');
   const [extraHours, setExtraHours] = useState(0);
@@ -231,11 +234,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   
   // Handle overnight extra hours change
   const handleOvernightExtraHoursChange = (change) => {
-    // Early check-in hours are stored as negative values
-    // from -9 to 0, where -9 means 9 hours early (6:00 AM) and 0 means standard check-in (3:00 PM)
+    // In the original price calculator, early check-in hours are stored as negative values
+    // from -3 to 0, where -3 means 3 hours early (12:00 PM) and 0 means standard check-in (3:00 PM)
     const newValue = overnightExtraHours + change;
-    // Ensure hours are within the valid range (-9 to 0)
-    if (newValue >= -9 && newValue <= 0) {
+    // Ensure hours are within the valid range (-3 to 0)
+    if (newValue >= -3 && newValue <= 0) {
       setOvernightExtraHours(newValue);
       // Show price summary
       setShowOvernightPriceSummary(true);
@@ -272,8 +275,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   // Calculate check-in time based on early check-in hours
   const calculateCheckInTime = (extraHours) => {
     // Default check-in time is 3:00 PM (15:00)
-    // extraHours is negative for early check-in
-    // e.g., -9 means 9 hours early, so 6:00 AM
+    // In the original price calculator, extraHours is negative for early check-in
+    // e.g., -3 means 3 hours early, so 12:00 PM
     const hours = 15 + extraHours; // Add because extraHours is negative
     const ampm = hours >= 12 ? 'PM' : 'AM';
     const displayHours = hours % 12 === 0 ? 12 : hours % 12;
@@ -517,6 +520,106 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     setSavedStays(updatedStays);
   };
   
+  // Edit a saved stay
+  const editSavedStay = (index) => {
+    const stayToEdit = savedStays[index];
+    
+    // Set the editing index
+    setEditingStayIndex(index);
+    
+    // Set the appropriate tab based on stay type
+    setActiveTab(stayToEdit.isShortStay ? 'short' : 'overnight');
+    
+    if (stayToEdit.isShortStay) {
+      // Populate short stay fields
+      setBedType(stayToEdit.bedType);
+      setHasJacuzzi(stayToEdit.hasJacuzzi);
+      setIsSmoking(stayToEdit.isSmoking);
+      setPaymentMethod(stayToEdit.paymentMethod);
+      setExtraHours(stayToEdit.extraHours || 0);
+      setExtraHourRate(stayToEdit.hourlyRate || 15);
+    } else {
+      // Populate overnight stay fields
+      const checkIn = new Date(stayToEdit.checkInDate);
+      const checkOut = new Date(stayToEdit.checkOutDate);
+      setCheckInDate(checkIn);
+      setCheckOutDate(checkOut);
+      setOvernightBedType(stayToEdit.bedType);
+      setHasJacuzziOvernight(stayToEdit.hasJacuzzi);
+      setOvernightSmoking(stayToEdit.isSmoking);
+      setOvernightPayment(stayToEdit.paymentMethod);
+      setOvernightExtraHours(stayToEdit.extraHoursCheckIn ? -Math.abs(stayToEdit.extraHoursCheckIn) : 0);
+      setOvernightCheckoutExtraHours(stayToEdit.extraHoursCheckOut || 0);
+      setOvernightRateType(stayToEdit.hourlyRate === 10 ? 'discounted' : 'regular');
+    }
+    
+    // Show the appropriate price summary
+    if (stayToEdit.isShortStay) {
+      setShowShortStayPriceSummary(true);
+    } else {
+      setShowOvernightPriceSummary(true);
+    }
+  };
+  
+  // Update a saved stay
+  const updateSavedStay = () => {
+    if (editingStayIndex === -1) return;
+    
+    // Create a new stay object based on which tab is active
+    let updatedStay;
+    
+    if (activeTab === 'short') {
+      updatedStay = {
+        checkInDate: new Date().toISOString(),
+        checkOutDate: new Date(new Date().getTime() + ((4 + extraHours) * 60 * 60 * 1000)).toISOString(),
+        nights: 0, // Short stay is not counted in nights
+        bedType,
+        hasJacuzzi,
+        isSmoking,
+        totalPrice,
+        basePrice,
+        taxAmount,
+        extraHoursCost,
+        extraHours,
+        paymentMethod,
+        hourlyRate: extraHourRate,
+        isShortStay: true
+      };
+    } else {
+      updatedStay = {
+        checkInDate: checkInDate.toISOString(),
+        checkOutDate: checkOutDate.toISOString(),
+        nights: overnightPriceInfo.nights,
+        bedType: overnightBedType,
+        hasJacuzzi: hasJacuzziOvernight,
+        isSmoking: overnightSmoking,
+        totalPrice: overnightPriceInfo.totalPrice,
+        basePrice: overnightPriceInfo.totalBasePrice,
+        taxAmount: overnightPriceInfo.taxAmount,
+        paymentMethod: overnightPayment,
+        extraHoursCheckIn: Math.abs(overnightExtraHours),
+        extraHoursCheckOut: overnightCheckoutExtraHours,
+        extraHoursCheckInCost: overnightPriceInfo.extraHoursCheckInCost,
+        extraHoursCheckOutCost: overnightPriceInfo.extraHoursCheckOutCost,
+        hourlyRate: overnightRateType === 'regular' ? shortStayPrices.extraHourRate.regular : shortStayPrices.extraHourRate.discounted,
+        dailyPrices: overnightPriceInfo.dailyPrices,
+        isShortStay: false
+      };
+    }
+    
+    // Update the stay in the saved stays array
+    const updatedStays = [...savedStays];
+    updatedStays[editingStayIndex] = updatedStay;
+    setSavedStays(updatedStays);
+    
+    // Reset editing state
+    setEditingStayIndex(-1);
+    
+    // Hide price summaries
+    setShowShortStayPriceSummary(false);
+    setShowOvernightPriceSummary(false);
+  };
+  
   return (
     <div className="iphone-container">
       {/* Top bar with date and price */}
@@ -547,8 +650,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           </>
         ) : (
           <>
-            <button className="add-stay-button" onClick={saveCurrentStay}>
-              + Add Stay
+            <button 
+              className="add-stay-button" 
+              onClick={editingStayIndex >= 0 ? updateSavedStay : saveCurrentStay}
+            >
+              {editingStayIndex >= 0 ? 'Update Stay' : '+ Add Stay'}
             </button>
             <button 
               className="small-clear-button" 
@@ -559,9 +665,54 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           </>
         )}
       </div>
+          <button className="clear-button" onClick={() => {
+            setActiveTab('short');
+            setShowShortStayPriceSummary(false);
+            setShowOvernightPriceSummary(false);
+            setEditingStayIndex(-1); // Reset editing state when clearing
+          }}>Clear</button>
+        </div>
+      ) : (
+        <div className="top-buttons">
+          <button className="add-stay-button" onClick={editingStayIndex >= 0 ? updateSavedStay : saveCurrentStay}>
+            {editingStayIndex >= 0 ? 'Update Stay' : '+ Add Stay'}
+          </button>
+          <button className="clear-button" onClick={() => {
+            setActiveTab('short');
+            setShowShortStayPriceSummary(false);
+            setShowOvernightPriceSummary(false);
+            setEditingStayIndex(-1); // Reset editing state when clearing
+          }}>Clear</button>
+        </div>
+      )}
+    </div>
+    
+    {/* Tabs */}
+    <div className="tabs">
+      <button 
+        className={`tab ${activeTab === 'short' ? 'active' : ''}`}
+        onClick={() => setActiveTab('short')}
+      >
+        SHORT STAY
+      </button>
+      <button 
+        className={`tab ${activeTab === 'overnight' ? 'active' : ''}`}
+        onClick={() => setActiveTab('overnight')}
+      >
+        MULTIPLE NIGHTS
+      </button>
+    </div>
+    
+    {/* Tab content */}
+    <div className="tab-content">
       
-      {/* Tabs */}
-      <div className="tabs">
+      {/* Selected Rooms Component */}
+      {selectedRooms.length > 0 && (
+        <SelectedRooms 
+          selectedRooms={selectedRooms} 
+          onRemoveRoom={handleRemoveRoom} 
+        />
+      )}
         <button 
           className={`tab ${activeTab === 'short' ? 'active' : ''}`}
           onClick={() => setActiveTab('short')}
@@ -921,7 +1072,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             </div>
             
             <div className="option-group">
-              <div className="centered-label">Early Check-in Hours</div>
+              <label>Early Check-in Hours</label>
               <div className="counter-control">
                 <button 
                   className="minus-button" 
@@ -943,7 +1094,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             </div>
             
             <div className="option-group">
-              <div className="centered-label">Late Check-out Hours</div>
+              <label>Late Check-out Hours</label>
               <div className="counter-control">
                 <button 
                   className="minus-button" 
@@ -1056,6 +1207,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                         onClick={() => removeSavedStay(index)}
                       >
                         ×
+                      </button>
+                      
+                      <button 
+                        className="edit-stay-button"
+                        onClick={() => editSavedStay(index)}
+                      >
+                        Edit
                       </button>
                       
                       <div className="saved-stay-header">

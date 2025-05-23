@@ -169,6 +169,17 @@
   letter-spacing: 0.5px;
 }
 
+/* Centered labels for check-in and check-out hours */
+.option-group .centered-label {
+  text-align: center;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 8px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 /* Toggle buttons */
 .toggle-buttons {
   display: flex;
