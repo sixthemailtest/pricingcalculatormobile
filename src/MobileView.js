@@ -577,7 +577,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       </div>
       
       {/* Tab content */}
-      <div className="tab-content">
+      <div className="tab-content" data-tab={activeTab}>
         
         {/* Selected Rooms Component */}
         {selectedRooms.length > 0 && (

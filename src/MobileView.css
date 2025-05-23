@@ -154,6 +154,41 @@
   background-color: #fff;
 }
 
+/* Background colors for tabs */
+.tab-content {
+  background: linear-gradient(to bottom, #e8f4f8, #ffffff);
+}
+
+/* Enhanced styling for option groups */
+.option-group {
+  background-color: rgba(255, 255, 255, 0.7);
+  border-radius: 10px;
+  padding: 15px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.option-group:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+/* Styling for price summary */
+.price-summary {
+  background: linear-gradient(135deg, #3a6186, #89253e);
+  border-radius: 12px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Styling for daily price breakdown */
+.daily-price-breakdown {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 10px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
 /* Option groups */
 .option-group {
   margin-bottom: 20px;
