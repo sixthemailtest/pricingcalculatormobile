@@ -1,7 +1,7 @@
 import React from 'react';
 import './SelectedRooms.css';
 
-function SelectedRooms({ selectedRooms = [] }) {
+function SelectedRooms({ selectedRooms = [], onRemoveRoom }) {
   // Group rooms by their characteristics
   const groupedRooms = {
     nonSmokingRegular: {
@@ -72,8 +72,26 @@ function SelectedRooms({ selectedRooms = [] }) {
     
     const classes = `room-card ${bedTypeClass} ${room.isSmoking ? 'smoking' : ''} ${room.hasJacuzzi ? 'jacuzzi' : ''}`;
     
+    // Determine the icon based on bed type
+    const getBedIcon = () => {
+      if (room.bedType === 'Queen') return '🛏️';
+      if (room.bedType === 'King') return '👑';
+      return '🛏️🛏️';
+    };
+    
     return (
       <div key={room.id} className={classes}>
+        {/* Remove button */}
+        <button 
+          className="remove-room-button"
+          onClick={() => onRemoveRoom && onRemoveRoom(room.id)}
+        >
+          ×
+        </button>
+        
+        {/* Room type icon */}
+        <span className="room-icon">{getBedIcon()}</span>
+        
         <span className="room-number">{room.number}</span>
         <span className="room-type">
           {room.bedType === 'Queen' ? 'Queen' : 

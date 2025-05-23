@@ -270,6 +270,70 @@
   padding: 15px;
   margin-top: 20px;
   color: white;
+  position: relative;
+}
+
+.saved-stay-item {
+  background: linear-gradient(135deg, #2d4373, #4a69bd);
+  border-radius: 10px;
+  padding: 15px;
+  margin-bottom: 15px;
+  color: white;
+  position: relative;
+}
+
+.saved-stay-item .price-summary {
+  margin-top: 15px;
+  background: none !important;
+  padding: 0 !important;
+}
+
+.saved-price-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.saved-price-row.total {
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.saved-price-divider {
+  height: 1px;
+  background-color: rgba(255, 255, 255, 0.2);
+  margin: 5px 0;
+  width: 100%;
+}
+
+.saved-stay-right .price-row {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 250px;
+  margin-bottom: 5px;
+}
+
+.saved-stay-right .price-row span:first-child {
+  text-align: left;
+}
+
+.saved-stay-right .price-row span:last-child {
+  text-align: right;
+  min-width: 80px;
+}
+
+.saved-stay-right .divider {
+  height: 1px;
+  background-color: rgba(255, 255, 255, 0.2);
+  margin: 5px 0;
+  width: 100%;
+  max-width: 250px;
+}
+
+.saved-stay-right .total {
+  font-weight: bold;
+  font-size: 16px;
 }
 
 .price-row {
@@ -303,6 +367,39 @@
 }
 
 /* Date pickers */
+.saved-stay-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.saved-stay-layout {
+  display: flex;
+  justify-content: space-between;
+}
+
+.saved-stay-left {
+  flex: 1;
+}
+
+.saved-stay-left {
+  flex: 1;
+}
+
+.saved-stay-right {
+  flex: 1;
+  text-align: right;
+}
+
+.saved-stay-dates {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 16px;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
 .date-pickers {
   display: flex;
   flex-direction: column;
@@ -855,7 +952,7 @@
 .saved-stays-section {
   margin-top: 20px;
   padding: 15px;
-  background: linear-gradient(135deg, #f0f7ff, #f8f9fa);
+  background-color: #f0f7ff;
   border-radius: 8px;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   border: 1px solid #e6f0fa;
@@ -873,11 +970,12 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px;
-  margin-bottom: 10px;
-  background-color: white;
-  border-radius: 6px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  padding: 15px;
+  margin-bottom: 15px;
+  background: linear-gradient(135deg, #2d4373, #4a69bd);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  color: white;
 }
 
 .saved-stay-details {
@@ -889,42 +987,51 @@
   margin-bottom: 3px;
   display: flex;
   align-items: center;
+  color: white;
 }
 
 .date-separator {
   margin: 0 5px;
-  color: #999;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .saved-stay-info {
   font-size: 12px;
-  color: #666;
+  color: rgba(255, 255, 255, 0.8);
   display: flex;
   gap: 5px;
+  margin-top: 5px;
 }
 
 .saved-stay-price {
   font-weight: 700;
-  color: #0077cc;
+  color: white;
   margin-right: 10px;
+  font-size: 18px;
 }
 
-.remove-stay-button {
+.remove-stay-button, .remove-price-button {
   background-color: #ff3b30;
   color: white;
   border: none;
   border-radius: 50%;
-  width: 24px;
-  height: 24px;
+  width: 16px;
+  height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 10px;
   cursor: pointer;
   transition: all 0.2s ease;
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  z-index: 10;
+  padding: 0;
+  line-height: 1;
 }
 
-.remove-stay-button:hover {
+.remove-stay-button:hover, .remove-price-button:hover {
   background-color: #e02e24;
 }
 
