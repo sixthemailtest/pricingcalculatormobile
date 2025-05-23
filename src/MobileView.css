@@ -64,7 +64,7 @@
 
 .price-label {
   font-size: 12px;
-  color: #6c5ce7;
+  color: #e67e22;
   font-weight: 600;
 }
 
@@ -717,7 +717,7 @@
 
 /* Small clear button */
 .small-clear-button {
-  background-color: transparent;
+  background-color: #e74c3c;
   color: white;
   border: none;
   border-radius: 25px;
@@ -730,18 +730,10 @@
   text-align: center;
 }
 
-.tab:first-child + .small-clear-button {
-  background-color: #6c5ce7;
-}
-
-.tab:last-child + .small-clear-button {
-  background-color: #00b894;
-}
-
 .small-clear-button:hover {
-  background-color: #e02e24;
+  background-color: #c0392b;
   transform: translateY(-1px);
-  box-shadow: 0 3px 7px rgba(255, 59, 48, 0.4);
+  box-shadow: 0 3px 7px rgba(231, 76, 60, 0.4);
 }
 
 /* Top buttons container */

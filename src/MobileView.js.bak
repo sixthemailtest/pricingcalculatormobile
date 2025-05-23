@@ -376,7 +376,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               className="small-clear-button" 
               onClick={clearShortStay}
             >
-              Clear
+              clear
             </button>
           </>
         ) : (
@@ -396,114 +396,136 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       
       {/* Tabs */}
       <div className="tabs">
-        <button 
-          className={`tab ${activeTab === 'short' ? 'active' : ''}`}
-          onClick={() => setActiveTab('short')}
-        >
-          SHORT STAY
-        </button>
-        <button 
-          className={`tab ${activeTab === 'overnight' ? 'active' : ''}`}
-          onClick={() => setActiveTab('overnight')}
-        >
-          MULTIPLE NIGHTS
-        </button>
+        <div className="tab-container">
+          <button 
+            className={`tab ${activeTab === 'short' ? 'active' : ''}`}
+            onClick={() => setActiveTab('short')}
+          >
+            SHORT STAY
+          </button>
+          <button 
+            className="tab-clear-button" 
+            onClick={(e) => {
+              e.stopPropagation();
+              clearShortStay();
+            }}
+          >
+            clear
+          </button>
+        </div>
+        <div className="tab-container">
+          <button 
+            className={`tab ${activeTab === 'overnight' ? 'active' : ''}`}
+            onClick={() => setActiveTab('overnight')}
+          >
+            MULTIPLE NIGHTS
+          </button>
+          <button 
+            className="tab-clear-button" 
+            onClick={(e) => {
+              e.stopPropagation();
+              clearOvernightStay();
+            }}
+          >
+            clear
+          </button>
+        </div>
       </div>
       
       {/* Tab content */}
       <div className="tab-content">
-        
-        {/* Selected Rooms Component */}
-        {selectedRooms.length > 0 && (
-          <SelectedRooms selectedRooms={selectedRooms} />
-        )}
-        
-        {/* Room Selector Modal */}
-        {showRoomSelector && (
-          <div className="room-selector-modal">
-            <div className="room-selector-content">
-              <div className="room-selector-header">
-                <h3>Select Rooms</h3>
-                <button className="close-button" onClick={toggleRoomSelector}>×</button>
-              </div>
-              
-              <div className="floor-tabs">
-                <button 
-                  className={`floor-tab ${activeFloor === 'ground' ? 'active' : ''}`}
-                  onClick={() => setActiveFloor('ground')}
-                >
-                  Ground Floor
-                </button>
-                <button 
-                  className={`floor-tab ${activeFloor === 'first' ? 'active' : ''}`}
-                  onClick={() => setActiveFloor('first')}
-                >
-                  First Floor
-                </button>
-              </div>
-              
-              <div className={`available-rooms-grid ${activeFloor === 'first' ? 'first-floor-active' : ''}`}>
-                {availableRooms
-                  .filter(room => room.floor === 'ground')
-                  .map(room => {
-                    const isSelected = selectedRooms.some(r => r.id === room.id);
-                    const bedTypeClass = room.bedType === 'Queen' ? 'queen' : 
-                                       room.bedType === 'King' ? 'king' : 'queen-2-beds';
+        {/* Wrapper div to ensure there's a parent element for all content */}
+        <div>
+          {/* Selected Rooms Component */}
+          {selectedRooms.length > 0 && (
+            <SelectedRooms selectedRooms={selectedRooms} />
+          )}
+          
+          {/* Room Selector Modal */}
+          {showRoomSelector && (
+            <div className="room-selector-modal">
+              <div className="room-selector-content">
+                <div className="room-selector-header">
+                  <h3>Select Rooms</h3>
+                  <button className="close-button" onClick={toggleRoomSelector}>x</button>
+                </div>
+                
+                <div className="floor-tabs">
+                  <button 
+                    className={`floor-tab ${activeFloor === 'ground' ? 'active' : ''}`}
+                    onClick={() => setActiveFloor('ground')}
+                  >
+                    Ground Floor
+                  </button>
+                  <button 
+                    className={`floor-tab ${activeFloor === 'first' ? 'active' : ''}`}
+                    onClick={() => setActiveFloor('first')}
+                  >
+                    First Floor
+                  </button>
+                </div>
+                
+                <div className={`available-rooms-grid ${activeFloor === 'first' ? 'first-floor-active' : ''}`}>
+                  {availableRooms
+                    .filter(room => room.floor === 'ground')
+                    .map(room => {
+                      const isSelected = selectedRooms.some(r => r.id === room.id);
+                      const bedTypeClass = room.bedType === 'Queen' ? 'queen' : 
+                                        room.bedType === 'King' ? 'king' : 'queen-2-beds';
+                      
+                      const classes = `room-selector-card ${bedTypeClass} ${room.isSmoking ? 'smoking' : ''} ${room.hasJacuzzi ? 'jacuzzi' : ''} ${isSelected ? 'selected' : ''}`;
+                      
+                      return (
+                        <div 
+                          key={room.id} 
+                          className={classes}
+                          onClick={() => handleRoomSelect(room)}
+                        >
+                          <span className="room-number">{room.number}</span>
+                          <span className="room-type">
+                            {room.bedType === 'Queen' ? 'Queen' : 
+                            room.bedType === 'King' ? 'King' : 'Queen 2B'}
+                          </span>
+                          {isSelected && <div className="selected-checkmark">✓</div>}
+                        </div>
+                      );
+                    })}
                     
-                    const classes = `room-selector-card ${bedTypeClass} ${room.isSmoking ? 'smoking' : ''} ${room.hasJacuzzi ? 'jacuzzi' : ''} ${isSelected ? 'selected' : ''}`;
-                    
-                    return (
-                      <div 
-                        key={room.id} 
-                        className={classes}
-                        onClick={() => handleRoomSelect(room)}
-                      >
-                        <span className="room-number">{room.number}</span>
-                        <span className="room-type">
-                          {room.bedType === 'Queen' ? 'Queen' : 
-                           room.bedType === 'King' ? 'King' : 'Queen 2B'}
-                        </span>
-                        {isSelected && <div className="selected-checkmark">✓</div>}
-                      </div>
-                    );
-                  })}
-                  
-                {/* First Floor Rooms - Initially hidden via CSS */}
-                {availableRooms
-                  .filter(room => room.floor === 'first')
-                  .map(room => {
-                    const isSelected = selectedRooms.some(r => r.id === room.id);
-                    const bedTypeClass = room.bedType === 'Queen' ? 'queen' : 
-                                       room.bedType === 'King' ? 'king' : 'queen-2-beds';
-                    
-                    const classes = `room-selector-card first-floor ${bedTypeClass} ${room.isSmoking ? 'smoking' : ''} ${room.hasJacuzzi ? 'jacuzzi' : ''} ${isSelected ? 'selected' : ''}`;
-                    
-                    return (
-                      <div 
-                        key={room.id} 
-                        className={classes}
-                        onClick={() => handleRoomSelect(room)}
-                      >
-                        <span className="room-number">{room.number}</span>
-                        <span className="room-type">
-                          {room.bedType === 'Queen' ? 'Queen' : 
-                           room.bedType === 'King' ? 'King' : 'Queen 2B'}
-                        </span>
-                        {isSelected && <div className="selected-checkmark">✓</div>}
-                      </div>
-                    );
-                  })}
-              </div>
-              <div className="room-selector-footer">
-                <button className="done-button" onClick={toggleRoomSelector}>Done</button>
+                  {/* First Floor Rooms - Initially hidden via CSS */}
+                  {availableRooms
+                    .filter(room => room.floor === 'first')
+                    .map(room => {
+                      const isSelected = selectedRooms.some(r => r.id === room.id);
+                      const bedTypeClass = room.bedType === 'Queen' ? 'queen' : 
+                                        room.bedType === 'King' ? 'king' : 'queen-2-beds';
+                      
+                      const classes = `room-selector-card first-floor ${bedTypeClass} ${room.isSmoking ? 'smoking' : ''} ${room.hasJacuzzi ? 'jacuzzi' : ''} ${isSelected ? 'selected' : ''}`;
+                      
+                      return (
+                        <div 
+                          key={room.id} 
+                          className={classes}
+                          onClick={() => handleRoomSelect(room)}
+                        >
+                          <span className="room-number">{room.number}</span>
+                          <span className="room-type">
+                            {room.bedType === 'Queen' ? 'Queen' : 
+                            room.bedType === 'King' ? 'King' : 'Queen 2B'}
+                          </span>
+                          {isSelected && <div className="selected-checkmark">✓</div>}
+                        </div>
+                      );
+                    })}
+                </div>
+                <div className="room-selector-footer">
+                  <button className="done-button" onClick={toggleRoomSelector}>Done</button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        
-        {activeTab === 'short' ? (
-          <div className="short-stay-section">
+          {activeTab === 'short' ? (
+            <div className="short-stay-section">
             <div className="option-group">
               <label>Room Type</label>
               <div className="toggle-buttons bed-type">
@@ -593,11 +615,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             
             <div className="simple-time-display">
               <div className="time-row">
-                <span className="time-label">Check-in:</span>
+                <span className="time-label">CHECK-IN @</span>
                 <span className="time-value">{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
               </div>
               <div className="time-row">
-                <span className="time-label">Checkout:</span>
+                <span className="time-label">CHECK-OUT @</span>
                 <span className="time-value">{checkoutTime}</span>
               </div>
             </div>
@@ -620,8 +642,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               </div>
             </div>
             
-
-            
             <div className="price-summary">
               <div className="price-row">
                 <span>Base Price:</span>
@@ -629,7 +649,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               </div>
               {extraHours > 0 && (
                 <div className="price-row">
-                  <span>Extra Hours ({extraHours} × ${extraHourRate}):</span>
+                  <span>Extra Hours ({extraHours} x ${extraHourRate}):</span>
                   <span>${extraHours * extraHourRate}</span>
                 </div>
               )}
@@ -640,21 +660,14 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             </div>
           </div>
         ) : (
-          <div className="multi-night-section">
-            <div className="date-pickers">
-              <div className="date-picker-container">
-                <span>Check-in Date</span>
-                <DatePicker
-                  selected={checkInDate}
-                  onChange={handleCheckInChange}
-                  dateFormat="MMMM d, yyyy"
-                  className="date-picker"
-                />
-              </div>
-              <div className="date-picker-container">
-                <span>Check-out Date</span>
-                <DatePicker
-                  selected={checkOutDate}
+          <div className="tab-panel">
+            <div className="tab-actions">
+              <button 
+                className="tab-clear-button" 
+                onClick={clearOvernightStay}
+              >
+                clear
+              </button>
                   onChange={handleCheckOutChange}
                   dateFormat="MMMM d, yyyy"
                   className="date-picker"
@@ -805,8 +818,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                 <span>Total:</span>
                 <span>${overnightPriceInfo.totalPrice?.toFixed(2)}</span>
               </div>
-              
-
             </div>
             
             {/* Saved Stays Section */}
@@ -836,7 +847,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                       className="remove-stay-button"
                       onClick={() => removeSavedStay(index)}
                     >
-                      ×
+                      x
                     </button>
                   </div>
                 ))}
@@ -845,9 +856,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           </div>
         )}
       </div>
-      
-      {/* Floating add button removed */}
     </div>
+      
+    {/* Floating add button removed */}
+  </div>
   );
 }
 
