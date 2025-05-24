@@ -115,19 +115,19 @@
 }
 
 .tab:first-child {
-  background-color: #6c5ce7;
+  background-color: #d2c5a0;
 }
 
 .tab:last-child {
-  background-color: #00b894;
+  background-color: #c5b78f;
 }
 
 .tab.active:first-child {
-  background-color: #6c5ce7;
+  background-color: #bfb082;
 }
 
 .tab.active:last-child {
-  background-color: #00b894;
+  background-color: #b3a578;
 }
 
 .tab span {
@@ -154,39 +154,37 @@
   background-color: #fff;
 }
 
-/* Background colors for tabs */
+/* Simple beige theme for the entire app */
 .tab-content {
-  background: linear-gradient(to bottom, #e8f4f8, #ffffff);
+  background: #f5f5dc; /* Classic beige */
 }
 
-/* Enhanced styling for option groups */
+/* Clean, subtle styling for option groups */
 .option-group {
-  background-color: rgba(255, 255, 255, 0.7);
-  border-radius: 10px;
+  background-color: #fff;
+  border-radius: 8px;
   padding: 15px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s ease;
-}
-
-.option-group:hover {
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  transform: translateY(-2px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 15px;
+  border: 1px solid #e8e0d0;
 }
 
 /* Styling for price summary */
 .price-summary {
-  background: linear-gradient(135deg, #3a6186, #89253e);
-  border-radius: 12px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  background: #e8e0d0; /* Lighter beige for price summary */
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid #d8ceb9;
 }
 
 /* Styling for daily price breakdown */
 .daily-price-breakdown {
-  background-color: rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.5);
+  border-radius: 6px;
   padding: 10px;
   margin-top: 10px;
   margin-bottom: 10px;
+  border: 1px solid #e8e0d0;
 }
 
 /* Option groups */
@@ -227,9 +225,9 @@
 .toggle-buttons button {
   flex: 1;
   padding: 10px;
-  border: none;
-  background-color: #f1f2f6;
-  color: #2f3542;
+  border: 1px solid #e8e0d0;
+  background-color: #fff;
+  color: #5a5a5a;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -238,24 +236,25 @@
 }
 
 .toggle-buttons button.active {
-  background-color: #6c5ce7;
-  color: white;
+  background-color: #d8ceb9;
+  color: #4a4a4a;
   font-weight: 600;
+  border-color: #c5b78f;
 }
 
 .toggle-buttons.bed-type button.active {
-  background-color: #00b894;
-  color: white;
+  background-color: #d8ceb9;
+  color: #4a4a4a;
 }
 
 .toggle-buttons.payment button.active {
-  background-color: #00b894;
-  color: white;
+  background-color: #d8ceb9;
+  color: #4a4a4a;
 }
 
 .toggle-buttons.rate-type button.active {
-  background-color: #00b894;
-  color: white;
+  background-color: #d8ceb9;
+  color: #4a4a4a;
 }
 
 .toggle-buttons.bed-type button {
@@ -275,8 +274,10 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  border: none;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  border: 1px solid #d8ceb9;
+  background-color: #fff;
+  color: #5a5a5a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   font-size: 18px;
   font-weight: 700;
   cursor: pointer;
@@ -354,10 +355,11 @@
   margin-top: 10px;
   padding: 10px;
   border-radius: 8px;
-  color: white;
+  color: #4a4a4a;
   width: 100%;
   box-sizing: border-box;
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: #e8e0d0;
+  border: 1px solid #d8ceb9;
 }
 
 .saved-stay-price-container .price-row {
@@ -368,7 +370,7 @@
 
 .price-row-divider {
   height: 1px;
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: #d8ceb9;
   margin: 5px 0;
   width: 100%;
 }
@@ -985,9 +987,9 @@
 
 /* Small clear button */
 .small-clear-button {
-  background-color: #e74c3c;
-  color: white;
-  border: none;
+  background-color: #d8ceb9;
+  color: #4a4a4a;
+  border: 1px solid #c5b78f;
   border-radius: 25px;
   padding: 8px 15px;
   font-size: 12px;
@@ -999,9 +1001,9 @@
 }
 
 .small-clear-button:hover {
-  background-color: #c0392b;
+  background-color: #c5b78f;
   transform: translateY(-1px);
-  box-shadow: 0 3px 7px rgba(231, 76, 60, 0.4);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* Top buttons container */
@@ -1015,15 +1017,15 @@
 
 .select-rooms-top-button {
   flex: 0.7;
-  background-color: #6c5ce7;
-  color: white;
-  border: none;
+  background-color: #c5b78f;
+  color: #4a4a4a;
+  border: 1px solid #b3a578;
   border-radius: 25px;
   padding: 8px 15px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 2px 5px rgba(108, 92, 231, 0.3);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease;
   white-space: nowrap;
   overflow: hidden;
@@ -1032,15 +1034,15 @@
 
 .add-stay-button {
   flex: 0.7;
-  background-color: #00b894;
-  color: white;
-  border: none;
+  background-color: #b3a578;
+  color: #4a4a4a;
+  border: 1px solid #a39268;
   border-radius: 25px;
   padding: 8px 15px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 2px 5px rgba(0, 184, 148, 0.3);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease;
   white-space: nowrap;
   overflow: hidden;
@@ -1049,7 +1051,8 @@
 
 .select-rooms-top-button:hover, .add-stay-button:hover {
   transform: translateY(-1px);
-  opacity: 0.9;
+  background-color: #d8ceb9;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* Floor tabs */
