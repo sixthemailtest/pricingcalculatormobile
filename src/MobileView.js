@@ -79,8 +79,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Calculate extra hours cost separately
     const extraHoursCost = extraHours * hourlyRate;
     
-    // Calculate tax (always 15% regardless of payment method)
-    const taxAmount = baseRate * 0.15;
+    // Calculate tax (15% only for credit card payments, no tax for cash)
+    const taxAmount = paymentMethod === 'credit' ? baseRate * 0.15 : 0;
     
     // Total is base + tax + extra hours
     const total = baseRate + taxAmount + extraHoursCost;
