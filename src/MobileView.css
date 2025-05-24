@@ -17,7 +17,7 @@
 /* Top bar with date and price */
 .iphone-top-bar {
   background: #2d4373;
-  padding: 15px;
+  padding: 8px 15px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -107,11 +107,12 @@
   padding: 10px;
   text-align: center;
   border: none;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
-  color: white;
+  color: #4a4a4a;
   cursor: pointer;
   transition: all 0.2s ease;
+  font-family: Arial, sans-serif;
 }
 
 .tab:first-child {

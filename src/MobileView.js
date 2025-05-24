@@ -566,13 +566,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           className={`tab ${activeTab === 'short' ? 'active' : ''}`}
           onClick={() => setActiveTab('short')}
         >
-          SHORT STAY
+          Short Stay
         </button>
         <button 
           className={`tab ${activeTab === 'overnight' ? 'active' : ''}`}
           onClick={() => setActiveTab('overnight')}
         >
-          MULTIPLE NIGHTS
+          Multiple Nights
         </button>
       </div>
       
