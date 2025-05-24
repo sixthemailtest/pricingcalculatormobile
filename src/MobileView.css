@@ -17,7 +17,7 @@
 /* Top bar with date and price */
 .iphone-top-bar {
   background: #2d4373;
-  padding: 8px 15px;
+  padding: 5px 15px;
   display: flex;
   justify-content: space-between;
   align-items: center;
