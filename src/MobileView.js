@@ -895,7 +895,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                 {/* Top row with Jacuzzi and Payment Method */}
                 <div className="short-stay-row">
                   <div className="short-stay-option">
-                    <label>Jacuzzi</label>
+                    <label><i className="fas fa-hot-tub" style={{"marginRight": "8px"}}></i>Jacuzzi</label>
                     <div className="toggle-buttons">
                       <button 
                         className={!hasJacuzzi ? 'active' : ''}
@@ -912,7 +912,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                     </div>
                   </div>
                   <div className="short-stay-option">
-                    <label>Payment</label>
+                    <label><i className="fas fa-credit-card" style={{"marginRight": "8px"}}></i>Payment</label>
                     <div className="toggle-buttons">
                       <button 
                         className={paymentMethod === 'cash' ? 'active' : ''}
@@ -1061,7 +1061,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             </div>
             
             <div className="option-group">
-              <label>Jacuzzi</label>
+              <label><i className="fas fa-hot-tub" style={{"marginRight": "8px"}}></i>Jacuzzi</label>
               <div className="toggle-buttons">
                 <button 
                   className={!hasJacuzziOvernight ? 'active' : ''}
@@ -1097,7 +1097,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             </div>
             
             <div className="option-group">
-              <label>Payment Method</label>
+              <label><i className="fas fa-credit-card" style={{"marginRight": "8px"}}></i>Payment Method</label>
               <div className="toggle-buttons">
                 <button 
                   className={overnightPayment === 'cash' ? 'active' : ''}

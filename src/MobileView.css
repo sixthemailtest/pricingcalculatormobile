@@ -856,7 +856,7 @@
 .simple-time-display .time-value {
   font-size: 14px;
   font-weight: 600;
-  color: #2f3542;
+  color: #000080; /* Navy blue color */
   text-align: center;
 }
 
@@ -902,7 +902,7 @@
 .time-value {
   font-size: 14px;
   font-weight: 600;
-  color: #1890ff;
+  color: #000080; /* Navy blue color */
 }
 
 /* Clear button */
