@@ -75,8 +75,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     const timeString = now.toLocaleTimeString('en-US', timeOptions);
     setCurrentTime(timeString);
     
-    // Also update checkout time
-    calculateCheckoutTime(now);
+    // Don't update checkout time here - it will be handled by the extraHours useEffect
   }, []);
   
   // Calculate checkout time based on current time and extra hours
@@ -110,10 +109,15 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     const extraHoursCost = extraHours * hourlyRate;
     
     // Calculate tax (15% only for credit card payments, no tax for cash)
-    const taxAmount = paymentMethod === 'credit' ? baseRate * 0.15 : 0;
+    // Apply tax to both base rate and extra hours for credit card payments
+    let taxAmount = 0;
+    if (paymentMethod === 'credit') {
+      // Apply 15% tax to both base rate and extra hours
+      taxAmount = (baseRate + extraHoursCost) * 0.15;
+    }
     
-    // Total is base + tax + extra hours
-    const total = baseRate + taxAmount + extraHoursCost;
+    // Total is base + extra hours + tax
+    const total = baseRate + extraHoursCost + taxAmount;
     
     setTotalPrice(total);
     setTaxAmount(taxAmount);
@@ -215,10 +219,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       totalBasePrice += 10 * nights;
     }
     
-    // Calculate tax (always 15% regardless of payment method)
-    const taxAmount = totalBasePrice * 0.15;
-    
-    // Calculate extra hours cost
+    // Calculate extra hours cost first
     const hourlyRate = overnightRateType === 'regular' ? 
       shortStayPrices.extraHourRate.regular : 
       shortStayPrices.extraHourRate.discounted;
@@ -226,6 +227,17 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // For early check-in, overnightExtraHours is negative, so we need to use Math.abs
     const extraHoursCheckInCost = Math.abs(overnightExtraHours) * hourlyRate;
     const extraHoursCheckOutCost = overnightCheckoutExtraHours * hourlyRate;
+    const totalExtraHoursCost = extraHoursCheckInCost + extraHoursCheckOutCost;
+    
+    // Calculate tax based on payment method
+    let taxAmount;
+    if (overnightPayment === 'credit') {
+      // Apply 15% tax to both base price and extra hours for credit card
+      taxAmount = (totalBasePrice + totalExtraHoursCost) * 0.15;
+    } else {
+      // For cash payment, only apply tax to base price
+      taxAmount = totalBasePrice * 0.15;
+    }
     
     // Calculate total
     const totalPrice = totalBasePrice + taxAmount + extraHoursCheckInCost + extraHoursCheckOutCost;
@@ -244,19 +256,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     };
   }, [checkInDate, checkOutDate, hasJacuzziOvernight, overnightBedType, overnightExtraHours, overnightCheckoutExtraHours, overnightRateType, overnightPayment, prices, shortStayPrices]);
   
-  // Handle extra hours change for short stay
+  // Handle extra hours change for short stay - simplified like in pricecalculator project
   const handleExtraHoursChange = (change) => {
-    setExtraHours(prevHours => {
-      const newValue = Math.max(0, prevHours + change);
-      // Calculate and update checkout time immediately
-      const now = new Date();
-      const checkoutDate = new Date(now.getTime() + ((4 + newValue) * 60 * 60 * 1000));
-      const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: true };
-      const checkinTime = now.toLocaleTimeString('en-US', timeOptions);
-      const checkoutTimeStr = checkoutDate.toLocaleTimeString('en-US', timeOptions);
-      setCheckoutTime(checkoutTimeStr);
-      return newValue;
-    });
+    const newValue = Math.max(0, extraHours + change);
+    setExtraHours(newValue);
+    // Price calculation will happen in useEffect
   };
   
   // Handle overnight extra hours change
@@ -353,18 +357,40 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   
   // Effect to initialize checkout time and set up timer for current time
   useEffect(() => {
-    // Initial update
+    // Initial update for current time
     updateCurrentDateTime();
+    
+    // Initial update for checkout time (current time + 4 hours)
+    const now = new Date();
+    const checkoutDate = new Date(now.getTime() + ((4 + extraHours) * 60 * 60 * 1000));
+    const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+    const checkoutTimeStr = checkoutDate.toLocaleTimeString('en-US', timeOptions);
+    setCheckoutTime(checkoutTimeStr);
+    
+    // Initial price calculation
     calculateShortStayPrice();
     
-    // Set up timer to update every second
+    // Set up timer to update only the current time every second
     const timer = setInterval(() => {
       updateCurrentDateTime();
     }, 1000);
     
     // Cleanup timer on component unmount
     return () => clearInterval(timer);
-  }, [updateCurrentDateTime, calculateShortStayPrice]);
+  }, [updateCurrentDateTime, calculateShortStayPrice, extraHours]);
+  
+  // Update checkout time and price calculation when extraHours changes
+  useEffect(() => {
+    // Update checkout time based on current time and extra hours
+    const now = new Date();
+    const checkoutDate = new Date(now.getTime() + ((4 + extraHours) * 60 * 60 * 1000));
+    const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+    const checkoutTimeStr = checkoutDate.toLocaleTimeString('en-US', timeOptions);
+    setCheckoutTime(checkoutTimeStr);
+    
+    // Also update price calculation
+    calculateShortStayPrice();
+  }, [extraHours, calculateShortStayPrice]);
   
   // Clear short stay selections
   const clearShortStay = () => {
@@ -863,106 +889,123 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         {/* Short Stay Tab Content */}
         {activeTab === 'short' && (
           <div className="short-stay-section">
-            <div className="option-group">
-              <label>Jacuzzi</label>
-              <div className="toggle-buttons">
-                <button 
-                  className={!hasJacuzzi ? 'active' : ''}
-                  onClick={() => setHasJacuzzi(false)}
-                >
-                  No
-                </button>
-                <button 
-                  className={hasJacuzzi ? 'active' : ''}
-                  onClick={() => setHasJacuzzi(true)}
-                >
-                  Yes
-                </button>
-              </div>
-            </div>
-            
-            <div className="option-group">
-              <label>Payment Method</label>
-              <div className="toggle-buttons">
-                <button 
-                  className={paymentMethod === 'cash' ? 'active' : ''}
-                  onClick={() => setPaymentMethod('cash')}
-                >
-                  Cash
-                </button>
-                <button 
-                  className={paymentMethod === 'credit' ? 'active' : ''}
-                  onClick={() => setPaymentMethod('credit')}
-                >
-                  Credit Card
-                </button>
-              </div>
-            </div>
-            
-            <div className="option-group">
-              <label>Extra Hours</label>
-              <div className="counter-control">
-                <button className="minus-button" onClick={() => handleExtraHoursChange(-1)}>-</button>
-                <span>{extraHours}</span>
-                <button className="plus-button" onClick={() => handleExtraHoursChange(1)}>+</button>
-              </div>
-            </div>
-            
-            <div className="simple-time-display">
-              <div className="time-row">
-                <span className="time-label">Check-in:</span>
-                <span className="time-value">{currentTime}</span>
-              </div>
-              <div className="time-row">
-                <span className="time-label">Check-out:</span>
-                <span className="time-value">{checkoutTime}</span>
-              </div>
-            </div>
-            
-            <div className="option-group">
-              <label>Extra Hour Rate</label>
-              <div className="toggle-buttons">
-                <button 
-                  className={extraHourRate === 15 ? 'active' : ''}
-                  onClick={() => setExtraHourRate(15)}
-                >
-                  Regular ($15)
-                </button>
-                <button 
-                  className={extraHourRate === 10 ? 'active' : ''}
-                  onClick={() => setExtraHourRate(10)}
-                >
-                  Discounted ($10)
-                </button>
-              </div>
-            </div>
-            
+            <div className="short-stay-card-layout">
+              {/* Main options card */}
+              <div className="short-stay-main-card">
+                {/* Top row with Jacuzzi and Payment Method */}
+                <div className="short-stay-row">
+                  <div className="short-stay-option">
+                    <label>Jacuzzi</label>
+                    <div className="toggle-buttons">
+                      <button 
+                        className={!hasJacuzzi ? 'active' : ''}
+                        onClick={() => setHasJacuzzi(false)}
+                      >
+                        No
+                      </button>
+                      <button 
+                        className={hasJacuzzi ? 'active' : ''}
+                        onClick={() => setHasJacuzzi(true)}
+                      >
+                        Yes
+                      </button>
+                    </div>
+                  </div>
+                  <div className="short-stay-option">
+                    <label>Payment</label>
+                    <div className="toggle-buttons">
+                      <button 
+                        className={paymentMethod === 'cash' ? 'active' : ''}
+                        onClick={() => setPaymentMethod('cash')}
+                      >
+                        Cash
+                      </button>
+                      <button 
+                        className={paymentMethod === 'credit' ? 'active' : ''}
+                        onClick={() => setPaymentMethod('credit')}
+                      >
+                        Card
+                      </button>
+                    </div>
+                  </div>
+                </div>
 
-            
-            {showShortStayPriceSummary && (
-              <div className="price-summary">
-                <div className="price-row">
-                  <span>Base Price:</span>
-                  <span>${basePrice.toFixed(2)}</span>
+                {/* Time display */}
+                <div className="short-stay-time-section">
+                  <div className="time-row">
+                    <span className="time-label">Check-in:</span>
+                    <span className="time-value">{currentTime}</span>
+                  </div>
+                  <div className="time-row">
+                    <span className="time-label">Check-out:</span>
+                    <span className="time-value">{checkoutTime}</span>
+                  </div>
                 </div>
-                {taxAmount > 0 && (
-                  <div className="price-row">
-                    <span>Tax (15%):</span>
-                    <span>${taxAmount.toFixed(2)}</span>
+                
+                {/* Bottom row with Extra Hours and Rate */}
+                <div className="short-stay-row">
+                  <div className="short-stay-option">
+                    <label>Extra Hours</label>
+                    <div className="counter-control">
+                      <button className="minus-button" onClick={() => handleExtraHoursChange(-1)}>-</button>
+                      <span>{extraHours}</span>
+                      <button className="plus-button" onClick={() => handleExtraHoursChange(1)}>+</button>
+                    </div>
+                    <div className="extra-hours-display">
+                      <div className="extra-hours-label">
+                        {extraHours > 0 ? `4+${extraHours} extra hours` : '4 hours'}
+                      </div>
+                      <div className="total-hours-display">
+                        Total: {4 + extraHours}hr
+                      </div>
+                    </div>
                   </div>
-                )}
-                {extraHours > 0 && (
-                  <div className="price-row">
-                    <span>Extra Hours ({extraHours} × ${extraHourRate}):</span>
-                    <span>${extraHoursCost.toFixed(2)}</span>
+                  <div className="short-stay-option">
+                    <label>Hour Rate</label>
+                    <div className="toggle-buttons">
+                      <button 
+                        className={extraHourRate === 15 ? 'active' : ''}
+                        onClick={() => setExtraHourRate(15)}
+                      >
+                        $15
+                      </button>
+                      <button 
+                        className={extraHourRate === 10 ? 'active' : ''}
+                        onClick={() => setExtraHourRate(10)}
+                      >
+                        $10
+                      </button>
+                    </div>
                   </div>
-                )}
-                <div className="price-row total">
-                  <span>Total:</span>
-                  <span>${totalPrice.toFixed(2)}</span>
                 </div>
               </div>
-            )}
+              
+              {/* Price summary card - always visible */}
+              <div className="price-summary-card">
+                <div className="price-summary">
+                  <div className="price-row">
+                    <span>Base Price:</span>
+                    <span>${basePrice.toFixed(2)}</span>
+                  </div>
+                  {extraHours > 0 && (
+                    <div className="price-row">
+                      <span>Extra ({extraHours}h):</span>
+                      <span>${(extraHours * extraHourRate).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {taxAmount > 0 && (
+                    <div className="price-row">
+                      <span>Tax (15%):</span>
+                      <span>${taxAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="price-row total">
+                    <span>Total:</span>
+                    <span>${totalPrice.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
         
