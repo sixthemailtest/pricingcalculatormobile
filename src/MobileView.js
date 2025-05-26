@@ -16,6 +16,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   // State for active tab
   const [activeTab, setActiveTab] = useState('short');
   
+  // State for tooltip
+  const [hoveredCard, setHoveredCard] = useState(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  
   // Short stay state
   const [checkoutTime, setCheckoutTime] = useState('');
   const [extraHours, setExtraHours] = useState(0);
@@ -486,6 +490,29 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     }
   };
   
+  // Handle card mouse enter for tooltip
+  const handleCardMouseEnter = (room, e) => {
+    // Calculate prices based on room type
+    const basePrice = room.hasJacuzzi ? dailyPrices.jacuzzi : dailyPrices.regular;
+    const tax = basePrice * 0.15; // 15% tax
+    const total = basePrice + tax;
+    
+    setHoveredCard({ room, basePrice, tax, total });
+    setMousePos({ x: e.clientX, y: e.clientY });
+  };
+  
+  // Handle card mouse leave
+  const handleCardMouseLeave = () => {
+    setHoveredCard(null);
+  };
+  
+  // Handle card mouse move
+  const handleCardMouseMove = (e) => {
+    if (hoveredCard) {
+      setMousePos({ x: e.clientX, y: e.clientY });
+    }
+  };
+  
   // Handle room removal from the SelectedRooms component
   const handleRemoveRoom = (roomId) => {
     setSelectedRooms(selectedRooms.filter(room => room.id !== roomId));
@@ -587,7 +614,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               Clear
             </button>
           </>
-        ) : (
+        ) : activeTab === 'overnight' ? (
           <>
             <button className="add-stay-button" onClick={saveCurrentStay}>
               + Add Stay
@@ -599,6 +626,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               Clear
             </button>
           </>
+        ) : (
+          // No buttons for rooms tab
+          <div></div>
         )}
       </div>
       
@@ -616,17 +646,77 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         >
           Multiple Nights
         </button>
+        <button 
+          className={`tab ${activeTab === 'rooms' ? 'active' : ''}`}
+          onClick={() => setActiveTab('rooms')}
+        >
+          Rooms
+        </button>
       </div>
       
       {/* Tab content */}
       <div className="tab-content" data-tab={activeTab}>
         
-        {/* Selected Rooms Component */}
-        {selectedRooms.length > 0 && (
+        {/* Selected Rooms Component - Only show in short stay tab */}
+        {activeTab === 'short' && selectedRooms.length > 0 && (
           <SelectedRooms 
             selectedRooms={selectedRooms} 
             onRemoveRoom={handleRemoveRoom} 
           />
+        )}
+        
+        {/* Rooms Tab Content */}
+        {activeTab === 'rooms' && (
+          <div className="rooms-tab-content">
+            <div className="floor-tabs">
+              <button 
+                className={`floor-tab ${activeFloor === 'ground' ? 'active' : ''}`}
+                onClick={() => setActiveFloor('ground')}
+              >
+                Ground Floor
+              </button>
+              <button 
+                className={`floor-tab ${activeFloor === 'first' ? 'active' : ''}`}
+                onClick={() => setActiveFloor('first')}
+              >
+                First Floor
+              </button>
+            </div>
+            
+            <div className="all-rooms-container">
+              {availableRooms
+                .filter(room => room.floor === (activeFloor === 'ground' ? 'ground' : 'first'))
+                .map(room => (
+                  <div 
+                    key={room.id}
+                    className="room-card-container"
+                    onMouseEnter={(e) => handleCardMouseEnter(room, e)}
+                    onMouseLeave={handleCardMouseLeave}
+                    onMouseMove={handleCardMouseMove}
+                  >
+                    <div 
+                      className={`room-card ${room.bedType === 'Queen' ? 'queen' : 
+                                 room.bedType === 'King' ? 'king' : 'queen-2-beds'} 
+                                 ${room.isSmoking ? 'smoking' : ''} 
+                                 ${room.hasJacuzzi ? 'jacuzzi' : ''}`}
+                    >
+                      <span className="room-number">{room.number}</span>
+                      <span className="room-type">
+                        {room.bedType === 'Queen' ? 'Queen' : 
+                         room.bedType === 'King' ? 'King' : 'Queen 2 Beds'}
+                      </span>
+                      <div className="room-features">
+                        {room.hasJacuzzi && <span className="feature jacuzzi">Jacuzzi</span>}
+                        <span className="feature smoking-status">
+                          {room.isSmoking ? 'Smoking' : 'Non-Smoking'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              }
+            </div>
+          </div>
         )}
         
         {/* Room Selector Modal */}
@@ -713,7 +803,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         )}
 
         
-        {activeTab === 'short' ? (
+        {/* Short Stay Tab Content */}
+        {activeTab === 'short' && (
           <div className="short-stay-section">
             <div className="option-group">
               <label>Room Type</label>
@@ -858,7 +949,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               </div>
             )}
           </div>
-        ) : (
+        )}
+        
+        {/* Overnight Stay Tab Content */}
+        {activeTab === 'overnight' && (
           <div className="multi-night-section">
             <div className="date-pickers">
               <div className="date-picker-container">
@@ -1170,6 +1264,39 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           </div>
         )}
       </div>
+      
+      {/* Global tooltip that follows the mouse */}
+      {hoveredCard && (
+        <div 
+          className="price-tooltip" 
+          style={{
+            position: 'fixed',
+            top: mousePos.y - 100,
+            left: mousePos.x,
+            transform: 'none',
+            opacity: 1,
+            visibility: 'visible',
+            pointerEvents: 'none',
+            zIndex: 10000,
+            width: '110px',
+            fontSize: '10px'
+          }}
+        >
+          <div className="price-row">
+            <span>Base:</span>
+            <span>${hoveredCard.basePrice.toFixed(2)}</span>
+          </div>
+          <div className="price-row">
+            <span>Tax:</span>
+            <span>${hoveredCard.tax.toFixed(2)}</span>
+          </div>
+          <div className="price-row total">
+            <span>Total:</span>
+            <span>${hoveredCard.total.toFixed(2)}</span>
+          </div>
+          <div className="tooltip-arrow"></div>
+        </div>
+      )}
       
       {/* Floating add button removed */}
     </div>
