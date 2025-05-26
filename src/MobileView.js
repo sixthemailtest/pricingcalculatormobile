@@ -1190,11 +1190,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                       </div>
                       
                       <div className="saved-stay-price-container">
-                        <div className="price-row">
-                          <span>Base Price:</span>
-                          <span>${stay.basePrice.toFixed(2)}</span>
-                        </div>
-                        
                         {/* Daily price breakdown for saved stays */}
                         {!stay.isShortStay && stay.dailyPrices && stay.dailyPrices.length > 0 && (
                           <div className="daily-price-breakdown">

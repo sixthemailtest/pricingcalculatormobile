@@ -431,11 +431,12 @@
   margin-top: 10px;
   padding: 10px;
   border-radius: 8px;
-  color: #4a4a4a;
+  color: white;
   width: 100%;
   box-sizing: border-box;
-  background-color: #e8e0d0;
-  border: 1px solid #d8ceb9;
+  background: linear-gradient(145deg, #2c3e50, #4776E6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 .saved-stay-price-container .price-row {
@@ -446,7 +447,7 @@
 
 .price-row-divider {
   height: 1px;
-  background-color: #d8ceb9;
+  background-color: rgba(255, 255, 255, 0.2);
   margin: 5px 0;
   width: 100%;
 }
