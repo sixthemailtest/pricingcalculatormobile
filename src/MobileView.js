@@ -829,30 +829,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         {activeTab === 'short' && (
           <div className="short-stay-section">
             <div className="option-group">
-              <label>Room Type</label>
-              <div className="toggle-buttons bed-type">
-                <button 
-                  className={bedType === 'Queen' ? 'active' : ''}
-                  onClick={() => setBedType('Queen')}
-                >
-                  Queen
-                </button>
-                <button 
-                  className={bedType === 'King' ? 'active' : ''}
-                  onClick={() => setBedType('King')}
-                >
-                  King
-                </button>
-                <button 
-                  className={bedType === 'Queen2Beds' ? 'active' : ''}
-                  onClick={() => setBedType('Queen2Beds')}
-                >
-                  Queen 2 Beds
-                </button>
-              </div>
-            </div>
-            
-            <div className="option-group">
               <label>Jacuzzi</label>
               <div className="toggle-buttons">
                 <button 
@@ -866,24 +842,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                   onClick={() => setHasJacuzzi(true)}
                 >
                   Yes
-                </button>
-              </div>
-            </div>
-            
-            <div className="option-group">
-              <label>Smoking</label>
-              <div className="toggle-buttons">
-                <button 
-                  className={!isSmoking ? 'active' : ''}
-                  onClick={() => setIsSmoking(false)}
-                >
-                  Non-Smoking
-                </button>
-                <button 
-                  className={isSmoking ? 'active' : ''}
-                  onClick={() => setIsSmoking(true)}
-                >
-                  Smoking
                 </button>
               </div>
             </div>
