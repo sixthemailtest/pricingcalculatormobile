@@ -46,6 +46,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   const [showShortStayPriceSummary, setShowShortStayPriceSummary] = useState(true);
   const [showOvernightPriceSummary, setShowOvernightPriceSummary] = useState(true);
   
+  // Current time state variables
+  const [currentTime, setCurrentTime] = useState('');
+  const [formattedCurrentDate, setFormattedCurrentDate] = useState('');
+  
   // Default check-in date (today at 3 PM)
   const defaultCheckIn = new Date();
   defaultCheckIn.setHours(15, 0, 0, 0);
@@ -58,16 +62,38 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   const [checkInDate, setCheckInDate] = useState(defaultCheckIn);
   const [checkOutDate, setCheckOutDate] = useState(defaultCheckOut);
   
-  // Calculate checkout time based on current time and extra hours
-  const calculateCheckoutTime = useCallback(() => {
+  // Update current date and time
+  const updateCurrentDateTime = useCallback(() => {
     const now = new Date();
-    const checkoutDate = new Date(now.getTime() + ((4 + extraHours) * 60 * 60 * 1000));
-    const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: true };
-    setCheckoutTime(checkoutDate.toLocaleTimeString('en-US', timeOptions));
     
-    // Also format current time
-    const checkinTime = now.toLocaleTimeString('en-US', timeOptions);
-    return { checkinTime, checkoutTime: checkoutDate.toLocaleTimeString('en-US', timeOptions) };
+    // Format date
+    const dateOptions = { year: 'numeric', month: 'long', day: 'numeric' };
+    setFormattedCurrentDate(now.toLocaleDateString('en-US', dateOptions));
+    
+    // Format time with seconds
+    const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+    const timeString = now.toLocaleTimeString('en-US', timeOptions);
+    setCurrentTime(timeString);
+    
+    // Also update checkout time
+    calculateCheckoutTime(now);
+  }, []);
+  
+  // Calculate checkout time based on current time and extra hours
+  const calculateCheckoutTime = useCallback((customNow = null) => {
+    const now = customNow || new Date();
+    
+    // Calculate checkout time (current time + 4 hours + extra hours)
+    const checkoutDate = new Date(now.getTime() + ((4 + extraHours) * 60 * 60 * 1000));
+    
+    // Format checkout time with seconds
+    const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+    const formattedCheckoutTime = checkoutDate.toLocaleTimeString('en-US', timeOptions);
+    
+    // Set state
+    setCheckoutTime(formattedCheckoutTime);
+    
+    return formattedCheckoutTime;
   }, [extraHours]);
   
   // Calculate short stay price
@@ -325,11 +351,20 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     }
   }, [currentDateTime, prices]);
   
-  // Update calculations when dependencies change
+  // Effect to initialize checkout time and set up timer for current time
   useEffect(() => {
-    calculateCheckoutTime();
+    // Initial update
+    updateCurrentDateTime();
     calculateShortStayPrice();
-  }, [calculateCheckoutTime, calculateShortStayPrice]);
+    
+    // Set up timer to update every second
+    const timer = setInterval(() => {
+      updateCurrentDateTime();
+    }, 1000);
+    
+    // Cleanup timer on component unmount
+    return () => clearInterval(timer);
+  }, [updateCurrentDateTime, calculateShortStayPrice]);
   
   // Clear short stay selections
   const clearShortStay = () => {
@@ -876,7 +911,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             <div className="simple-time-display">
               <div className="time-row">
                 <span className="time-label">Check-in:</span>
-                <span className="time-value">{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                <span className="time-value">{currentTime}</span>
               </div>
               <div className="time-row">
                 <span className="time-label">Check-out:</span>
