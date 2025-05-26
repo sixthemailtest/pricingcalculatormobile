@@ -391,41 +391,83 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     if (availableRooms.length === 0) {
       const rooms = [];
       
-      // Generate ground floor room numbers 101-120
-      for (let i = 101; i <= 120; i++) {
-        // Determine room characteristics based on room number
-        const isSmoking = i % 2 === 0;
-        const hasJacuzzi = i > 110;
-        const bedType = i % 3 === 0 ? 'Queen2Beds' : (i % 3 === 1 ? 'Queen' : 'King');
+      // Define room data according to specific room types
+      const roomData = {
+        // Ground floor (100s)
+        101: { bedType: 'Queen', isSmoking: false, hasJacuzzi: false },
+        102: { bedType: 'Queen', isSmoking: true, hasJacuzzi: false },
+        103: { bedType: 'Queen2Beds', isSmoking: false, hasJacuzzi: false },
+        104: { bedType: 'Queen', isSmoking: true, hasJacuzzi: false },
+        105: { bedType: 'Queen2Beds', isSmoking: false, hasJacuzzi: false },
+        106: { bedType: 'Queen', isSmoking: false, hasJacuzzi: false },
+        107: { bedType: 'Queen2Beds', isSmoking: false, hasJacuzzi: false },
+        108: { bedType: 'Queen', isSmoking: false, hasJacuzzi: false },
+        109: { bedType: 'Queen', isSmoking: false, hasJacuzzi: true },
+        110: { bedType: 'Queen', isSmoking: true, hasJacuzzi: true },
+        111: { bedType: 'Queen', isSmoking: false, hasJacuzzi: true },
+        112: { bedType: 'Queen', isSmoking: true, hasJacuzzi: true },
+        114: { bedType: 'Queen', isSmoking: false, hasJacuzzi: false },
+        119: { bedType: 'Queen', isSmoking: true, hasJacuzzi: true },
         
-        rooms.push({
-          id: `room-${i}`,
-          number: i,
-          floor: 'ground',
-          isSmoking,
-          hasJacuzzi,
-          bedType,
-          isAvailable: true
-        });
-      }
+        // First floor (200s)
+        200: { bedType: 'Queen', isSmoking: false, hasJacuzzi: false },
+        201: { bedType: 'Queen2Beds', isSmoking: false, hasJacuzzi: false },
+        202: { bedType: 'Queen', isSmoking: false, hasJacuzzi: false },
+        203: { bedType: 'Queen2Beds', isSmoking: false, hasJacuzzi: false },
+        204: { bedType: 'Queen', isSmoking: true, hasJacuzzi: false },
+        205: { bedType: 'Queen2Beds', isSmoking: false, hasJacuzzi: false },
+        206: { bedType: 'Queen', isSmoking: true, hasJacuzzi: false },
+        207: { bedType: 'Queen2Beds', isSmoking: true, hasJacuzzi: false },
+        208: { bedType: 'King', isSmoking: false, hasJacuzzi: true },
+        209: { bedType: 'Queen', isSmoking: false, hasJacuzzi: false },
+        210: { bedType: 'King', isSmoking: true, hasJacuzzi: true },
+        211: { bedType: 'King', isSmoking: true, hasJacuzzi: false },
+        212: { bedType: 'King', isSmoking: false, hasJacuzzi: false },
+        214: { bedType: 'King', isSmoking: false, hasJacuzzi: true },
+        215: { bedType: 'Queen2Beds', isSmoking: false, hasJacuzzi: false },
+        216: { bedType: 'Queen', isSmoking: false, hasJacuzzi: false },
+        217: { bedType: 'Queen2Beds', isSmoking: false, hasJacuzzi: false },
+        218: { bedType: 'Queen2Beds', isSmoking: false, hasJacuzzi: false },
+        219: { bedType: 'Queen2Beds', isSmoking: true, hasJacuzzi: false },
+        220: { bedType: 'Queen', isSmoking: false, hasJacuzzi: false },
+        221: { bedType: 'King', isSmoking: false, hasJacuzzi: false },
+        222: { bedType: 'King', isSmoking: false, hasJacuzzi: false },
+        223: { bedType: 'King', isSmoking: false, hasJacuzzi: false },
+        224: { bedType: 'Queen', isSmoking: false, hasJacuzzi: false },
+        225: { bedType: 'King', isSmoking: false, hasJacuzzi: false }
+      };
       
-      // Generate first floor room numbers 201-220
-      for (let i = 201; i <= 220; i++) {
-        // Determine room characteristics based on room number
-        const isSmoking = i % 2 === 0;
-        const hasJacuzzi = i > 210;
-        const bedType = i % 3 === 0 ? 'Queen2Beds' : (i % 3 === 1 ? 'Queen' : 'King');
-        
-        rooms.push({
-          id: `room-${i}`,
-          number: i,
-          floor: 'first',
-          isSmoking,
-          hasJacuzzi,
-          bedType,
-          isAvailable: true
-        });
-      }
+      // Add ground floor rooms (100s)
+      Object.keys(roomData).forEach(number => {
+        const roomNumber = parseInt(number);
+        if (roomNumber >= 100 && roomNumber < 200) {
+          rooms.push({
+            id: `room-${roomNumber}`,
+            number: roomNumber,
+            floor: 'ground',
+            isSmoking: roomData[number].isSmoking,
+            hasJacuzzi: roomData[number].hasJacuzzi,
+            bedType: roomData[number].bedType,
+            isAvailable: true
+          });
+        }
+      });
+      
+      // Add first floor rooms (200s)
+      Object.keys(roomData).forEach(number => {
+        const roomNumber = parseInt(number);
+        if (roomNumber >= 200) {
+          rooms.push({
+            id: `room-${roomNumber}`,
+            number: roomNumber,
+            floor: 'first',
+            isSmoking: roomData[number].isSmoking,
+            hasJacuzzi: roomData[number].hasJacuzzi,
+            bedType: roomData[number].bedType,
+            isAvailable: true
+          });
+        }
+      });
       
       setAvailableRooms(rooms);
     }
