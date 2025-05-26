@@ -497,8 +497,19 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     const tax = basePrice * 0.15; // 15% tax
     const total = basePrice + tax;
     
+    // Get the viewport width to adjust tooltip position
+    const viewportWidth = window.innerWidth;
+    const tooltipWidth = 110; // Width of our tooltip
+    const cursorX = e.clientX;
+    
+    // Adjust x position if tooltip would go off screen on the right
+    let adjustedX = cursorX;
+    if (cursorX + tooltipWidth > viewportWidth) {
+      adjustedX = cursorX - tooltipWidth;
+    }
+    
     setHoveredCard({ room, basePrice, tax, total });
-    setMousePos({ x: e.clientX, y: e.clientY });
+    setMousePos({ x: adjustedX, y: e.clientY });
   };
   
   // Handle card mouse leave
@@ -509,7 +520,18 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   // Handle card mouse move
   const handleCardMouseMove = (e) => {
     if (hoveredCard) {
-      setMousePos({ x: e.clientX, y: e.clientY });
+      // Get the viewport width to adjust tooltip position
+      const viewportWidth = window.innerWidth;
+      const tooltipWidth = 110; // Width of our tooltip
+      const cursorX = e.clientX;
+      
+      // Adjust x position if tooltip would go off screen on the right
+      let adjustedX = cursorX;
+      if (cursorX + tooltipWidth > viewportWidth) {
+        adjustedX = cursorX - tooltipWidth;
+      }
+      
+      setMousePos({ x: adjustedX, y: e.clientY });
     }
   };
   
