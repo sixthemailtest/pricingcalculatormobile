@@ -1005,6 +1005,105 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                   </div>
                 </div>
               </div>
+              
+              {/* Pricing Grid Table */}
+              <div className="pricing-grid-container">
+                <table className="pricing-grid-table">
+                  <thead>
+                    <tr>
+                      <th></th>
+                      <th colSpan="2" className="jacuzzi-header">No Jacuzzi</th>
+                      <th colSpan="2" className="jacuzzi-header">Jacuzzi</th>
+                    </tr>
+                    <tr>
+                      <th></th>
+                      <th>Cash</th>
+                      <th>Credit card</th>
+                      <th>Cash</th>
+                      <th>Credit card</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="hours-column">4 hrs</td>
+                      <td>$60</td>
+                      <td>$69</td>
+                      <td>$90</td>
+                      <td>$104</td>
+                    </tr>
+                    <tr>
+                      <td className="hours-column">4+1 (5 hrs)</td>
+                      <td>$75</td>
+                      <td>$87</td>
+                      <td>$105</td>
+                      <td>$121</td>
+                    </tr>
+                    <tr>
+                      <td className="hours-column">4+2 (6 hrs)</td>
+                      <td>$90</td>
+                      <td>$104</td>
+                      <td>$120</td>
+                      <td>$138</td>
+                    </tr>
+                    <tr>
+                      <td className="hours-column">4+3 (7 hrs)</td>
+                      <td>$105</td>
+                      <td>$121</td>
+                      <td>$135</td>
+                      <td>$156</td>
+                    </tr>
+                    <tr>
+                      <td className="hours-column">4+4 (8 hrs)</td>
+                      <td>$120</td>
+                      <td>$138</td>
+                      <td>$150</td>
+                      <td>$173</td>
+                    </tr>
+                    <tr>
+                      <td className="hours-column">4+5 (9 hrs)</td>
+                      <td>$135</td>
+                      <td>$156</td>
+                      <td>$165</td>
+                      <td>$190</td>
+                    </tr>
+                    <tr>
+                      <td className="hours-column">4+6 (10 hrs)</td>
+                      <td>$150</td>
+                      <td>$173</td>
+                      <td>$180</td>
+                      <td>$207</td>
+                    </tr>
+                    <tr>
+                      <td className="hours-column">4+7 (11 hrs)</td>
+                      <td>$165</td>
+                      <td>$190</td>
+                      <td>$195</td>
+                      <td>$225</td>
+                    </tr>
+                    <tr>
+                      <td className="hours-column">4+8 (12 hrs)</td>
+                      <td>$180</td>
+                      <td>$207</td>
+                      <td>$210</td>
+                      <td>$242</td>
+                    </tr>
+                    <tr>
+                      <td className="hours-column">4+9 (13 hrs)</td>
+                      <td>$195</td>
+                      <td>$225</td>
+                      <td>$225</td>
+                      <td>$259</td>
+                    </tr>
+                    <tr>
+                      <td className="hours-column">4+10 (14 hrs)</td>
+                      <td>$210</td>
+                      <td>$242</td>
+                      <td>$240</td>
+                      <td>$276</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
