@@ -9,6 +9,27 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   const [selectedRooms, setSelectedRooms] = useState([]);
   const [showRoomSelector, setShowRoomSelector] = useState(false);
   const [availableRooms, setAvailableRooms] = useState([]);
+  
+  // Load selected rooms from session storage on component mount
+  useEffect(() => {
+    try {
+      const storedRooms = sessionStorage.getItem('selectedRooms');
+      if (storedRooms) {
+        setSelectedRooms(JSON.parse(storedRooms));
+      }
+    } catch (error) {
+      console.error('Error loading rooms from session storage:', error);
+    }
+  }, []);  
+  
+  // Save selected rooms to session storage whenever they change
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('selectedRooms', JSON.stringify(selectedRooms));
+    } catch (error) {
+      console.error('Error saving rooms to session storage:', error);
+    }
+  }, [selectedRooms]);
   const [activeFloor, setActiveFloor] = useState('ground'); // 'ground' or 'first'
   
   // State for saved stays
@@ -406,6 +427,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     setTotalPrice(0);
     calculateCheckoutTime();
     setShowShortStayPriceSummary(false);
+    
+    // Clear selected rooms from session storage
+    try {
+      sessionStorage.removeItem('selectedRooms');
+    } catch (error) {
+      console.error('Error clearing rooms from session storage:', error);
+    }
   };
   
   // Clear overnight stay selections
@@ -429,6 +457,14 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     setOvernightRateType('regular');
     setOvernightBedType('Queen');
     setShowOvernightPriceSummary(false);
+    
+    // Clear selected rooms from session storage
+    try {
+      sessionStorage.removeItem('selectedRooms');
+      setSelectedRooms([]);
+    } catch (error) {
+      console.error('Error clearing rooms from session storage:', error);
+    }
   };
   
   // Calculate overnight price info
