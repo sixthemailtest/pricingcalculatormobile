@@ -650,7 +650,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     let finalTranscript = '';
     let silenceTimer = null;
-    const silenceTimeout = 2500; // 2.5 seconds of silence will end recognition
+    const silenceTimeout = 4000; // 4 seconds of silence will end recognition
+    
+    // Create a flag to track if we've started speaking
+    let hasStartedSpeaking = false;
     
     recognition.onresult = (event) => {
       let interimTranscript = '';
@@ -665,6 +668,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         }
       }
       
+      // Mark that we've started speaking
+      if (interimTranscript !== '') {
+        hasStartedSpeaking = true;
+      }
+      
       // Reset silence timer when user is speaking
       if (interimTranscript !== '') {
         if (silenceTimer) {
@@ -674,6 +682,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         // Set a new silence timer
         silenceTimer = setTimeout(() => {
           // User has been silent for the timeout period, stop listening
+          console.log('Silence detected for', silenceTimeout/1000, 'seconds - stopping recognition');
           recognition.stop();
         }, silenceTimeout);
       }
@@ -716,7 +725,36 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       }, 300);
     };
     
+    // Set a maximum duration for the recognition to prevent it from running indefinitely
+    const maxDurationTimer = setTimeout(() => {
+      if (isListening) {
+        console.log('Maximum recognition duration reached, stopping recognition');
+        recognition.stop();
+      }
+    }, 15000); // 15 seconds maximum
+    
     recognition.start();
+    
+    // Add a special handler for iOS devices
+    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+      console.log('iOS device detected, adding special handling');
+      
+      // iOS sometimes needs an extra nudge to stop recognition
+      document.addEventListener('touchstart', function iosTouchHandler() {
+        if (isListening && hasStartedSpeaking) {
+          // If the user touches the screen after speaking, consider stopping the recognition
+          setTimeout(() => {
+            if (isListening) {
+              console.log('iOS touch detected after speaking, stopping recognition');
+              recognition.stop();
+            }
+          }, 500);
+          
+          // Remove this handler after it's been used once
+          document.removeEventListener('touchstart', iosTouchHandler);
+        }
+      });
+    }
   };
   
   // Process voice search query
@@ -731,6 +769,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     const lowerQuery = query.toLowerCase();
     console.log('Processing voice query:', lowerQuery);
     
+    // Define valid room types in the hotel
+    const validRoomTypes = {
+      'Queen': 'Standard Queen bed',
+      'King': 'King size bed (fits 3 people)',
+      'Queen2Beds': 'Queen room with 2 beds (fits 4 people)'
+    };
+    
     // Initialize results object
     let results = {
       query: query,
@@ -744,7 +789,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       tax: 0,
       total: 0,
       dailyPrices: [], // Add array for daily price breakdown
-      foundMatch: false
+      foundMatch: false,
+      validRoomTypes: validRoomTypes, // Add valid room types for reference
+      invalidRoomType: false, // Flag for invalid room type
+      requestedInvalidType: '' // Store the invalid room type that was requested
     };
     
     // Extract days of the week
@@ -815,13 +863,26 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       }
     }
     
-    // Extract bed type with improved detection logic
+    // Extract bed type with improved detection logic and validation
     console.log('Voice query for bed type detection:', lowerQuery);
     
     // First, set default room type
     let detectedBedType = 'Queen';
+    let invalidRoomTypeRequested = false;
+    let requestedInvalidType = '';
     
-    // Create a more robust detection system
+    // Check for invalid room types first
+    if (lowerQuery.includes('suite') || lowerQuery.includes('penthouse')) {
+      invalidRoomTypeRequested = true;
+      requestedInvalidType = lowerQuery.includes('suite') ? 'Suite' : 'Penthouse';
+      console.log('Invalid room type requested:', requestedInvalidType);
+    } else if (lowerQuery.includes('twin') || lowerQuery.includes('single')) {
+      invalidRoomTypeRequested = true;
+      requestedInvalidType = lowerQuery.includes('twin') ? 'Twin beds' : 'Single bed';
+      console.log('Invalid room type requested:', requestedInvalidType);
+    }
+    
+    // Create a more robust detection system for valid types
     const containsKing = lowerQuery.includes('king');
     const containsQueen = lowerQuery.includes('queen');
     const containsDoubleBed = 
@@ -844,9 +905,12 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       console.log('No specific bed type detected, defaulting to Queen');
     }
     
-    // Set the bed type and log it
+    // Set the bed type and validation flags
     results.bedType = detectedBedType;
+    results.invalidRoomType = invalidRoomTypeRequested;
+    results.requestedInvalidType = requestedInvalidType;
     console.log('Final bed type selected:', results.bedType);
+    console.log('Invalid room type?', results.invalidRoomType);
     
     // Check for jacuzzi
     if (lowerQuery.includes('jacuzzi') || lowerQuery.includes('hot tub') || lowerQuery.includes('spa')) {
@@ -1831,6 +1895,20 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             
             {voiceSearchResults.foundMatch ? (
               <div>
+                {/* Show error message for invalid room types */}
+                {voiceSearchResults.invalidRoomType && (
+                  <div className="room-type-error">
+                    <p><strong>Sorry!</strong> We don't have {voiceSearchResults.requestedInvalidType} rooms available.</p>
+                    <p>Available room types:</p>
+                    <ul>
+                      {Object.entries(voiceSearchResults.validRoomTypes).map(([key, description]) => (
+                        <li key={key}><strong>{key === 'Queen2Beds' ? 'Queen 2 Beds' : key}:</strong> {description}</li>
+                      ))}
+                    </ul>
+                    <p>We've selected a {voiceSearchResults.bedType === 'Queen2Beds' ? 'Queen 2 Beds' : voiceSearchResults.bedType} room for your stay.</p>
+                  </div>
+                )}
+                
                 <div>
                   <strong>Stay Details:</strong>
                   <ul>
