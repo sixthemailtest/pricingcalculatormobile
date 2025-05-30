@@ -637,6 +637,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     setIsListening(true);
     setVoiceSearchQuery('');
+    setShowVoiceSearchResults(false); // Hide any previous results
+    setVoiceSearchResults(null); // Clear previous results
     
     // Initialize speech recognition
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -648,7 +650,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     let finalTranscript = '';
     let silenceTimer = null;
-    const silenceTimeout = 2000; // 2 seconds of silence will end recognition
+    const silenceTimeout = 2500; // 2.5 seconds of silence will end recognition
     
     recognition.onresult = (event) => {
       let interimTranscript = '';
@@ -680,9 +682,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       const currentTranscript = finalTranscript || interimTranscript;
       setVoiceSearchQuery(currentTranscript);
       
-      // Only process final results
+      // Only process final results - don't show modal yet
       if (finalTranscript !== '') {
-        processVoiceSearch(finalTranscript);
+        console.log('Got final transcript:', finalTranscript);
+        // We'll process this in onend to ensure we have the complete utterance
       }
     };
     
@@ -695,14 +698,22 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     };
     
     recognition.onend = () => {
-      // If we have interim results but no final transcript, process what we have
-      if (finalTranscript === '' && voiceSearchQuery !== '') {
-        processVoiceSearch(voiceSearchQuery);
-      }
+      console.log('Speech recognition ended');
       setIsListening(false);
       if (silenceTimer) {
         clearTimeout(silenceTimer);
       }
+      
+      // Wait a moment to ensure we have the complete utterance
+      setTimeout(() => {
+        // Get the final transcript from state
+        const finalQuery = voiceSearchQuery;
+        console.log('Processing final query:', finalQuery);
+        
+        if (finalQuery && finalQuery.trim().length > 3) {
+          processVoiceSearch(finalQuery);
+        }
+      }, 300);
     };
     
     recognition.start();
@@ -710,8 +721,15 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   
   // Process voice search query
   const processVoiceSearch = (query) => {
+    // Don't process empty or very short queries
+    if (!query || query.trim().length < 3) {
+      console.log('Query too short, not processing');
+      return;
+    }
+    
     // Convert query to lowercase for easier matching
     const lowerQuery = query.toLowerCase();
+    console.log('Processing voice query:', lowerQuery);
     
     // Initialize results object
     let results = {
@@ -719,7 +737,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       nights: 1,
       checkInDate: new Date(),
       checkOutDate: new Date(new Date().getTime() + 24 * 60 * 60 * 1000),
-      bedType: 'Queen',
+      bedType: 'Queen', // Default to Queen
       hasJacuzzi: false,
       isSmoking: false,
       price: 0,
@@ -778,14 +796,15 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         let daysBetween = lastDayIndex - firstDayIndex;
         if (daysBetween <= 0) daysBetween += 7; // If it wraps around to the next week
         
-        // Set check-out date
+        // Set check-out date to the day AFTER the last mentioned night
+        // This ensures the last mentioned night is included in the stay
         const checkOutDate = new Date(checkInDate);
-        checkOutDate.setDate(checkInDate.getDate() + daysBetween);
+        checkOutDate.setDate(checkInDate.getDate() + daysBetween + 1); // Add 1 to include the last night
         checkOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
         results.checkOutDate = checkOutDate;
         
-        // Calculate nights
-        results.nights = daysBetween;
+        // Calculate nights - add 1 to include the last night
+        results.nights = daysBetween + 1;
       } else {
         // If only one day mentioned, assume 1 night stay
         const checkOutDate = new Date(checkInDate);
@@ -796,14 +815,38 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       }
     }
     
-    // Extract bed type
-    if (lowerQuery.includes('king')) {
-      results.bedType = 'King';
-    } else if (lowerQuery.includes('queen') && (lowerQuery.includes('double') || lowerQuery.includes('two') || lowerQuery.includes('2') || lowerQuery.includes('beds'))) {
-      results.bedType = 'Queen2Beds';
+    // Extract bed type with improved detection logic
+    console.log('Voice query for bed type detection:', lowerQuery);
+    
+    // First, set default room type
+    let detectedBedType = 'Queen';
+    
+    // Create a more robust detection system
+    const containsKing = lowerQuery.includes('king');
+    const containsQueen = lowerQuery.includes('queen');
+    const containsDoubleBed = 
+      (containsQueen && lowerQuery.includes('double')) || 
+      (containsQueen && lowerQuery.includes('two')) || 
+      (containsQueen && lowerQuery.includes('2')) || 
+      (containsQueen && lowerQuery.includes('beds'));
+    
+    // Apply detection logic with clear priority
+    if (containsDoubleBed) {
+      detectedBedType = 'Queen2Beds';
+      console.log('Detected: Queen 2 Beds');
+    } else if (containsQueen) {
+      detectedBedType = 'Queen';
+      console.log('Detected: Queen');
+    } else if (containsKing) {
+      detectedBedType = 'King';
+      console.log('Detected: King');
     } else {
-      results.bedType = 'Queen';
+      console.log('No specific bed type detected, defaulting to Queen');
     }
+    
+    // Set the bed type and log it
+    results.bedType = detectedBedType;
+    console.log('Final bed type selected:', results.bedType);
     
     // Check for jacuzzi
     if (lowerQuery.includes('jacuzzi') || lowerQuery.includes('hot tub') || lowerQuery.includes('spa')) {
@@ -1794,26 +1837,30 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                     <li>Check-in: {voiceSearchResults.checkInDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</li>
                     <li>Check-out: {voiceSearchResults.checkOutDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</li>
                     <li>Nights: {voiceSearchResults.nights}</li>
-                    <li>Room Type: {voiceSearchResults.bedType === 'Queen' ? 'Queen' : voiceSearchResults.bedType === 'King' ? 'King' : 'Queen 2 Beds'}</li>
-                    <li>{voiceSearchResults.hasJacuzzi ? 'With Jacuzzi' : 'Without Jacuzzi'}</li>
+                    <li>Room Type: {voiceSearchResults.bedType === 'Queen2Beds' ? 'Queen 2 Beds' : voiceSearchResults.bedType}</li>
+                    {/* Only show jacuzzi label if it was mentioned in the search query */}
+                    {voiceSearchResults.query.toLowerCase().includes('jacuzzi') || 
+                     voiceSearchResults.query.toLowerCase().includes('hot tub') || 
+                     voiceSearchResults.query.toLowerCase().includes('spa') ? (
+                      <li>{voiceSearchResults.hasJacuzzi ? 'With Jacuzzi' : 'No Jacuzzi'}</li>
+                    ) : null}
                     <li>{voiceSearchResults.isSmoking ? 'Smoking' : 'Non-Smoking'}</li>
                   </ul>
                 </div>
                 
-                {/* Daily price breakdown */}
-                {voiceSearchResults.dailyPrices && voiceSearchResults.dailyPrices.length > 0 && (
-                  <div className="daily-price-breakdown">
-                    <div className="breakdown-header">Daily Price Breakdown:</div>
-                    {voiceSearchResults.dailyPrices.map((day, index) => (
-                      <div key={index} className="price-row daily-price">
-                        <span>{day.dayOfWeek}, {day.date} ({day.dayType}):</span>
-                        <span>${day.price.toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                
                 <div className="voice-search-price-card">
+                  {/* Daily price breakdown - only show if more than 1 night */}
+                  {voiceSearchResults.dailyPrices && voiceSearchResults.dailyPrices.length > 1 && (
+                    <div className="daily-price-breakdown">
+                      <div className="breakdown-header">Daily Price Breakdown:</div>
+                      {voiceSearchResults.dailyPrices.map((day, index) => (
+                        <div key={index} className="daily-price">
+                          <span>{day.dayOfWeek}, {day.date}</span>
+                          <span>${day.price.toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                     <span>Base Price:</span>
                     <span>${voiceSearchResults.price.toFixed(2)}</span>
