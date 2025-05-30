@@ -589,8 +589,16 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   
   // Handle card mouse enter for tooltip
   const handleCardMouseEnter = (room, e) => {
-    // Calculate prices based on room type
-    const basePrice = room.hasJacuzzi ? dailyPrices.jacuzzi : dailyPrices.regular;
+    // Get base price based on jacuzzi option
+    let basePrice = room.hasJacuzzi ? dailyPrices.jacuzzi : dailyPrices.regular;
+    
+    // Add surcharge based on bed type, matching the logic in Multinights section
+    if (room.bedType === 'King') {
+      basePrice += 5; // $5 extra for King beds
+    } else if (room.bedType === 'Queen2Beds') {
+      basePrice += 10; // $10 extra for Queen 2 beds
+    }
+    
     const tax = basePrice * 0.15; // 15% tax
     const total = basePrice + tax;
     
