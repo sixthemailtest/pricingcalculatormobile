@@ -64,6 +64,27 @@ function SelectedRooms({ selectedRooms = [], onRemoveRoom }) {
       }
     }
   });
+  
+  // Sort each room category by floor (ground floor first, then first floor)
+  // Ground floor rooms have numbers 100-199, first floor rooms have numbers 200+
+  const sortByFloor = (a, b) => {
+    // First sort by floor (ground floor first)
+    const aIsGroundFloor = a.number < 200;
+    const bIsGroundFloor = b.number < 200;
+    
+    if (aIsGroundFloor && !bIsGroundFloor) return -1;
+    if (!aIsGroundFloor && bIsGroundFloor) return 1;
+    
+    // Then sort by room number within the same floor
+    return a.number - b.number;
+  };
+  
+  // Apply sorting to all room categories
+  Object.keys(groupedRooms).forEach(category => {
+    Object.keys(groupedRooms[category]).forEach(bedType => {
+      groupedRooms[category][bedType].sort(sortByFloor);
+    });
+  });
 
   // Helper function to render a room card
   const renderRoomCard = (room) => {
