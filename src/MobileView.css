@@ -250,19 +250,23 @@
   height: 36px;
   padding: 0 15px;
   border-radius: 18px;
-  background: linear-gradient(135deg, #FF5E62, #FF9966); /* Brighter orange-red gradient */
+  background: linear-gradient(135deg, #4776E6, #8E54E9); /* Default blue-purple gradient */
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
   border: none;
-  box-shadow: 0 3px 10px rgba(255, 94, 98, 0.4);
+  box-shadow: 0 3px 10px rgba(71, 118, 230, 0.4);
   z-index: 1000;
   cursor: pointer;
   transition: all 0.2s ease;
   font-weight: bold;
   font-size: 14px;
   margin: 0 10px;
+  -webkit-touch-callout: none; /* Prevent iOS callout on long press */
+  -webkit-user-select: none; /* Prevent text selection on iOS */
+  user-select: none;
+  touch-action: manipulation; /* Improve touch behavior */
 }
 
 .press-to-talk-text {
@@ -271,14 +275,17 @@
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
-.voice-search-button:active {
+/* Active state - when button is being pressed */
+.voice-search-button.active {
   transform: scale(0.95);
-  background: linear-gradient(135deg, #FF4757, #FF7B54);
+  background: linear-gradient(135deg, #FF0844, #FF3C5F); /* Bright red when active */
+  box-shadow: 0 2px 8px rgba(255, 8, 68, 0.5);
+  animation: pulse 1.5s infinite;
 }
 
-.voice-search-button.listening {
-  animation: pulse 1.5s infinite;
-  background: linear-gradient(135deg, #FF0844, #FF3C5F);
+/* Inactive state - default state */
+.voice-search-button.inactive {
+  background: linear-gradient(135deg, #4776E6, #8E54E9); /* Blue-purple when inactive */
 }
 
 @keyframes pulse {
@@ -385,6 +392,26 @@
   margin-bottom: 15px;
   border-radius: 6px;
   color: #2d3748;
+}
+
+/* No speech detected error message styling */
+.no-speech-error {
+  text-align: center;
+  padding: 20px;
+  margin: 15px 0;
+  background-color: rgba(236, 236, 255, 0.9);
+  border-radius: 6px;
+  color: #2d3748;
+}
+
+.no-speech-error i {
+  font-size: 32px;
+  color: #4776E6;
+  margin-bottom: 10px;
+}
+
+.no-speech-error p {
+  margin: 8px 0;
 }
 
 .room-type-error p {

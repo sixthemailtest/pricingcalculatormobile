@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import './MobileView.css';
@@ -12,9 +12,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   
   // Voice search state
   const [isListening, setIsListening] = useState(false);
+  const [isButtonActive, setIsButtonActive] = useState(false);
   const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
   const [showVoiceSearchResults, setShowVoiceSearchResults] = useState(false);
   const [voiceSearchResults, setVoiceSearchResults] = useState(null);
+  
+  // Reference to store the speech recognition instance
+  const recognitionRef = useRef(null);
   
   // Load selected rooms from local storage on component mount
   useEffect(() => {
@@ -628,13 +632,18 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     setHoveredCard(null);
   };
   
-  // Voice search functionality
-  const startVoiceSearch = () => {
+  // Handle voice search button press
+  const handleVoiceButtonPress = (e) => {
+    e.preventDefault(); // Prevent default behavior
+    
+    // Check if speech recognition is supported
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
       alert('Speech recognition is not supported in your browser. Please try Chrome or Edge.');
       return;
     }
     
+    console.log('Voice button pressed');
+    setIsButtonActive(true);
     setIsListening(true);
     setVoiceSearchQuery('');
     setShowVoiceSearchResults(false); // Hide any previous results
@@ -643,118 +652,108 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Initialize speech recognition
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
     
     recognition.lang = 'en-US';
-    recognition.continuous = false;
-    recognition.interimResults = true; // Enable interim results to detect pauses
+    recognition.continuous = true; // Keep listening while button is pressed
+    recognition.interimResults = true; // Get results as user speaks
     
-    let finalTranscript = '';
-    let silenceTimer = null;
-    const silenceTimeout = 4000; // 4 seconds of silence will end recognition
+    let transcript = '';
     
-    // Create a flag to track if we've started speaking
-    let hasStartedSpeaking = false;
+    recognition.onstart = () => {
+      console.log('Speech recognition started');
+    };
     
     recognition.onresult = (event) => {
-      let interimTranscript = '';
-      
-      // Process results
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          finalTranscript += transcript;
-        } else {
-          interimTranscript += transcript;
-        }
+      // Get the latest transcript
+      transcript = '';
+      for (let i = 0; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
       }
       
-      // Mark that we've started speaking
-      if (interimTranscript !== '') {
-        hasStartedSpeaking = true;
-      }
-      
-      // Reset silence timer when user is speaking
-      if (interimTranscript !== '') {
-        if (silenceTimer) {
-          clearTimeout(silenceTimer);
-        }
-        
-        // Set a new silence timer
-        silenceTimer = setTimeout(() => {
-          // User has been silent for the timeout period, stop listening
-          console.log('Silence detected for', silenceTimeout/1000, 'seconds - stopping recognition');
-          recognition.stop();
-        }, silenceTimeout);
-      }
-      
-      // Update the current transcript
-      const currentTranscript = finalTranscript || interimTranscript;
-      setVoiceSearchQuery(currentTranscript);
-      
-      // Only process final results - don't show modal yet
-      if (finalTranscript !== '') {
-        console.log('Got final transcript:', finalTranscript);
-        // We'll process this in onend to ensure we have the complete utterance
-      }
+      // Update the transcript in state
+      setVoiceSearchQuery(transcript);
+      console.log('Current transcript:', transcript);
     };
     
     recognition.onerror = (event) => {
-      console.error('Speech recognition error', event.error);
-      setIsListening(false);
-      if (silenceTimer) {
-        clearTimeout(silenceTimer);
+      console.error('Speech recognition error:', event.error);
+      if (event.error === 'no-speech') {
+        console.log('No speech detected');
       }
     };
     
     recognition.onend = () => {
       console.log('Speech recognition ended');
       setIsListening(false);
-      if (silenceTimer) {
-        clearTimeout(silenceTimer);
-      }
-      
-      // Wait a moment to ensure we have the complete utterance
-      setTimeout(() => {
-        // Get the final transcript from state
-        const finalQuery = voiceSearchQuery;
-        console.log('Processing final query:', finalQuery);
-        
-        if (finalQuery && finalQuery.trim().length > 3) {
-          processVoiceSearch(finalQuery);
-        }
-      }, 300);
+      setIsButtonActive(false);
     };
     
-    // Set a maximum duration for the recognition to prevent it from running indefinitely
-    const maxDurationTimer = setTimeout(() => {
-      if (isListening) {
-        console.log('Maximum recognition duration reached, stopping recognition');
-        recognition.stop();
-      }
-    }, 15000); // 15 seconds maximum
-    
-    recognition.start();
-    
-    // Add a special handler for iOS devices
-    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-      console.log('iOS device detected, adding special handling');
-      
-      // iOS sometimes needs an extra nudge to stop recognition
-      document.addEventListener('touchstart', function iosTouchHandler() {
-        if (isListening && hasStartedSpeaking) {
-          // If the user touches the screen after speaking, consider stopping the recognition
-          setTimeout(() => {
-            if (isListening) {
-              console.log('iOS touch detected after speaking, stopping recognition');
-              recognition.stop();
-            }
-          }, 500);
-          
-          // Remove this handler after it's been used once
-          document.removeEventListener('touchstart', iosTouchHandler);
-        }
-      });
+    // Start recognition
+    try {
+      recognition.start();
+      console.log('Recognition started');
+    } catch (error) {
+      console.error('Error starting recognition:', error);
     }
+    
+    // Add event listeners for touch events on iOS
+    document.addEventListener('touchend', handleVoiceButtonRelease);
+    document.addEventListener('touchcancel', handleVoiceButtonRelease);
+  };
+  
+  // Handle voice search button release
+  const handleVoiceButtonRelease = (e) => {
+    if (e) e.preventDefault(); // Prevent default behavior
+    
+    console.log('Voice button released');
+    setIsButtonActive(false);
+    
+    // Stop the recognition
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+        console.log('Recognition stopped');
+      } catch (error) {
+        console.error('Error stopping recognition:', error);
+      }
+    }
+    
+    // Remove event listeners
+    document.removeEventListener('touchend', handleVoiceButtonRelease);
+    document.removeEventListener('touchcancel', handleVoiceButtonRelease);
+    
+    // Process the final transcript
+    setTimeout(() => {
+      const finalQuery = voiceSearchQuery;
+      console.log('Processing final query:', finalQuery);
+      
+      if (finalQuery && finalQuery.trim().length > 0) {
+        processVoiceSearch(finalQuery);
+      } else {
+        // If no speech was detected, show a helpful message
+        const emptyResults = {
+          query: "No speech detected",
+          foundMatch: false,
+          noSpeechDetected: true
+        };
+        setVoiceSearchResults(emptyResults);
+        setShowVoiceSearchResults(true);
+      }
+    }, 300);
+  };
+  
+  // Handle mouse events for desktop browsers
+  const handleMouseDown = (e) => {
+    e.preventDefault();
+    handleVoiceButtonPress(e);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+  
+  const handleMouseUp = (e) => {
+    e.preventDefault();
+    handleVoiceButtonRelease(e);
+    document.removeEventListener('mouseup', handleMouseUp);
   };
   
   // Process voice search query
@@ -776,6 +775,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       'Queen2Beds': 'Queen room with 2 beds (fits 4 people)'
     };
     
+    // Define valid room combinations
+    const validCombinations = {
+      'Queen-Jacuzzi': true,     // Queen with Jacuzzi exists
+      'King-Jacuzzi': true,      // King with Jacuzzi exists
+      'Queen2Beds-Jacuzzi': false // Queen 2 Beds with Jacuzzi does NOT exist
+    };
+    
     // Initialize results object
     let results = {
       query: query,
@@ -791,8 +797,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       dailyPrices: [], // Add array for daily price breakdown
       foundMatch: false,
       validRoomTypes: validRoomTypes, // Add valid room types for reference
+      validCombinations: validCombinations, // Add valid combinations for reference
       invalidRoomType: false, // Flag for invalid room type
-      requestedInvalidType: '' // Store the invalid room type that was requested
+      requestedInvalidType: '', // Store the invalid room type that was requested
+      invalidCombination: false, // Flag for invalid room combination
+      requestedInvalidCombination: '' // Store the invalid combination that was requested
     };
     
     // Extract days of the week
@@ -885,11 +894,23 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Create a more robust detection system for valid types
     const containsKing = lowerQuery.includes('king');
     const containsQueen = lowerQuery.includes('queen');
+    
+    // Improved detection for double beds - check for double without requiring 'queen'
     const containsDoubleBed = 
-      (containsQueen && lowerQuery.includes('double')) || 
+      lowerQuery.includes('double') || 
+      lowerQuery.includes('two beds') || 
+      lowerQuery.includes('2 beds') || 
       (containsQueen && lowerQuery.includes('two')) || 
       (containsQueen && lowerQuery.includes('2')) || 
       (containsQueen && lowerQuery.includes('beds'));
+    
+    // Add detailed logging for debugging
+    console.log('Detection flags:', {
+      containsKing,
+      containsQueen,
+      containsDoubleBed,
+      query: lowerQuery
+    });
     
     // Apply detection logic with clear priority
     if (containsDoubleBed) {
@@ -905,6 +926,12 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       console.log('No specific bed type detected, defaulting to Queen');
     }
     
+    // Special case for 'double' without specifying bed type
+    if (lowerQuery.includes('double') && !containsQueen && !containsKing) {
+      console.log('Special case: Double without bed type specified');
+      detectedBedType = 'Queen2Beds';
+    }
+    
     // Set the bed type and validation flags
     results.bedType = detectedBedType;
     results.invalidRoomType = invalidRoomTypeRequested;
@@ -915,6 +942,24 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Check for jacuzzi
     if (lowerQuery.includes('jacuzzi') || lowerQuery.includes('hot tub') || lowerQuery.includes('spa')) {
       results.hasJacuzzi = true;
+      
+      // Check for invalid combinations
+      const combinationKey = `${results.bedType}-Jacuzzi`;
+      console.log('Checking combination:', combinationKey);
+      
+      if (validCombinations[combinationKey] === false) {
+        console.log('Invalid combination detected:', combinationKey);
+        results.invalidCombination = true;
+        results.requestedInvalidCombination = `${results.bedType === 'Queen2Beds' ? 'Queen 2 Beds' : results.bedType} with Jacuzzi`;
+        
+        // Suggest an alternative
+        if (results.bedType === 'Queen2Beds') {
+          // If they asked for Queen 2 Beds with Jacuzzi (which doesn't exist),
+          // suggest either Queen with Jacuzzi or King with Jacuzzi
+          results.bedType = 'Queen';
+          results.hasJacuzzi = true;
+        }
+      }
     }
     
     // Check for smoking preference
@@ -1096,11 +1141,15 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         
         {/* Voice Search Button - centered in top bar */}
         <button 
-          className={`voice-search-button ${isListening ? 'listening' : ''}`}
-          onClick={startVoiceSearch}
+          className={`voice-search-button ${isButtonActive ? 'active' : 'inactive'}`}
+          onTouchStart={handleVoiceButtonPress}
+          onMouseDown={handleMouseDown}
+          aria-label="Press and hold to talk"
         >
-          <span className="press-to-talk-text">Press to Talk</span>
-          <i className="fas fa-microphone"></i>
+          <span className="press-to-talk-text">
+            {isButtonActive ? 'Release when done' : 'Press & hold to talk'}
+          </span>
+          <i className={`fas ${isButtonActive ? 'fa-microphone-alt' : 'fa-microphone'}`}></i>
         </button>
         
         <div className="daily-price">
@@ -1893,7 +1942,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           <div className="voice-search-content">
             <div className="voice-search-query">You said: "{voiceSearchResults.query}"</div>
             
-            {voiceSearchResults.foundMatch ? (
+            {voiceSearchResults.noSpeechDetected ? (
+              <div className="no-speech-error">
+                <p><i className="fas fa-microphone-slash"></i></p>
+                <p><strong>No speech detected</strong></p>
+                <p>Please tap "Press to Talk" and speak clearly into your microphone.</p>
+              </div>
+            ) : voiceSearchResults.foundMatch ? (
               <div>
                 {/* Show error message for invalid room types */}
                 {voiceSearchResults.invalidRoomType && (
@@ -1906,6 +1961,27 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                       ))}
                     </ul>
                     <p>We've selected a {voiceSearchResults.bedType === 'Queen2Beds' ? 'Queen 2 Beds' : voiceSearchResults.bedType} room for your stay.</p>
+                  </div>
+                )}
+                
+                {/* Show error message for invalid room combinations */}
+                {voiceSearchResults.invalidCombination && (
+                  <div className="room-type-error">
+                    <p><strong>Sorry!</strong> We don't have {voiceSearchResults.requestedInvalidCombination} rooms available.</p>
+                    <p>Available room combinations with Jacuzzi:</p>
+                    <ul>
+                      {Object.entries(voiceSearchResults.validCombinations)
+                        .filter(([key, isValid]) => isValid && key.includes('Jacuzzi'))
+                        .map(([key]) => {
+                          const roomType = key.split('-')[0];
+                          return (
+                            <li key={key}>
+                              <strong>{roomType === 'Queen2Beds' ? 'Queen 2 Beds' : roomType} with Jacuzzi</strong>
+                            </li>
+                          );
+                        })}
+                    </ul>
+                    <p>We've selected a {voiceSearchResults.bedType === 'Queen2Beds' ? 'Queen 2 Beds' : voiceSearchResults.bedType} room with Jacuzzi for your stay.</p>
                   </div>
                 )}
                 
