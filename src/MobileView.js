@@ -459,7 +459,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       // Define room data according to specific room types
       const roomData = {
         // Ground floor (100s)
-        101: { bedType: 'Queen', isSmoking: false, hasJacuzzi: false },
+        101: { bedType: 'Queen', isSmoking: true, hasJacuzzi: false },
         102: { bedType: 'Queen', isSmoking: true, hasJacuzzi: false },
         103: { bedType: 'Queen2Beds', isSmoking: false, hasJacuzzi: false },
         104: { bedType: 'Queen', isSmoking: true, hasJacuzzi: false },
