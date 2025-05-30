@@ -644,21 +644,65 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     recognition.lang = 'en-US';
     recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.interimResults = true; // Enable interim results to detect pauses
+    
+    let finalTranscript = '';
+    let silenceTimer = null;
+    const silenceTimeout = 2000; // 2 seconds of silence will end recognition
     
     recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      setVoiceSearchQuery(transcript);
-      processVoiceSearch(transcript);
+      let interimTranscript = '';
+      
+      // Process results
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
+        }
+      }
+      
+      // Reset silence timer when user is speaking
+      if (interimTranscript !== '') {
+        if (silenceTimer) {
+          clearTimeout(silenceTimer);
+        }
+        
+        // Set a new silence timer
+        silenceTimer = setTimeout(() => {
+          // User has been silent for the timeout period, stop listening
+          recognition.stop();
+        }, silenceTimeout);
+      }
+      
+      // Update the current transcript
+      const currentTranscript = finalTranscript || interimTranscript;
+      setVoiceSearchQuery(currentTranscript);
+      
+      // Only process final results
+      if (finalTranscript !== '') {
+        processVoiceSearch(finalTranscript);
+      }
     };
     
     recognition.onerror = (event) => {
       console.error('Speech recognition error', event.error);
       setIsListening(false);
+      if (silenceTimer) {
+        clearTimeout(silenceTimer);
+      }
     };
     
     recognition.onend = () => {
+      // If we have interim results but no final transcript, process what we have
+      if (finalTranscript === '' && voiceSearchQuery !== '') {
+        processVoiceSearch(voiceSearchQuery);
+      }
       setIsListening(false);
+      if (silenceTimer) {
+        clearTimeout(silenceTimer);
+      }
     };
     
     recognition.start();
@@ -681,6 +725,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       price: 0,
       tax: 0,
       total: 0,
+      dailyPrices: [], // Add array for daily price breakdown
       foundMatch: false
     };
     
@@ -781,29 +826,46 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     let basePrice = 0;
     const checkInDate = new Date(results.checkInDate);
     
+    // Day names for display
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    
     for (let i = 0; i < results.nights; i++) {
-      const dayOfWeek = checkInDate.getDay(); // 0 = Sunday, 6 = Saturday
+      const currentDate = new Date(checkInDate);
+      currentDate.setDate(checkInDate.getDate() + i);
+      const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 6 = Saturday
       let dayPrice = 0;
+      let dayType = '';
       
       if (dayOfWeek === 5) { // Friday
         dayPrice = roomPrices.friday;
+        dayType = 'Friday';
       } else if (dayOfWeek === 0 || dayOfWeek === 6) { // Sunday or Saturday
         dayPrice = roomPrices.weekend;
+        dayType = 'Weekend';
       } else { // Weekday
         dayPrice = roomPrices.weekday;
+        dayType = 'Weekday';
       }
       
       // Add bed type surcharge
+      let baseDayPrice = dayPrice;
       if (results.bedType === 'King') {
         dayPrice += 5; // $5 extra per night for King
       } else if (results.bedType === 'Queen2Beds') {
         dayPrice += 10; // $10 extra per night for Queen 2 Beds
       }
       
-      basePrice += dayPrice;
+      // Add to daily prices array
+      results.dailyPrices.push({
+        date: currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        dayOfWeek: dayNames[dayOfWeek],
+        dayType: dayType,
+        basePrice: baseDayPrice,
+        bedTypeSurcharge: dayPrice - baseDayPrice,
+        price: dayPrice
+      });
       
-      // Move to next day
-      checkInDate.setDate(checkInDate.getDate() + 1);
+      basePrice += dayPrice;
     }
     
     // Calculate tax (15%)
@@ -918,20 +980,21 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   
   return (
     <div className="iphone-container">
-      {/* Voice Search Button - positioned absolutely */}
-      <button 
-        className={`voice-search-button ${isListening ? 'listening' : ''}`}
-        onClick={startVoiceSearch}
-      >
-        <i className="fas fa-microphone"></i>
-      </button>
-      
       {/* Top bar with date and price */}
       <div className="iphone-top-bar">
         <div className="date-time">
           <span className="day" style={dayStyle}>{currentDay}</span>
           <span className="date">{currentDate}</span>
         </div>
+        
+        {/* Voice Search Button - centered in top bar */}
+        <button 
+          className={`voice-search-button ${isListening ? 'listening' : ''}`}
+          onClick={startVoiceSearch}
+        >
+          <span className="press-to-talk-text">Press to Talk</span>
+          <i className="fas fa-microphone"></i>
+        </button>
         
         <div className="daily-price">
           <span className="price-label">Today's Room Prices</span>
@@ -1736,6 +1799,19 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                     <li>{voiceSearchResults.isSmoking ? 'Smoking' : 'Non-Smoking'}</li>
                   </ul>
                 </div>
+                
+                {/* Daily price breakdown */}
+                {voiceSearchResults.dailyPrices && voiceSearchResults.dailyPrices.length > 0 && (
+                  <div className="daily-price-breakdown">
+                    <div className="breakdown-header">Daily Price Breakdown:</div>
+                    {voiceSearchResults.dailyPrices.map((day, index) => (
+                      <div key={index} className="price-row daily-price">
+                        <span>{day.dayOfWeek}, {day.date} ({day.dayType}):</span>
+                        <span>${day.price.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 
                 <div className="voice-search-price-card">
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>

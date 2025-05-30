@@ -245,43 +245,51 @@
 
 /* Voice Search Button */
 .voice-search-button {
-  position: absolute;
-  top: 10px;
-  right: 15px;
-  width: 36px;
+  position: relative;
+  width: auto;
   height: 36px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #4776E6, #8E54E9);
+  padding: 0 15px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #FF5E62, #FF9966); /* Brighter orange-red gradient */
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
   border: none;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 3px 10px rgba(255, 94, 98, 0.4);
   z-index: 1000;
   cursor: pointer;
   transition: all 0.2s ease;
+  font-weight: bold;
+  font-size: 14px;
+  margin: 0 10px;
+}
+
+.press-to-talk-text {
+  margin-right: 8px;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .voice-search-button:active {
   transform: scale(0.95);
-  background: linear-gradient(135deg, #3b5fc8, #7a47c8);
+  background: linear-gradient(135deg, #FF4757, #FF7B54);
 }
 
 .voice-search-button.listening {
   animation: pulse 1.5s infinite;
-  background: linear-gradient(135deg, #e74c3c, #c0392b);
+  background: linear-gradient(135deg, #FF0844, #FF3C5F);
 }
 
 @keyframes pulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.4);
+    box-shadow: 0 0 0 0 rgba(255, 8, 68, 0.6);
   }
   70% {
-    box-shadow: 0 0 0 10px rgba(231, 76, 60, 0);
+    box-shadow: 0 0 0 10px rgba(255, 8, 68, 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(231, 76, 60, 0);
+    box-shadow: 0 0 0 0 rgba(255, 8, 68, 0);
   }
 }
 
