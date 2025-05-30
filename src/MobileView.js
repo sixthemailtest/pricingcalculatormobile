@@ -10,24 +10,24 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   const [showRoomSelector, setShowRoomSelector] = useState(false);
   const [availableRooms, setAvailableRooms] = useState([]);
   
-  // Load selected rooms from session storage on component mount
+  // Load selected rooms from local storage on component mount
   useEffect(() => {
     try {
-      const storedRooms = sessionStorage.getItem('selectedRooms');
+      const storedRooms = localStorage.getItem('selectedRooms');
       if (storedRooms) {
         setSelectedRooms(JSON.parse(storedRooms));
       }
     } catch (error) {
-      console.error('Error loading rooms from session storage:', error);
+      console.error('Error loading rooms from local storage:', error);
     }
   }, []);  
   
-  // Save selected rooms to session storage whenever they change
+  // Save selected rooms to local storage whenever they change
   useEffect(() => {
     try {
-      sessionStorage.setItem('selectedRooms', JSON.stringify(selectedRooms));
+      localStorage.setItem('selectedRooms', JSON.stringify(selectedRooms));
     } catch (error) {
-      console.error('Error saving rooms to session storage:', error);
+      console.error('Error saving rooms to local storage:', error);
     }
   }, [selectedRooms]);
   const [activeFloor, setActiveFloor] = useState('ground'); // 'ground' or 'first'
@@ -428,11 +428,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     calculateCheckoutTime();
     setShowShortStayPriceSummary(false);
     
-    // Clear selected rooms from session storage
+    // Clear selected rooms from local storage
     try {
-      sessionStorage.removeItem('selectedRooms');
+      localStorage.removeItem('selectedRooms');
     } catch (error) {
-      console.error('Error clearing rooms from session storage:', error);
+      console.error('Error clearing rooms from local storage:', error);
     }
   };
   
@@ -458,12 +458,12 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     setOvernightBedType('Queen');
     setShowOvernightPriceSummary(false);
     
-    // Clear selected rooms from session storage
+    // Clear selected rooms from local storage
     try {
-      sessionStorage.removeItem('selectedRooms');
+      localStorage.removeItem('selectedRooms');
       setSelectedRooms([]);
     } catch (error) {
-      console.error('Error clearing rooms from session storage:', error);
+      console.error('Error clearing rooms from local storage:', error);
     }
   };
   
