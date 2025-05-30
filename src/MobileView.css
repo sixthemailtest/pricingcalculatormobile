@@ -231,6 +231,18 @@
   font-size: 8px;
 }
 
+.multiple-label {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  font-size: 7px;
+  background-color: #805ad5;
+  color: white;
+  padding: 1px 3px;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
 .feature.smoking-status:has(.smoking) {
   background-color: rgba(231, 76, 60, 0.2);
   color: #c0392b;

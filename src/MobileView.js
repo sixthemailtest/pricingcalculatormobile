@@ -896,6 +896,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                           {room.bedType === 'Queen' ? 'Queen' : 
                            room.bedType === 'King' ? 'King' : 'Queen 2B'}
                         </span>
+                        {room.hasJacuzzi && <div className="multiple-label">Multiple</div>}
                         {isSelected && <div className="selected-checkmark">✓</div>}
                       </div>
                     );
@@ -922,6 +923,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                           {room.bedType === 'Queen' ? 'Queen' : 
                            room.bedType === 'King' ? 'King' : 'Queen 2B'}
                         </span>
+                        {room.hasJacuzzi && <div className="multiple-label">Multiple</div>}
                         {isSelected && <div className="selected-checkmark">✓</div>}
                       </div>
                     );

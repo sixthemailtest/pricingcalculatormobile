@@ -97,6 +97,7 @@ function SelectedRooms({ selectedRooms = [], onRemoveRoom }) {
           {room.bedType === 'Queen' ? 'Queen' : 
            room.bedType === 'King' ? 'King' : 'Queen 2 Beds'}
         </span>
+        {room.hasJacuzzi && <div className="multiple-label">Multiple</div>}
       </div>
     );
   };
