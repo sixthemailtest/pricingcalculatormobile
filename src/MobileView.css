@@ -221,8 +221,14 @@
 }
 
 .feature.smoking-status {
-  background-color: rgba(46, 204, 113, 0.2);
-  color: #27ae60;
+  background-color: #fff7ed;
+  color: #c05621;
+}
+
+.feature.capacity {
+  background-color: #ebf8ff;
+  color: #2b6cb0;
+  font-size: 8px;
 }
 
 .feature.smoking-status:has(.smoking) {
@@ -1210,6 +1216,21 @@
 .selected-room-type {
   font-size: 10px;
   color: #4a5568;
+  margin-top: 2px;
+}
+
+.room-capacity {
+  font-size: 9px;
+  color: #718096;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.people-icon {
+  font-size: 8px;
+  margin-right: 2px;
 }
 
 /* Small clear button */

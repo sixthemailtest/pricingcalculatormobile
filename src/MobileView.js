@@ -837,6 +837,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                         <span className="feature smoking-status">
                           {room.isSmoking ? 'Smoking' : 'Non-Smoking'}
                         </span>
+                        <span className="feature capacity">
+                          {room.bedType === 'Queen' && '👤👤'}
+                          {room.bedType === 'King' && '👤👤👤'}
+                          {room.bedType === 'Queen2Beds' && '👤👤👤👤'}
+                        </span>
                       </div>
                     </div>
                   </div>
