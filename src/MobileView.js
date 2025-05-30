@@ -10,6 +10,12 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   const [showRoomSelector, setShowRoomSelector] = useState(false);
   const [availableRooms, setAvailableRooms] = useState([]);
   
+  // Voice search state
+  const [isListening, setIsListening] = useState(false);
+  const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
+  const [showVoiceSearchResults, setShowVoiceSearchResults] = useState(false);
+  const [voiceSearchResults, setVoiceSearchResults] = useState(null);
+  
   // Load selected rooms from local storage on component mount
   useEffect(() => {
     try {
@@ -622,6 +628,203 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     setHoveredCard(null);
   };
   
+  // Voice search functionality
+  const startVoiceSearch = () => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('Speech recognition is not supported in your browser. Please try Chrome or Edge.');
+      return;
+    }
+    
+    setIsListening(true);
+    setVoiceSearchQuery('');
+    
+    // Initialize speech recognition
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    
+    recognition.lang = 'en-US';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setVoiceSearchQuery(transcript);
+      processVoiceSearch(transcript);
+    };
+    
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error', event.error);
+      setIsListening(false);
+    };
+    
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+    
+    recognition.start();
+  };
+  
+  // Process voice search query
+  const processVoiceSearch = (query) => {
+    // Convert query to lowercase for easier matching
+    const lowerQuery = query.toLowerCase();
+    
+    // Initialize results object
+    let results = {
+      query: query,
+      nights: 1,
+      checkInDate: new Date(),
+      checkOutDate: new Date(new Date().getTime() + 24 * 60 * 60 * 1000),
+      bedType: 'Queen',
+      hasJacuzzi: false,
+      isSmoking: false,
+      price: 0,
+      tax: 0,
+      total: 0,
+      foundMatch: false
+    };
+    
+    // Extract days of the week
+    const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const mentionedDays = [];
+    
+    daysOfWeek.forEach(day => {
+      if (lowerQuery.includes(day)) {
+        mentionedDays.push(day);
+      }
+    });
+    
+    // Set check-in and check-out dates based on mentioned days
+    if (mentionedDays.length > 0) {
+      const today = new Date();
+      const currentDayIndex = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      
+      // Map day names to day indices
+      const dayIndices = {
+        'sunday': 0,
+        'monday': 1,
+        'tuesday': 2,
+        'wednesday': 3,
+        'thursday': 4,
+        'friday': 5,
+        'saturday': 6
+      };
+      
+      // Find the first mentioned day
+      const firstDay = mentionedDays[0];
+      const firstDayIndex = dayIndices[firstDay];
+      
+      // Calculate days until the first mentioned day
+      let daysUntilFirstDay = firstDayIndex - currentDayIndex;
+      if (daysUntilFirstDay <= 0) daysUntilFirstDay += 7; // If it's in the past, go to next week
+      
+      // Set check-in date
+      const checkInDate = new Date(today);
+      checkInDate.setDate(today.getDate() + daysUntilFirstDay);
+      checkInDate.setHours(15, 0, 0, 0); // 3 PM check-in
+      results.checkInDate = checkInDate;
+      
+      // If multiple days mentioned, set check-out date based on the last day
+      if (mentionedDays.length > 1) {
+        const lastDay = mentionedDays[mentionedDays.length - 1];
+        const lastDayIndex = dayIndices[lastDay];
+        
+        // Calculate days between first and last day
+        let daysBetween = lastDayIndex - firstDayIndex;
+        if (daysBetween <= 0) daysBetween += 7; // If it wraps around to the next week
+        
+        // Set check-out date
+        const checkOutDate = new Date(checkInDate);
+        checkOutDate.setDate(checkInDate.getDate() + daysBetween);
+        checkOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
+        results.checkOutDate = checkOutDate;
+        
+        // Calculate nights
+        results.nights = daysBetween;
+      } else {
+        // If only one day mentioned, assume 1 night stay
+        const checkOutDate = new Date(checkInDate);
+        checkOutDate.setDate(checkInDate.getDate() + 1);
+        checkOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
+        results.checkOutDate = checkOutDate;
+        results.nights = 1;
+      }
+    }
+    
+    // Extract bed type
+    if (lowerQuery.includes('king')) {
+      results.bedType = 'King';
+    } else if (lowerQuery.includes('queen') && (lowerQuery.includes('double') || lowerQuery.includes('two') || lowerQuery.includes('2') || lowerQuery.includes('beds'))) {
+      results.bedType = 'Queen2Beds';
+    } else {
+      results.bedType = 'Queen';
+    }
+    
+    // Check for jacuzzi
+    if (lowerQuery.includes('jacuzzi') || lowerQuery.includes('hot tub') || lowerQuery.includes('spa')) {
+      results.hasJacuzzi = true;
+    }
+    
+    // Check for smoking preference
+    if (lowerQuery.includes('smoking')) {
+      results.isSmoking = true;
+    } else if (lowerQuery.includes('non-smoking') || lowerQuery.includes('non smoking')) {
+      results.isSmoking = false;
+    }
+    
+    // Calculate price based on extracted information
+    const roomPrices = results.hasJacuzzi ? 
+      { weekday: prices.weekday.withJacuzzi, friday: prices.friday.withJacuzzi, weekend: prices.weekend.withJacuzzi } :
+      { weekday: prices.weekday.withoutJacuzzi, friday: prices.friday.withoutJacuzzi, weekend: prices.weekend.withoutJacuzzi };
+    
+    // Calculate base price
+    let basePrice = 0;
+    const checkInDate = new Date(results.checkInDate);
+    
+    for (let i = 0; i < results.nights; i++) {
+      const dayOfWeek = checkInDate.getDay(); // 0 = Sunday, 6 = Saturday
+      let dayPrice = 0;
+      
+      if (dayOfWeek === 5) { // Friday
+        dayPrice = roomPrices.friday;
+      } else if (dayOfWeek === 0 || dayOfWeek === 6) { // Sunday or Saturday
+        dayPrice = roomPrices.weekend;
+      } else { // Weekday
+        dayPrice = roomPrices.weekday;
+      }
+      
+      // Add bed type surcharge
+      if (results.bedType === 'King') {
+        dayPrice += 5; // $5 extra per night for King
+      } else if (results.bedType === 'Queen2Beds') {
+        dayPrice += 10; // $10 extra per night for Queen 2 Beds
+      }
+      
+      basePrice += dayPrice;
+      
+      // Move to next day
+      checkInDate.setDate(checkInDate.getDate() + 1);
+    }
+    
+    // Calculate tax (15%)
+    const tax = basePrice * 0.15;
+    
+    // Set price information
+    results.price = basePrice;
+    results.tax = tax;
+    results.total = basePrice + tax;
+    results.foundMatch = true;
+    
+    // Show results
+    setVoiceSearchResults(results);
+    setShowVoiceSearchResults(true);
+  };
+  
+  // Close voice search results
+  const closeVoiceSearchResults = () => {
+    setShowVoiceSearchResults(false);
+  };
+  
   // Handle card mouse move
   const handleCardMouseMove = (e) => {
     if (hoveredCard) {
@@ -715,12 +918,21 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   
   return (
     <div className="iphone-container">
+      {/* Voice Search Button - positioned absolutely */}
+      <button 
+        className={`voice-search-button ${isListening ? 'listening' : ''}`}
+        onClick={startVoiceSearch}
+      >
+        <i className="fas fa-microphone"></i>
+      </button>
+      
       {/* Top bar with date and price */}
       <div className="iphone-top-bar">
         <div className="date-time">
           <span className="day" style={dayStyle}>{currentDay}</span>
           <span className="date">{currentDate}</span>
         </div>
+        
         <div className="daily-price">
           <span className="price-label">Today's Room Prices</span>
           <div className="price-value">${dailyPrices.regular} - ${dailyPrices.jacuzzi}</div>
@@ -1498,6 +1710,55 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             <span>${hoveredCard.total.toFixed(2)}</span>
           </div>
           <div className="tooltip-arrow"></div>
+        </div>
+      )}
+      
+      {/* Voice Search Results Popup */}
+      {showVoiceSearchResults && voiceSearchResults && (
+        <div className="voice-search-results">
+          <div className="voice-search-header">
+            <h3>Voice Search Results</h3>
+            <button onClick={closeVoiceSearchResults}>×</button>
+          </div>
+          <div className="voice-search-content">
+            <div className="voice-search-query">You said: "{voiceSearchResults.query}"</div>
+            
+            {voiceSearchResults.foundMatch ? (
+              <div>
+                <div>
+                  <strong>Stay Details:</strong>
+                  <ul>
+                    <li>Check-in: {voiceSearchResults.checkInDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</li>
+                    <li>Check-out: {voiceSearchResults.checkOutDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</li>
+                    <li>Nights: {voiceSearchResults.nights}</li>
+                    <li>Room Type: {voiceSearchResults.bedType === 'Queen' ? 'Queen' : voiceSearchResults.bedType === 'King' ? 'King' : 'Queen 2 Beds'}</li>
+                    <li>{voiceSearchResults.hasJacuzzi ? 'With Jacuzzi' : 'Without Jacuzzi'}</li>
+                    <li>{voiceSearchResults.isSmoking ? 'Smoking' : 'Non-Smoking'}</li>
+                  </ul>
+                </div>
+                
+                <div className="voice-search-price-card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span>Base Price:</span>
+                    <span>${voiceSearchResults.price.toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span>Tax (15%):</span>
+                    <span>${voiceSearchResults.tax.toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.1em', marginTop: '5px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
+                    <span>Total:</span>
+                    <span>${voiceSearchResults.total.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div>Sorry, I couldn't understand your request. Please try again.</div>
+            )}
+          </div>
+          <div className="voice-search-footer">
+            <button className="voice-search-close-button" onClick={closeVoiceSearchResults}>Close</button>
+          </div>
         </div>
       )}
       
