@@ -1543,7 +1543,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     console.log('Processed mentioned days:', mentionedDays);
     
-    // Check for specific date mentions (e.g., "26th June")
+    // Check for specific date mentions (e.g., "26th June", "June 15 and June 16th")
     let specificDateDetected = false;
     const datePatterns = [
       // Format: "26th June", "26 June", "June 26th", "June 26"
@@ -1551,55 +1551,132 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       /\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i
     ];
     
-    let specificDay, specificMonth, specificYear;
+    // Array to store multiple detected dates
+    const detectedDates = [];
     
-    // Try each date pattern
-    for (const pattern of datePatterns) {
-      const match = lowerQuery.match(pattern);
-      if (match) {
-        if (match[1] && isNaN(parseInt(match[1]))) {
-          // Month is first (e.g., "June 26th")
-          specificMonth = months[match[1].toLowerCase()];
-          specificDay = parseInt(match[2]);
-        } else {
-          // Day is first (e.g., "26th June")
-          specificDay = parseInt(match[1]);
-          specificMonth = months[match[2].toLowerCase()];
+    // Function to extract a date from text using the patterns
+    const extractDate = (text) => {
+      for (const pattern of datePatterns) {
+        const match = text.match(pattern);
+        if (match) {
+          let day, month;
+          
+          if (match[1] && isNaN(parseInt(match[1]))) {
+            // Month is first (e.g., "June 26th")
+            month = months[match[1].toLowerCase()];
+            day = parseInt(match[2]);
+          } else {
+            // Day is first (e.g., "26th June")
+            day = parseInt(match[1]);
+            month = months[match[2].toLowerCase()];
+          }
+          
+          // Validate day of month
+          if (day >= 1 && day <= 31) {
+            return { day, month };
+          }
         }
-        
-        // Validate day of month
-        if (specificDay >= 1 && specificDay <= 31) {
-          specificDateDetected = true;
-          dateDetected = true;
-          break;
+      }
+      return null;
+    };
+    
+    // Check if we have multiple dates with "and" between them
+    if (lowerQuery.includes(' and ')) {
+      console.log('Detected potential multiple dates with "and"');
+      
+      // Split the query by "and" to check for multiple dates
+      const parts = lowerQuery.split(' and ');
+      
+      for (const part of parts) {
+        const dateInfo = extractDate(part);
+        if (dateInfo) {
+          detectedDates.push(dateInfo);
         }
+      }
+      
+      // If we found multiple dates, set the flag
+      if (detectedDates.length > 1) {
+        specificDateDetected = true;
+        dateDetected = true;
+        console.log(`Detected ${detectedDates.length} specific dates: `, detectedDates);
       }
     }
     
-    // If specific date detected, set check-in and check-out dates
-    if (specificDateDetected) {
+    // If we didn't find multiple dates, try to find a single date
+    if (!specificDateDetected) {
+      const dateInfo = extractDate(lowerQuery);
+      if (dateInfo) {
+        detectedDates.push(dateInfo);
+        specificDateDetected = true;
+        dateDetected = true;
+      }
+    }
+    
+    // If specific date(s) detected, set check-in and check-out dates
+    if (specificDateDetected && detectedDates.length > 0) {
       // Default to current year
-      specificYear = voiceToday.getFullYear();
+      const currentYear = voiceToday.getFullYear();
       
-      // If the month is earlier than current month, assume next year
-      if (specificMonth < voiceToday.getMonth()) {
-        specificYear++;
+      // Sort dates chronologically
+      const datesWithYear = detectedDates.map(dateInfo => {
+        let year = currentYear;
+        
+        // If the month is earlier than current month, assume next year
+        if (dateInfo.month < voiceToday.getMonth()) {
+          year++;
+        }
+        // If same month but day has passed, assume next year
+        else if (dateInfo.month === voiceToday.getMonth() && dateInfo.day < voiceToday.getDate()) {
+          year++;
+        }
+        
+        return {
+          ...dateInfo,
+          year,
+          date: new Date(year, dateInfo.month, dateInfo.day)
+        };
+      });
+      
+      // Sort by date
+      datesWithYear.sort((a, b) => a.date - b.date);
+      
+      console.log('Sorted dates with year:', datesWithYear.map(d => d.date.toDateString()));
+      
+      // Handle multiple dates (e.g., "June 15 and June 16")
+      if (datesWithYear.length > 1) {
+        // First date is check-in
+        const firstDate = datesWithYear[0];
+        // Last date is the last night of stay
+        const lastDate = datesWithYear[datesWithYear.length - 1];
+        
+        // Set check-in date to the first specific date at 3 PM
+        voiceCheckInDate = new Date(firstDate.year, firstDate.month, firstDate.day, 15, 0, 0, 0);
+        
+        // Set check-out date to the day after the last specific date at 11 AM
+        voiceCheckOutDate = new Date(lastDate.year, lastDate.month, lastDate.day);
+        voiceCheckOutDate.setDate(voiceCheckOutDate.getDate() + 1);
+        voiceCheckOutDate.setHours(11, 0, 0, 0);
+        
+        // Calculate nights based on the number of dates mentioned
+        voiceNights = datesWithYear.length;
+        
+        console.log(`Multiple specific dates detected: Check-in ${voiceCheckInDate.toDateString()}, Check-out ${voiceCheckOutDate.toDateString()}, Nights: ${voiceNights}`);
+      } 
+      // Handle single date
+      else {
+        const dateInfo = datesWithYear[0];
+        
+        // Set check-in date to the specific date at 3 PM
+        voiceCheckInDate = new Date(dateInfo.year, dateInfo.month, dateInfo.day, 15, 0, 0, 0);
+        
+        // Set check-out date to the next day at 11 AM
+        voiceCheckOutDate = new Date(voiceCheckInDate);
+        voiceCheckOutDate.setDate(voiceCheckInDate.getDate() + 1);
+        voiceCheckOutDate.setHours(11, 0, 0, 0);
+        
+        voiceNights = 1;
+        console.log(`Single specific date detected: ${voiceCheckInDate.toDateString()}`);
       }
-      // If same month but day has passed, assume next year
-      else if (specificMonth === voiceToday.getMonth() && specificDay < voiceToday.getDate()) {
-        specificYear++;
-      }
-      
-      // Set check-in date to the specific date at 3 PM
-      voiceCheckInDate = new Date(specificYear, specificMonth, specificDay, 15, 0, 0, 0);
-      
-      // Set check-out date to the next day at 11 AM
-      voiceCheckOutDate = new Date(voiceCheckInDate);
-      voiceCheckOutDate.setDate(voiceCheckInDate.getDate() + 1);
-      voiceCheckOutDate.setHours(11, 0, 0, 0);
-      
-      voiceNights = 1;
-      console.log(`Specific date detected: ${voiceCheckInDate.toDateString()}`);
     }
     // Check for "tomorrow"
     else if (lowerQuery.includes('tomorrow')) {
