@@ -1419,6 +1419,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // This is a high-priority check that will override other processing
     const twoRoomsDirectCheck = query.toLowerCase().trim();
     let forceRoomQuantity = null;
+    let isStandaloneRoomQuantityRequest = false;
     
     // Direct checks for the most common phrases
     if (twoRoomsDirectCheck === 'i want two rooms' || 
@@ -1428,10 +1429,32 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         twoRoomsDirectCheck === 'two rooms') {
       console.log('DIRECT MATCH for "two rooms" phrase');
       forceRoomQuantity = 2;
+      isStandaloneRoomQuantityRequest = true;
     } else if (twoRoomsDirectCheck === 'i want three rooms' || 
-               twoRoomsDirectCheck === 'i want 3 rooms') {
+               twoRoomsDirectCheck === 'i want 3 rooms' ||
+               twoRoomsDirectCheck === 'three rooms' ||
+               twoRoomsDirectCheck === '3 rooms') {
       console.log('DIRECT MATCH for "three rooms" phrase');
       forceRoomQuantity = 3;
+      isStandaloneRoomQuantityRequest = true;
+    }
+    
+    // Check if this is a standalone room quantity request and we have previous voice search results
+    // If so, we'll preserve the dates from the previous search
+    let preservedDates = null;
+    if (isStandaloneRoomQuantityRequest && voiceSearchResults) {
+      console.log('This appears to be a standalone room quantity request. Preserving dates from previous search.');
+      preservedDates = {
+        checkInDate: new Date(voiceSearchResults.checkInDate),
+        checkOutDate: new Date(voiceSearchResults.checkOutDate),
+        nights: voiceSearchResults.nights,
+        roomType: voiceSearchResults.roomType,
+        bedType: voiceSearchResults.bedType,
+        hasJacuzzi: voiceSearchResults.hasJacuzzi,
+        isSmoking: voiceSearchResults.isSmoking,
+        dailyPrices: [...voiceSearchResults.dailyPrices]
+      };
+      console.log('Preserved dates:', preservedDates);
     }
     
     // Pre-process the query to normalize common speech recognition variations
@@ -1628,25 +1651,37 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       query: query,
       timestamp: Date.now(), // Add timestamp to prevent caching issues
       searchId: searchId || `search-${Date.now()}`, // Use provided searchId or generate a new one
-      nights: 1,
+      nights: preservedDates ? preservedDates.nights : 1,
       roomQuantity: roomQuantity, // Add room quantity to results
-      checkInDate: new Date(),
-      checkOutDate: new Date(new Date().getTime() + 24 * 60 * 60 * 1000),
-      bedType: 'Queen', // Default to Queen
-      hasJacuzzi: false,
-      isSmoking: false, // Always non-smoking by default
+      checkInDate: preservedDates ? new Date(preservedDates.checkInDate) : new Date(),
+      checkOutDate: preservedDates ? new Date(preservedDates.checkOutDate) : new Date(new Date().getTime() + 24 * 60 * 60 * 1000),
+      bedType: preservedDates ? preservedDates.bedType : 'Queen', // Use preserved bed type or default to Queen
+      hasJacuzzi: preservedDates ? preservedDates.hasJacuzzi : false,
+      isSmoking: preservedDates ? preservedDates.isSmoking : false, // Use preserved smoking preference or default to non-smoking
       price: 0,
       tax: 0,
       total: 0,
-      dailyPrices: [], // Add array for daily price breakdown
+      dailyPrices: preservedDates ? [...preservedDates.dailyPrices] : [], // Use preserved daily prices or empty array
       foundMatch: false,
       validRoomTypes: validRoomTypes, // Add valid room types for reference
       validCombinations: validCombinations, // Add valid combinations for reference
       invalidRoomType: false, // Flag for invalid room type
       requestedInvalidType: '', // Store the invalid room type that was requested
       invalidCombination: false, // Flag for invalid room combination
-      requestedInvalidCombination: '' // Store the invalid combination that was requested
+      requestedInvalidCombination: '', // Store the invalid combination that was requested
+      isStandaloneRoomQuantityRequest: isStandaloneRoomQuantityRequest // Flag to indicate this is a standalone room quantity request
     };
+    
+    // If this is a standalone room quantity request with preserved dates, log it
+    if (isStandaloneRoomQuantityRequest && preservedDates) {
+      console.log('Using preserved dates for standalone room quantity request:');
+      console.log('Check-in:', results.checkInDate);
+      console.log('Check-out:', results.checkOutDate);
+      console.log('Nights:', results.nights);
+      console.log('Room type:', results.bedType);
+      console.log('Has jacuzzi:', results.hasJacuzzi);
+      console.log('Is smoking:', results.isSmoking);
+    }
     
     // Enhanced date detection for voice search
     const voiceToday = new Date();
@@ -2356,43 +2391,72 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Day names for display
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     
-    for (let i = 0; i < results.nights; i++) {
-      const currentDate = new Date(checkInDate);
-      currentDate.setDate(checkInDate.getDate() + i);
-      const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 6 = Saturday
-      let dayPrice = 0;
-      let dayType = '';
+    // Clear daily prices array if this is a standalone room quantity request
+    // We need to recalculate it even if we preserved dates
+    if (isStandaloneRoomQuantityRequest) {
+      console.log('Clearing daily prices array for standalone room quantity request');
+      results.dailyPrices = [];
+    }
+    
+    // If this is a standalone room quantity request and we have preserved dates,
+    // we can use the preserved daily prices to calculate the base price more accurately
+    if (isStandaloneRoomQuantityRequest && preservedDates && preservedDates.dailyPrices && preservedDates.dailyPrices.length > 0) {
+      console.log('Using preserved daily prices to calculate base price');
       
-      if (dayOfWeek === 5) { // Friday
-        dayPrice = roomPrices.friday;
-        dayType = 'Friday';
-      } else if (dayOfWeek === 0 || dayOfWeek === 6) { // Sunday or Saturday
-        dayPrice = roomPrices.weekend;
-        dayType = 'Weekend';
-      } else { // Weekday
-        dayPrice = roomPrices.weekday;
-        dayType = 'Weekday';
+      // Use the preserved daily prices but recalculate the base price
+      for (const dayPrice of preservedDates.dailyPrices) {
+        // Create a new day price object with the same values
+        results.dailyPrices.push({
+          date: dayPrice.date,
+          dayOfWeek: dayPrice.dayOfWeek,
+          dayType: dayPrice.dayType,
+          basePrice: dayPrice.basePrice,
+          bedTypeSurcharge: dayPrice.bedTypeSurcharge,
+          price: dayPrice.price
+        });
+        
+        basePrice += dayPrice.price;
       }
-      
-      // Add bed type surcharge
-      let baseDayPrice = dayPrice;
-      if (results.bedType === 'King') {
-        dayPrice += 5; // $5 extra per night for King
-      } else if (results.bedType === 'Queen2Beds') {
-        dayPrice += 10; // $10 extra per night for Queen 2 Beds
+    } else {
+      // Calculate daily prices normally
+      for (let i = 0; i < results.nights; i++) {
+        const currentDate = new Date(checkInDate);
+        currentDate.setDate(checkInDate.getDate() + i);
+        const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 6 = Saturday
+        let dayPrice = 0;
+        let dayType = '';
+        
+        if (dayOfWeek === 5) { // Friday
+          dayPrice = roomPrices.friday;
+          dayType = 'Friday';
+        } else if (dayOfWeek === 0 || dayOfWeek === 6) { // Sunday or Saturday
+          dayPrice = roomPrices.weekend;
+          dayType = 'Weekend';
+        } else { // Weekday
+          dayPrice = roomPrices.weekday;
+          dayType = 'Weekday';
+        }
+        
+        // Add bed type surcharge
+        let baseDayPrice = dayPrice;
+        if (results.bedType === 'King') {
+          dayPrice += 5; // $5 extra per night for King
+        } else if (results.bedType === 'Queen2Beds') {
+          dayPrice += 10; // $10 extra per night for Queen 2 Beds
+        }
+        
+        // Add to daily prices array
+        results.dailyPrices.push({
+          date: currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          dayOfWeek: dayNames[dayOfWeek],
+          dayType: dayType,
+          basePrice: baseDayPrice,
+          bedTypeSurcharge: dayPrice - baseDayPrice,
+          price: dayPrice
+        });
+        
+        basePrice += dayPrice;
       }
-      
-      // Add to daily prices array
-      results.dailyPrices.push({
-        date: currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        dayOfWeek: dayNames[dayOfWeek],
-        dayType: dayType,
-        basePrice: baseDayPrice,
-        bedTypeSurcharge: dayPrice - baseDayPrice,
-        price: dayPrice
-      });
-      
-      basePrice += dayPrice;
     }
     
     // Store the single room price before applying quantity
@@ -2417,7 +2481,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     // Set the final results with forced state update to prevent caching
     results.foundMatch = true;
-    results.uniqueId = `result-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    // Include room quantity in the unique ID to ensure different quantities create different results
+    results.uniqueId = `result-${Date.now()}-qty${results.roomQuantity}-${Math.random().toString(36).substring(2, 9)}`;
     
     // Store the results in session storage as a backup
     try {
@@ -2461,11 +2526,33 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       setIsListening(false);
       setIsButtonActive(false);
       
+      // Add a refresh timestamp to force React to treat this as a completely new object
+      // This is critical for ensuring the UI updates when only room quantity changes
+      const refreshedResults = {
+        ...results,
+        refreshTimestamp: Date.now(),
+        forceRefresh: Math.random() // Add random value to ensure state is always seen as different
+      };
+      
       // Now show the results
-      console.log('Setting voice search results with room quantity:', results.roomQuantity);
-      console.log('Full results object:', JSON.stringify(results, null, 2));
-      setVoiceSearchResults(results);
-      setShowVoiceSearchResults(true);
+      console.log('Setting voice search results with room quantity:', refreshedResults.roomQuantity);
+      console.log('Full results object with refresh data:', JSON.stringify(refreshedResults, null, 2));
+      
+      // First completely hide the modal
+      setShowVoiceSearchResults(false);
+      
+      // Then use a small timeout to ensure the UI has time to process the hide
+      setTimeout(() => {
+        // Set the results with the refresh data
+        setVoiceSearchResults(refreshedResults);
+        
+        // Apply the results to app state immediately
+        applyVoiceSearchResults(refreshedResults);
+        
+        // Then show the modal with the updated results
+        setShowVoiceSearchResults(true);
+        console.log('Voice search results refreshed, applied to app state, and displayed');
+      }, 50);
       
       // Reset button states
       setIsListening(false);
@@ -2495,9 +2582,49 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     }
   };
   
+  // Function to apply voice search results to the app state
+  const applyVoiceSearchResults = (results) => {
+    if (!results) return;
+    
+    console.log('Applying voice search results to app state:', results.roomQuantity, 'rooms');
+    
+    // Create a unique key for this room configuration
+    const roomKey = `${results.roomType}-${results.bedType}-${results.hasJacuzzi}-${results.isSmoking}`;
+    
+    // Store this room configuration in local storage with the updated quantity
+    try {
+      // First check if we already have this room type in local storage
+      const existingRoomsJson = localStorage.getItem('selectedRooms');
+      let selectedRooms = existingRoomsJson ? JSON.parse(existingRoomsJson) : {};
+      
+      // Update or add the room with the new quantity
+      selectedRooms[roomKey] = {
+        roomType: results.roomType,
+        bedType: results.bedType,
+        hasJacuzzi: results.hasJacuzzi,
+        isSmoking: results.isSmoking,
+        quantity: results.roomQuantity,
+        price: results.singleRoomPrice,
+        checkIn: results.checkInDate,
+        checkOut: results.checkOutDate
+      };
+      
+      // Save back to local storage
+      localStorage.setItem('selectedRooms', JSON.stringify(selectedRooms));
+      console.log('Updated selected rooms in local storage with quantity:', results.roomQuantity);
+    } catch (e) {
+      console.error('Error updating local storage with room quantity:', e);
+    }
+  };
+  
   // Close voice search results
   const closeVoiceSearchResults = () => {
     console.log('Closing voice search results modal');
+    
+    // Apply the current voice search results to the app state before closing
+    if (voiceSearchResults) {
+      applyVoiceSearchResults(voiceSearchResults);
+    }
     
     // Check if this is an iOS device
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
