@@ -42,43 +42,57 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       console.error('Error loading rooms from local storage:', error);
     }
     
-    // Automatically request microphone permission when app starts
+    // For iOS devices, we need a different approach to avoid permission popups
     if (('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window)) {
-      try {
-        // Create a temporary recognition instance just to trigger the permission prompt
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const tempRecognition = new SpeechRecognition();
+      // Check if this is an iOS device
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      
+      if (isIOS) {
+        // On iOS, we'll use a different approach to handle permissions silently
+        // We'll set a flag to indicate we've attempted to handle permissions
+        localStorage.setItem('micPermissionHandled', 'true');
         
-        // Configure minimal settings
-        tempRecognition.lang = 'en-US';
-        tempRecognition.continuous = false;
-        tempRecognition.interimResults = false;
-        
-        // Add minimal handlers
-        tempRecognition.onstart = () => {
-          console.log('Microphone permission check started');
-          // Stop after a very short time - just enough to trigger the permission prompt
-          setTimeout(() => {
-            try {
-              tempRecognition.stop();
-            } catch (e) {
-              console.log('Error stopping temp recognition:', e);
-            }
-          }, 100);
-        };
-        
-        tempRecognition.onend = () => {
-          console.log('Microphone permission check completed');
-        };
-        
-        tempRecognition.onerror = (event) => {
-          console.log('Microphone permission check error:', event.error);
-        };
-        
-        // Start recognition to trigger permission prompt
-        tempRecognition.start();
-      } catch (error) {
-        console.error('Error requesting microphone permission:', error);
+        // For iOS, we'll rely on the first actual voice search to handle permissions
+        // This avoids showing any permission popups until the user actually wants to use voice search
+        console.log('iOS device detected - will handle microphone permissions during first voice search');
+      } else {
+        try {
+          // On non-iOS devices, we can use a more standard approach
+          // Create a temporary recognition instance with minimal settings
+          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+          const tempRecognition = new SpeechRecognition();
+          
+          // Configure minimal settings
+          tempRecognition.lang = 'en-US';
+          tempRecognition.continuous = false;
+          tempRecognition.interimResults = false;
+          
+          // Add minimal handlers
+          tempRecognition.onstart = () => {
+            console.log('Microphone permission check started');
+            // Stop immediately to minimize any UI impact
+            setTimeout(() => {
+              try {
+                tempRecognition.stop();
+              } catch (e) {
+                console.log('Error stopping temp recognition:', e);
+              }
+            }, 50);
+          };
+          
+          tempRecognition.onend = () => {
+            console.log('Microphone permission check completed');
+          };
+          
+          tempRecognition.onerror = (event) => {
+            console.log('Microphone permission check error:', event.error);
+          };
+          
+          // Start recognition to trigger permission prompt
+          tempRecognition.start();
+        } catch (error) {
+          console.error('Error requesting microphone permission:', error);
+        }
       }
     }
   }, []);  
@@ -1377,6 +1391,22 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     }, 100);
   };
   
+  // Helper function to check if days are consecutive
+  const areConsecutiveDays = (sortedDays) => {
+    // If all days are in different weeks, they can't be consecutive
+    const allSameWeek = sortedDays.every(day => day.isNextWeek === sortedDays[0].isNextWeek);
+    if (!allSameWeek) return false;
+    
+    // Check if indices are consecutive
+    for (let i = 1; i < sortedDays.length; i++) {
+      // Check if this day's index is exactly 1 more than the previous day's index
+      if (sortedDays[i].index !== (sortedDays[i-1].index + 1) % 7) {
+        return false;
+      }
+    }
+    return true;
+  };
+  
   // Internal implementation of voice search processing with complete isolation
   const processVoiceSearchInternal = (query, specificCheckIn = null, specificCheckOut = null, searchId = null) => {
     // Don't process empty or very short queries
@@ -1753,26 +1783,34 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       
       // STEP 5: Calculate the number of nights and check-out date
       
-      // For random days like "Monday, Tuesday, Friday", we want to calculate
-      // from the first to the last mentioned day
+      // For random days like "Monday, Tuesday, Friday", we want to only count the specific days mentioned
       let nightsCount;
       
       // If we have multiple days mentioned
       if (sortedDays.length > 1) {
-        // If all days are in the same week
-        if (firstDay.isNextWeek === lastDay.isNextWeek) {
-          // Calculate nights from first to last day
-          let dayDiff = lastDay.index - firstDay.index;
-          if (dayDiff < 0) dayDiff += 7; // Handle week wrap-around
-          nightsCount = dayDiff + 1; // Add 1 because we're staying the last night too
-        } 
-        // If days span across weeks
-        else {
-          // Calculate days in current week + days in next week
-          nightsCount = (7 - firstDay.index) + lastDay.index + 1;
-        }
+        // Check if the query contains "and" which typically indicates specific non-consecutive days
+        const hasAndKeyword = lowerQuery.includes(' and ');
         
-        console.log('Multiple days detected:', sortedDays.map(d => d.name).join(', '));
+        // If the query has "and" or there are gaps between the mentioned days (non-consecutive)
+        if (hasAndKeyword || !areConsecutiveDays(sortedDays)) {
+          // Only count the specific days mentioned
+          nightsCount = sortedDays.length;
+          console.log('Non-consecutive days detected, counting only mentioned days:', sortedDays.map(d => d.name).join(', '));
+        } else {
+          // For consecutive days without "and", calculate the span
+          if (firstDay.isNextWeek === lastDay.isNextWeek) {
+            // Calculate nights from first to last day
+            let dayDiff = lastDay.index - firstDay.index;
+            if (dayDiff < 0) dayDiff += 7; // Handle week wrap-around
+            nightsCount = dayDiff + 1; // Add 1 because we're staying the last night too
+          } 
+          // If days span across weeks
+          else {
+            // Calculate days in current week + days in next week
+            nightsCount = (7 - firstDay.index) + lastDay.index + 1;
+          }
+          console.log('Consecutive days detected, calculating span:', sortedDays.map(d => d.name).join(', '));
+        }
       } else {
         // If only one day mentioned, assume 1 night stay
         nightsCount = 1;
@@ -1780,10 +1818,36 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       
       console.log('Number of nights calculated:', nightsCount);
       
-      // STEP 6: Set the check-out date based on check-in date + nights
-      voiceCheckOutDate = new Date(voiceCheckInDate);
-      voiceCheckOutDate.setDate(voiceCheckInDate.getDate() + nightsCount);
-      voiceCheckOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
+      // STEP 6: Set the check-out date
+      // For non-consecutive days with "and", use the last mentioned day + 1 as checkout
+      const hasAndKeyword = lowerQuery.includes(' and ');
+      if (hasAndKeyword && sortedDays.length > 1 && !areConsecutiveDays(sortedDays)) {
+        // For non-consecutive days, set checkout to the day after the last mentioned day
+        const lastDayDate = new Date(voiceToday);
+        let daysUntilLastDay;
+        
+        if (lastDay.isNextWeek) {
+          daysUntilLastDay = (lastDay.index - currentDayIndex + 7) % 7;
+          if (daysUntilLastDay === 0) daysUntilLastDay = 7;
+        } else {
+          daysUntilLastDay = lastDay.index - currentDayIndex;
+          if (daysUntilLastDay <= 0) daysUntilLastDay += 7;
+        }
+        
+        lastDayDate.setDate(voiceToday.getDate() + daysUntilLastDay);
+        
+        // Set checkout to the day after the last mentioned day
+        voiceCheckOutDate = new Date(lastDayDate);
+        voiceCheckOutDate.setDate(lastDayDate.getDate() + 1);
+        voiceCheckOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
+        
+        console.log('Non-consecutive days: Setting checkout to day after last mentioned day:', voiceCheckOutDate.toDateString());
+      } else {
+        // For consecutive days or single day, use normal calculation
+        voiceCheckOutDate = new Date(voiceCheckInDate);
+        voiceCheckOutDate.setDate(voiceCheckInDate.getDate() + nightsCount);
+        voiceCheckOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
+      }
       
       voiceNights = nightsCount;
       console.log('Check-out date:', voiceCheckOutDate.toDateString(), 'Total nights:', voiceNights);
@@ -2099,18 +2163,36 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Use setTimeout to ensure the state has been cleared before setting new results
     setTimeout(() => {
       console.log('Setting voice search results with unique ID:', results.uniqueId);
-      setVoiceSearchResults(results);
-      setShowVoiceSearchResults(true);
       
-      // Also reset any active recognition
+      // IMPORTANT: First, ensure microphone is completely turned off before showing results
+      // This guarantees the microphone is off before the modal appears
       if (recognitionRef.current) {
         try {
           recognitionRef.current.abort();
+          recognitionRef.current.onresult = null;
+          recognitionRef.current.onend = null;
+          recognitionRef.current.onerror = null;
+          recognitionRef.current.onspeechend = null;
+          recognitionRef.current.onnomatch = null;
+          recognitionRef.current.onaudiostart = null;
+          recognitionRef.current.onaudioend = null;
+          recognitionRef.current.onsoundstart = null;
+          recognitionRef.current.onsoundend = null;
+          recognitionRef.current.onspeechstart = null;
           recognitionRef.current = null;
+          console.log('Microphone completely turned off before showing results');
         } catch (e) {
           console.log('Error cleaning up recognition:', e);
         }
       }
+      
+      // Force microphone state to be off
+      setIsListening(false);
+      setIsButtonActive(false);
+      
+      // Now show the results
+      setVoiceSearchResults(results);
+      setShowVoiceSearchResults(true);
       
       // Reset button states
       setIsListening(false);
