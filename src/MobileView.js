@@ -1397,7 +1397,12 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     const allSameWeek = sortedDays.every(day => day.isNextWeek === sortedDays[0].isNextWeek);
     if (!allSameWeek) return false;
     
-    // Check if indices are consecutive
+    // If we have 2 or fewer days, check if they are adjacent
+    if (sortedDays.length <= 2) {
+      return sortedDays[sortedDays.length - 1].index === (sortedDays[0].index + sortedDays.length - 1) % 7;
+    }
+    
+    // For 3+ days, check every pair of days to ensure they're all consecutive
     for (let i = 1; i < sortedDays.length; i++) {
       // Check if this day's index is exactly 1 more than the previous day's index
       if (sortedDays[i].index !== (sortedDays[i-1].index + 1) % 7) {
@@ -1405,6 +1410,25 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       }
     }
     return true;
+  };
+  
+  // Helper function to strictly check if we're dealing with a non-consecutive days query
+  const isNonConsecutiveDaysQuery = (query, sortedDays) => {
+    // If the query explicitly contains "and" between days
+    const hasAndKeyword = query.toLowerCase().includes(' and ');
+    
+    // If there are commas between days, that's also a strong indicator
+    const hasDayCommas = /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s*,\s*(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i.test(query);
+    
+    // Check for explicit phrases like "only Monday, Tuesday and Friday"
+    const hasOnlyKeyword = /\bonly\b.*\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)/i.test(query);
+    
+    // If days aren't consecutive
+    const daysNotConsecutive = !areConsecutiveDays(sortedDays);
+    
+    // If we have 3+ days with "and" or commas, or if days aren't consecutive, treat as non-consecutive
+    return (hasAndKeyword || hasDayCommas || hasOnlyKeyword || 
+           (sortedDays.length >= 3 && daysNotConsecutive));
   };
   
   // Internal implementation of voice search processing with complete isolation
@@ -2083,16 +2107,20 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       
       // If we have multiple days mentioned
       if (sortedDays.length > 1) {
-        // Check if the query contains "and" which typically indicates specific non-consecutive days
-        const hasAndKeyword = lowerQuery.includes(' and ');
+        // Use the improved non-consecutive days detection
+        const isNonConsecutive = isNonConsecutiveDaysQuery(lowerQuery, sortedDays);
         
-        // If the query has "and" or there are gaps between the mentioned days (non-consecutive)
-        if (hasAndKeyword || !areConsecutiveDays(sortedDays)) {
+        // If the query indicates non-consecutive days (has "and", commas, or days aren't consecutive)
+        if (isNonConsecutive) {
           // Only count the specific days mentioned
           nightsCount = sortedDays.length;
-          console.log('Non-consecutive days detected, counting only mentioned days:', sortedDays.map(d => d.name).join(', '));
+          console.log('Non-consecutive days detected, counting ONLY the mentioned days:', sortedDays.map(d => d.name).join(', '));
+          
+          // For non-consecutive days, we want to override how we calculate nights
+          // to make sure it's exactly the number of mentioned days
+          voiceNights = sortedDays.length;
         } else {
-          // For consecutive days without "and", calculate the span
+          // For consecutive days, calculate the span
           if (firstDay.isNextWeek === lastDay.isNextWeek) {
             // Calculate nights from first to last day
             let dayDiff = lastDay.index - firstDay.index;
@@ -2104,7 +2132,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             // Calculate days in current week + days in next week
             nightsCount = (7 - firstDay.index) + lastDay.index + 1;
           }
-          console.log('Consecutive days detected, calculating span:', sortedDays.map(d => d.name).join(', '));
+          console.log('Consecutive days detected, calculating span from first to last day:', sortedDays.map(d => d.name).join(', '));
         }
       } else {
         // If only one day mentioned, assume 1 night stay
@@ -2114,9 +2142,57 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       console.log('Number of nights calculated:', nightsCount);
       
       // STEP 6: Set the check-out date
-      // For non-consecutive days with "and", use the last mentioned day + 1 as checkout
-      const hasAndKeyword = lowerQuery.includes(' and ');
-      if (hasAndKeyword && sortedDays.length > 1 && !areConsecutiveDays(sortedDays)) {
+      // Use our improved detection for non-consecutive days
+      const isNonConsecutive = isNonConsecutiveDaysQuery(lowerQuery, sortedDays);
+      
+      // Store the non-consecutive days flag and the mentioned days in the results object
+      // so we can use them when calculating daily prices
+      results.isNonConsecutiveDays = isNonConsecutive;
+      
+      // If this is a non-consecutive days request, we need to store information about the exact days
+      // to build an accurate daily price breakdown that only shows the requested days
+      if (isNonConsecutive) {
+        // Create an array of specific dates for each mentioned day
+        const exactDates = [];
+        
+        for (const dayObj of sortedDays) {
+          // Calculate the date for this specific day
+          const specificDate = new Date(voiceToday);
+          let daysUntilThisDay;
+          
+          if (dayObj.isNextWeek) {
+            // For days in next week
+            daysUntilThisDay = (dayObj.index - currentDayIndex + 7) % 7;
+            if (daysUntilThisDay === 0) daysUntilThisDay = 7;
+          } else {
+            // For days in current week
+            daysUntilThisDay = dayObj.index - currentDayIndex;
+            if (daysUntilThisDay <= 0) daysUntilThisDay += 7;
+          }
+          
+          specificDate.setDate(voiceToday.getDate() + daysUntilThisDay);
+          specificDate.setHours(15, 0, 0, 0); // 3 PM
+          
+          exactDates.push({
+            name: dayObj.name,
+            date: new Date(specificDate),
+            dayIndex: dayObj.index
+          });
+        }
+        
+        // Sort dates chronologically
+        exactDates.sort((a, b) => a.date - b.date);
+        
+        // Store these in the results
+        results.exactDates = exactDates;
+        console.log('Exact dates for non-consecutive request:', 
+                   exactDates.map(d => `${d.name}: ${d.date.toDateString()}`));
+      }
+      
+      // Store the list of day names
+      results.mentionedDays = sortedDays.map(d => d.name);
+      
+      if (isNonConsecutive && sortedDays.length > 1) {
         // For non-consecutive days, set checkout to the day after the last mentioned day
         const lastDayDate = new Date(voiceToday);
         let daysUntilLastDay;
@@ -2418,44 +2494,95 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         basePrice += dayPrice.price;
       }
     } else {
-      // Calculate daily prices normally
-      for (let i = 0; i < results.nights; i++) {
-        const currentDate = new Date(checkInDate);
-        currentDate.setDate(checkInDate.getDate() + i);
-        const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 6 = Saturday
-        let dayPrice = 0;
-        let dayType = '';
+      // Check if this is a non-consecutive days request
+      const nonConsecutiveDaysRequest = results.isNonConsecutiveDays;
+      
+      if (nonConsecutiveDaysRequest && results.exactDates && results.exactDates.length > 0) {
+        console.log('Calculating prices using exact dates for non-consecutive days');
         
-        if (dayOfWeek === 5) { // Friday
-          dayPrice = roomPrices.friday;
-          dayType = 'Friday';
-        } else if (dayOfWeek === 0 || dayOfWeek === 6) { // Sunday or Saturday
-          dayPrice = roomPrices.weekend;
-          dayType = 'Weekend';
-        } else { // Weekday
-          dayPrice = roomPrices.weekday;
-          dayType = 'Weekday';
+        // Clear the daily prices array first
+        results.dailyPrices = [];
+        basePrice = 0;
+        
+        // Use the exact dates we already calculated and stored in the results object
+        for (const dateInfo of results.exactDates) {
+          const currentDate = new Date(dateInfo.date);
+          const dayOfWeek = currentDate.getDay();
+          
+          let dayPrice = 0;
+          let dayType = '';
+          
+          if (dayOfWeek === 5) { // Friday
+            dayPrice = roomPrices.friday;
+            dayType = 'Friday';
+          } else if (dayOfWeek === 0 || dayOfWeek === 6) { // Sunday or Saturday
+            dayPrice = roomPrices.weekend;
+            dayType = 'Weekend';
+          } else { // Weekday
+            dayPrice = roomPrices.weekday;
+            dayType = 'Weekday';
+          }
+          
+          // Add bed type surcharge
+          let baseDayPrice = dayPrice;
+          if (results.bedType === 'King') {
+            dayPrice += 5; // $5 extra per night for King
+          } else if (results.bedType === 'Queen2Beds') {
+            dayPrice += 10; // $10 extra per night for Queen 2 Beds
+          }
+          
+          // Add to daily prices array
+          results.dailyPrices.push({
+            date: currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            dayOfWeek: dayNames[dayOfWeek],
+            dayType: dayType,
+            basePrice: baseDayPrice,
+            bedTypeSurcharge: dayPrice - baseDayPrice,
+            price: dayPrice
+          });
+          
+          basePrice += dayPrice;
         }
-        
-        // Add bed type surcharge
-        let baseDayPrice = dayPrice;
-        if (results.bedType === 'King') {
-          dayPrice += 5; // $5 extra per night for King
-        } else if (results.bedType === 'Queen2Beds') {
-          dayPrice += 10; // $10 extra per night for Queen 2 Beds
+      } else {
+        // Calculate daily prices normally for consecutive days
+        for (let i = 0; i < results.nights; i++) {
+          const currentDate = new Date(checkInDate);
+          currentDate.setDate(checkInDate.getDate() + i);
+          const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 6 = Saturday
+          let dayPrice = 0;
+          let dayType = '';
+          
+          if (dayOfWeek === 5) { // Friday
+            dayPrice = roomPrices.friday;
+            dayType = 'Friday';
+          } else if (dayOfWeek === 0 || dayOfWeek === 6) { // Sunday or Saturday
+            dayPrice = roomPrices.weekend;
+            dayType = 'Weekend';
+          } else { // Weekday
+            dayPrice = roomPrices.weekday;
+            dayType = 'Weekday';
+          }
+          
+          // Add bed type surcharge
+          let baseDayPrice = dayPrice;
+          if (results.bedType === 'King') {
+            dayPrice += 5; // $5 extra per night for King
+          } else if (results.bedType === 'Queen2Beds') {
+            dayPrice += 10; // $10 extra per night for Queen 2 Beds
+          }
+          
+          // Add to daily prices array
+          results.dailyPrices.push({
+            date: currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            dayOfWeek: dayNames[dayOfWeek],
+            dayType: dayType,
+            basePrice: baseDayPrice,
+            bedTypeSurcharge: dayPrice - baseDayPrice,
+            price: dayPrice
+          });
+          
+          basePrice += dayPrice;
         }
-        
-        // Add to daily prices array
-        results.dailyPrices.push({
-          date: currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          dayOfWeek: dayNames[dayOfWeek],
-          dayType: dayType,
-          basePrice: baseDayPrice,
-          bedTypeSurcharge: dayPrice - baseDayPrice,
-          price: dayPrice
-        });
-        
-        basePrice += dayPrice;
       }
     }
     
