@@ -31,6 +31,32 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   // Reference to store the speech recognition instance
   const recognitionRef = useRef(null);
   
+  // Effect to clean up speech recognition on unmount
+  useEffect(() => {
+    // Cleanup function to run when component unmounts
+    return () => {
+      console.log('Component unmounting - cleaning up voice recognition');
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+          recognitionRef.current.onresult = null;
+          recognitionRef.current.onend = null;
+          recognitionRef.current.onerror = null;
+          recognitionRef.current.onspeechend = null;
+          recognitionRef.current.onnomatch = null;
+          recognitionRef.current.onaudiostart = null;
+          recognitionRef.current.onaudioend = null;
+          recognitionRef.current.onsoundstart = null;
+          recognitionRef.current.onsoundend = null;
+          recognitionRef.current.onspeechstart = null;
+          recognitionRef.current = null;
+        } catch (e) {
+          console.error('Error during cleanup:', e);
+        }
+      }
+    };
+  }, []); // Empty dependency array means this runs on mount and unmount
+  
   // Load selected rooms from local storage on component mount
   useEffect(() => {
     try {
@@ -1279,25 +1305,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     document.addEventListener('mouseup', (event) => handleVoiceButtonRelease(event, searchSessionId, sessionTranscript));
   };
   
-  // Handle voice search button release with session ID and transcript
-  const handleVoiceButtonRelease = (e, sessionId, sessionTranscript) => {
-    if (e) e.preventDefault();
+  // Function to stop and clean up voice recognition
+  const stopAndCleanupRecognition = (sessionId) => {
+    console.log(`Stopping and cleaning up recognition for session ${sessionId}`);
     
-    // Only process if this is the active button press
-    if (!isButtonActive) return;
-    
-    console.log(`Button released for session ${sessionId}`);
-    setIsButtonActive(false);
-    
-    // Capture the current transcript from state as a fallback
-    const stateTranscript = voiceSearchQuery;
-    
-    // Use the session transcript if available, otherwise fall back to state
-    // This is crucial for preventing cross-session contamination
-    const finalTranscript = sessionTranscript || stateTranscript;
-    console.log(`Final transcript for session ${sessionId}:`, finalTranscript);
-    
-    // Stop recognition
+    // Stop recognition if it's active
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -1316,6 +1328,45 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         console.log(`Error cleaning up recognition for session ${sessionId}:`, e);
       }
     }
+    
+    // Update UI state
+    setIsListening(false);
+    setIsButtonActive(false);
+    
+    // Remove all event listeners
+    const cleanupEventListeners = () => {
+      document.removeEventListener('touchend', handleVoiceButtonRelease);
+      document.removeEventListener('touchcancel', handleVoiceButtonRelease);
+      document.removeEventListener('mouseup', handleVoiceButtonRelease);
+    };
+    
+    // Ensure we clean up listeners even if something fails
+    try {
+      cleanupEventListeners();
+    } catch (e) {
+      console.error('Error cleaning up event listeners:', e);
+    }
+  };
+  
+  // Handle voice search button release with session ID and transcript
+  const handleVoiceButtonRelease = (e, sessionId, sessionTranscript) => {
+    if (e) e.preventDefault();
+    
+    // Only process if this is the active button press
+    if (!isButtonActive) return;
+    
+    console.log(`Button released for session ${sessionId}`);
+    setIsButtonActive(false);
+    
+    // Capture the current transcript from state as a fallback
+    const stateTranscript = voiceSearchQuery;
+    
+    // Use the session transcript if available, otherwise fall back to state
+    const finalTranscript = sessionTranscript || stateTranscript;
+    console.log(`Final transcript for session ${sessionId}:`, finalTranscript);
+    
+    // Stop and clean up recognition
+    stopAndCleanupRecognition(sessionId);
     
     // Remove all event listeners
     document.removeEventListener('touchend', handleVoiceButtonRelease);
@@ -1359,6 +1410,12 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     forceReset();
     
+    // Ensure any active recognition is stopped
+    if (recognitionRef.current) {
+      console.log('Stopping any active recognition before processing new query');
+      stopAndCleanupRecognition(searchId || 'process-voice-search');
+    }
+    
     // Check if this is an iOS device
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     
@@ -1369,6 +1426,12 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       
       // Show the results
       setShowVoiceSearchResults(true);
+      
+      // Ensure microphone is definitely stopped when showing results
+      if (recognitionRef.current) {
+        console.log('Ensuring recognition is stopped after processing');
+        stopAndCleanupRecognition(searchId || 'show-results');
+      }
       
       // For iOS devices, we need to do some extra work to make the modal visible
       if (isIOS) {
