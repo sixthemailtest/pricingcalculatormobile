@@ -734,14 +734,27 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       // Update the transcript in state
       setVoiceSearchQuery(transcript);
       
-      // Store the detected query for watermark display
-      setDetectedVoiceQuery({
-        query: transcript,
-        originalTranscript: transcript
-      });
+      // Pre-process the transcript to fix common misrecognitions
+      let processedTranscript = transcript;
       
-      // Process the complete query directly
-      processVoiceSearch(transcript);
+      // Fix "Queen" vs "King" confusion
+      const lowerTranscript = transcript.toLowerCase();
+      
+      // Look for clear indicators of "King" bed
+      if (lowerTranscript.includes('king') || 
+          lowerTranscript.includes('keen') || 
+          lowerTranscript.includes('kin')) {
+        // Check if there are strong indicators this is actually a King bed
+        if (!lowerTranscript.includes('queen') || 
+            lowerTranscript.indexOf('king') < lowerTranscript.indexOf('queen')) {
+          // Replace with clear "King" for processing
+          processedTranscript = transcript.replace(/\b(king|keen|kin)\b/gi, 'King');
+          console.log('Detected King bed, processed transcript:', processedTranscript);
+        }
+      }
+      
+      // Process the enhanced transcript
+      processVoiceSearch(processedTranscript);
     };
     
     recognition.onend = () => {
@@ -1239,9 +1252,21 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     };
     
     forceReset();
+    
+    // Process the query and show results with a slight delay
+    // This helps ensure the modal appears properly on iOS
     setTimeout(() => {
+      // Process the query
       processVoiceSearchInternal(query, specificCheckIn, specificCheckOut, searchId);
-      setShowVoiceSearchResults(true);
+      
+      // Force the modal to show with a slight delay
+      setTimeout(() => {
+        console.log('Showing voice search results modal');
+        setShowVoiceSearchResults(true);
+        
+        // Force iOS to recognize the modal
+        document.body.style.overflow = 'hidden';
+      }, 300);
     }, 100);
   };
   
@@ -1373,11 +1398,45 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     // Extract bed type with improved detection logic and validation
     console.log('Voice query for bed type detection:', lowerQuery);
-    
-    // Advanced NLP-based room type detection system
+  
+    // Advanced NLP-based room type detection system with improved Queen vs King disambiguation
     let detectedBedType = 'Queen'; // Default
     let invalidRoomTypeRequested = false;
     let requestedInvalidType = '';
+  
+    // Specific checks for King bed with common speech recognition confusions
+    const kingIndicators = ['king', 'kings', 'keen', 'kin', 'kim', 'kingdom'];
+    const queenIndicators = ['queen', 'queens', 'clean', 'cream', 'green'];
+  
+    // Count occurrences of king and queen indicators
+    let kingScore = 0;
+    let queenScore = 0;
+  
+    // Check for king indicators
+    kingIndicators.forEach(indicator => {
+      // Use word boundary to avoid partial matches
+      const regex = new RegExp('\\b' + indicator + '\\b', 'gi');
+      const matches = lowerQuery.match(regex);
+      if (matches) kingScore += matches.length;
+    });
+  
+    // Check for queen indicators
+    queenIndicators.forEach(indicator => {
+      const regex = new RegExp('\\b' + indicator + '\\b', 'gi');
+      const matches = lowerQuery.match(regex);
+      if (matches) queenScore += matches.length;
+    });
+  
+    console.log(`Bed type detection scores - King: ${kingScore}, Queen: ${queenScore}`);
+  
+    // Determine bed type based on scores
+    if (kingScore > queenScore) {
+      detectedBedType = 'King';
+      console.log('Detected King bed based on indicators');
+    } else if (queenScore > 0) {
+      detectedBedType = 'Queen';
+      console.log('Detected Queen bed based on indicators');
+    }
     
     // Define room type patterns with keywords, weights, and patterns
     const roomTypePatterns = {
@@ -1646,23 +1705,36 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   
   // Close voice search results and completely reset the state
   const closeVoiceSearchResults = () => {
-    console.log('Completely resetting voice search state');
+    console.log('Closing voice search results modal');
+    
+    // Reset modal state
     setShowVoiceSearchResults(false);
     setVoiceSearchResults(null);
     setVoiceSearchQuery('');
+    setVoiceSearchError(null);
     
-    // Force cleanup of any lingering recognition instances
+    // Reset body overflow (important for iOS)
+    document.body.style.overflow = 'auto';
+    
+    // Also reset any active recognition
     if (recognitionRef.current) {
       try {
         recognitionRef.current.abort();
-        recognitionRef.current.onresult = null;
-        recognitionRef.current.onend = null;
-        recognitionRef.current.onerror = null;
         recognitionRef.current = null;
       } catch (e) {
         console.log('Error cleaning up recognition:', e);
       }
     }
+    
+    // Reset button states
+    setIsListening(false);
+    setIsButtonActive(false);
+    
+    // Force a reflow for iOS
+    setTimeout(() => {
+      window.scrollTo(0, 1);
+      window.scrollTo(0, 0);
+    }, 100);
   };
   
   // Handle card mouse move
