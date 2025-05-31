@@ -1253,21 +1253,116 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     forceReset();
     
-    // Process the query and show results with a slight delay
-    // This helps ensure the modal appears properly on iOS
-    setTimeout(() => {
-      // Process the query
-      processVoiceSearchInternal(query, specificCheckIn, specificCheckOut, searchId);
-      
-      // Force the modal to show with a slight delay
+    // Check if this is an iOS device
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    
+    if (isIOS) {
+      // For iOS devices, use a simpler approach with a native alert
       setTimeout(() => {
-        console.log('Showing voice search results modal');
-        setShowVoiceSearchResults(true);
+        // Process the query
+        const results = processVoiceSearchInternalForIOS(query, specificCheckIn, specificCheckOut, searchId);
         
-        // Force iOS to recognize the modal
-        document.body.style.overflow = 'hidden';
-      }, 300);
-    }, 100);
+        // Show results in a native alert for iOS
+        if (results) {
+          const message = `Room: ${results.bedType} (${results.isSmoking ? 'Smoking' : 'Non-Smoking'})
+` +
+                         `Check-in: ${results.checkInDate.toLocaleDateString()}
+` +
+                         `Check-out: ${results.checkOutDate.toLocaleDateString()}
+` +
+                         `Total: $${results.total.toFixed(2)}`;
+          
+          alert(`Voice Search Results:\n${message}`);
+        }
+      }, 100);
+    } else {
+      // For non-iOS devices, use the modal approach
+      setTimeout(() => {
+        // Process the query
+        processVoiceSearchInternal(query, specificCheckIn, specificCheckOut, searchId);
+        
+        // Show the modal
+        setTimeout(() => {
+          console.log('Showing voice search results modal');
+          setShowVoiceSearchResults(true);
+        }, 300);
+      }, 100);
+    }
+  };
+  
+  // iOS-specific implementation for voice search processing
+  const processVoiceSearchInternalForIOS = (query, specificCheckIn = null, specificCheckOut = null, searchId = null) => {
+    // Don't process empty or very short queries
+    if (!query || query.trim().length < 3) {
+      console.log('Query too short, not processing');
+      return null;
+    }
+    
+    // Convert query to lowercase for easier matching
+    const lowerQuery = query.toLowerCase();
+    console.log('Processing iOS voice query:', lowerQuery);
+    
+    // Initialize results object
+    let results = {
+      query: query,
+      timestamp: Date.now(),
+      searchId: searchId || `search-${Date.now()}`,
+      nights: 1,
+      checkInDate: new Date(),
+      checkOutDate: new Date(new Date().getTime() + 24 * 60 * 60 * 1000),
+      bedType: 'Queen', // Default
+      hasJacuzzi: false,
+      isSmoking: false,
+      price: 0,
+      tax: 0,
+      total: 0
+    };
+    
+    // Extract room type (smoking/non-smoking)
+    if (lowerQuery.includes('smoking') && !lowerQuery.includes('non') && 
+        !lowerQuery.includes('no smoking')) {
+      results.isSmoking = true;
+    }
+    
+    // Extract bed type
+    if (lowerQuery.includes('king')) {
+      results.bedType = 'King';
+    } else if (lowerQuery.includes('double') || 
+              lowerQuery.includes('two bed') || 
+              lowerQuery.includes('2 bed')) {
+      results.bedType = 'Queen2Beds';
+    }
+    
+    // Extract jacuzzi preference
+    if (lowerQuery.includes('jacuzzi') || 
+        lowerQuery.includes('hot tub') || 
+        lowerQuery.includes('spa')) {
+      results.hasJacuzzi = true;
+    }
+    
+    // Extract dates
+    if (lowerQuery.includes('weekend')) {
+      // Find the next Friday
+      const dayOfWeek = results.checkInDate.getDay(); // 0 = Sunday, 6 = Saturday
+      const daysUntilFriday = (5 - dayOfWeek + 7) % 7;
+      results.checkInDate.setDate(results.checkInDate.getDate() + daysUntilFriday);
+      results.checkOutDate = new Date(results.checkInDate);
+      results.checkOutDate.setDate(results.checkOutDate.getDate() + 2); // Friday to Sunday
+      results.nights = 2;
+    } else if (specificCheckIn && specificCheckOut) {
+      results.checkInDate = new Date(specificCheckIn);
+      results.checkOutDate = new Date(specificCheckOut);
+      const diffTime = Math.abs(results.checkOutDate - results.checkInDate);
+      results.nights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+    
+    // Calculate price
+    const basePrice = results.hasJacuzzi ? 159 : 129;
+    results.price = basePrice * results.nights;
+    results.tax = results.price * 0.15;
+    results.total = results.price + results.tax;
+    
+    return results;
   };
   
   // Internal implementation of voice search processing with complete isolation
