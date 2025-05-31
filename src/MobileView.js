@@ -10,20 +10,22 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   const [showRoomSelector, setShowRoomSelector] = useState(false);
   const [availableRooms, setAvailableRooms] = useState([]);
   
-  // Voice search state
-  const [isListening, setIsListening] = useState(false);
+  // State for voice search
   const [isButtonActive, setIsButtonActive] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
-  const [showVoiceSearchResults, setShowVoiceSearchResults] = useState(false);
   const [voiceSearchResults, setVoiceSearchResults] = useState(null);
-  
-  // Guided voice search state
+  const [showVoiceSearchResults, setShowVoiceSearchResults] = useState(false);
+  const [voiceSearchError, setVoiceSearchError] = useState(null);
+  const [detectedVoiceQuery, setDetectedVoiceQuery] = useState(null);
   const [guidedVoiceSearch, setGuidedVoiceSearch] = useState({
     active: false,
-    step: 1, // 1: Room type, 2: Bed type, 3: Stay duration
-    roomType: null, // 'smoking' or 'non-smoking'
-    bedType: null,  // 'Queen', 'King', or 'Queen2Beds'
-    stayDuration: null // 'tonight', 'weekend', or specific dates
+    step: 1,
+    roomType: null,
+    bedType: null,
+    stayDuration: null,
+    specificDate: null,
+    exactQuery: ''
   });
   
   // Reference to store the speech recognition instance
@@ -671,16 +673,92 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     return recognition;
   };
   
-  // Start guided voice search
+  // Start voice search
   const startGuidedVoiceSearch = () => {
     // Reset guided voice search state
     setGuidedVoiceSearch({
-      active: true,
+      active: false,
       step: 1,
       roomType: null,
       bedType: null,
-      stayDuration: null
+      stayDuration: null,
+      specificDate: null,
+      exactQuery: ''
     });
+    
+    // Start improved voice recognition
+    startImprovedVoiceRecognition();
+  };
+  
+  // Improved voice recognition that captures complete phrases
+  const startImprovedVoiceRecognition = () => {
+    // Check if speech recognition is supported
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('Speech recognition is not supported in your browser. Please try Chrome or Edge.');
+      return;
+    }
+    
+    setIsButtonActive(true);
+    setIsListening(true);
+    setVoiceSearchQuery('');
+    
+    // Clean up any existing recognition instance
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+      } catch (e) {
+        console.log('Error cleaning up previous recognition:', e);
+      }
+    }
+    
+    // Create a new recognition instance
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
+    
+    // Configure recognition settings for better accuracy
+    recognition.lang = 'en-US';
+    recognition.continuous = false; // Changed to false to get complete utterances
+    recognition.interimResults = false; // Changed to false to get only final results
+    
+    console.log('Starting improved voice recognition...');
+    
+    recognition.onresult = (event) => {
+      // Get the complete transcript
+      const transcript = event.results[0][0].transcript;
+      console.log('Complete voice transcript:', transcript);
+      
+      // Update the transcript in state
+      setVoiceSearchQuery(transcript);
+      
+      // Store the detected query for watermark display
+      setDetectedVoiceQuery({
+        query: transcript,
+        originalTranscript: transcript
+      });
+      
+      // Process the complete query directly
+      processVoiceSearch(transcript);
+    };
+    
+    recognition.onend = () => {
+      console.log('Voice recognition ended');
+      setIsListening(false);
+      setIsButtonActive(false);
+    };
+    
+    // Start recognition
+    try {
+      recognition.start();
+      console.log('Voice recognition started');
+    } catch (error) {
+      console.error('Error starting voice recognition:', error);
+      setIsButtonActive(false);
+      setIsListening(false);
+    }
   };
   
   // Handle voice button press for a specific guided step
@@ -714,10 +792,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     const recognition = new SpeechRecognition();
     recognitionRef.current = recognition;
     
-    // Configure recognition settings
+    // Configure recognition settings for better accuracy
     recognition.lang = 'en-US';
-    recognition.continuous = true;
-    recognition.interimResults = true;
+    recognition.continuous = false; // Changed to false to get complete utterances
+    recognition.interimResults = false; // Changed to false to get only final results
+    recognition.maxAlternatives = 3; // Get multiple alternatives
     
     // Get the current step
     const currentStep = guidedVoiceSearch.step;
@@ -727,15 +806,18 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     let transcript = '';
     
     recognition.onresult = (event) => {
-      // Get the latest transcript
-      transcript = '';
-      for (let i = 0; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
+      // Get the best result with highest confidence
+      const result = event.results[0];
+      transcript = result[0].transcript;
+      
+      // Log all alternatives for debugging
+      for (let i = 0; i < result.length; i++) {
+        console.log(`Alternative ${i}: ${result[i].transcript} (Confidence: ${result[i].confidence})`);
       }
       
       // Update the transcript in state
       setVoiceSearchQuery(transcript);
-      console.log(`Current transcript for step ${currentStep}:`, transcript);
+      console.log(`Final transcript for step ${currentStep}:`, transcript);
     };
     
     recognition.onend = () => {
@@ -743,8 +825,22 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       setIsListening(false);
       setIsButtonActive(false);
       
-      // Process the result based on the current step
-      processGuidedStepResult(transcript, currentStep);
+      // Make sure we have a valid transcript
+      if (transcript && transcript.trim().length > 0) {
+        // Process the result based on the current step
+        processGuidedStepResult(transcript, currentStep);
+      } else {
+        // If no valid transcript, show an error or retry
+        alert('No speech detected. Please try again.');
+      }
+    };
+    
+    // Handle errors
+    recognition.onerror = (event) => {
+      console.error(`Speech recognition error: ${event.error}`);
+      setIsListening(false);
+      setIsButtonActive(false);
+      alert(`Speech recognition error: ${event.error}. Please try again.`);
     };
     
     // Start recognition
@@ -775,6 +871,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       setGuidedVoiceSearch(prev => ({
         ...prev,
         roomType: roomType,
+        exactQuery: lowerTranscript, // Store the exact query
         step: 2 // Move to next step
       }));
       
@@ -793,23 +890,105 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       setGuidedVoiceSearch(prev => ({
         ...prev,
         bedType: bedType,
+        exactQuery: prev.exactQuery + ' | ' + lowerTranscript, // Append the exact query
         step: 3 // Move to next step
       }));
       
     } else if (step === 3) { // Stay duration
       let stayDuration = 'tonight'; // Default
+      let specificDate = null;
       
-      if (lowerTranscript.includes('weekend') || 
-          lowerTranscript.includes('friday') && lowerTranscript.includes('sunday')) {
+      // Advanced date detection for future stays
+      const today = new Date();
+      const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      
+      // Handle specific days of the week
+      if (lowerTranscript.includes('saturday') || lowerTranscript.includes('saturday night')) {
+        // Calculate days until next Saturday
+        const daysUntilSaturday = (6 - dayOfWeek + 7) % 7 || 7; // If today is Saturday, get next Saturday
+        specificDate = new Date(today);
+        specificDate.setDate(today.getDate() + daysUntilSaturday);
+        stayDuration = `Saturday (${specificDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+      } 
+      else if (lowerTranscript.includes('sunday') || lowerTranscript.includes('sunday night')) {
+        const daysUntilSunday = (7 - dayOfWeek) % 7 || 7;
+        specificDate = new Date(today);
+        specificDate.setDate(today.getDate() + daysUntilSunday);
+        stayDuration = `Sunday (${specificDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+      }
+      else if (lowerTranscript.includes('monday') || lowerTranscript.includes('monday night')) {
+        const daysUntilMonday = (1 - dayOfWeek + 7) % 7 || 7;
+        specificDate = new Date(today);
+        specificDate.setDate(today.getDate() + daysUntilMonday);
+        stayDuration = `Monday (${specificDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+      }
+      else if (lowerTranscript.includes('tuesday') || lowerTranscript.includes('tuesday night')) {
+        const daysUntilTuesday = (2 - dayOfWeek + 7) % 7 || 7;
+        specificDate = new Date(today);
+        specificDate.setDate(today.getDate() + daysUntilTuesday);
+        stayDuration = `Tuesday (${specificDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+      }
+      else if (lowerTranscript.includes('wednesday') || lowerTranscript.includes('wednesday night')) {
+        const daysUntilWednesday = (3 - dayOfWeek + 7) % 7 || 7;
+        specificDate = new Date(today);
+        specificDate.setDate(today.getDate() + daysUntilWednesday);
+        stayDuration = `Wednesday (${specificDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+      }
+      else if (lowerTranscript.includes('thursday') || lowerTranscript.includes('thursday night')) {
+        const daysUntilThursday = (4 - dayOfWeek + 7) % 7 || 7;
+        specificDate = new Date(today);
+        specificDate.setDate(today.getDate() + daysUntilThursday);
+        stayDuration = `Thursday (${specificDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+      }
+      else if (lowerTranscript.includes('friday') || lowerTranscript.includes('friday night')) {
+        const daysUntilFriday = (5 - dayOfWeek + 7) % 7 || 7;
+        specificDate = new Date(today);
+        specificDate.setDate(today.getDate() + daysUntilFriday);
+        stayDuration = `Friday (${specificDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+      }
+      // Handle 'next week' or 'next [day]'
+      else if (lowerTranscript.includes('next week')) {
+        specificDate = new Date(today);
+        specificDate.setDate(today.getDate() + 7);
+        stayDuration = `Next week (${specificDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+      }
+      else if (lowerTranscript.includes('next')) {
+        // Handle 'next Saturday', 'next Sunday', etc.
+        const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        for (let i = 0; i < days.length; i++) {
+          if (lowerTranscript.includes(`next ${days[i]}`)) {
+            const targetDay = i;
+            // Calculate days until the next occurrence of the target day
+            let daysUntil = (targetDay - dayOfWeek + 7) % 7;
+            // If today is the target day or we've already passed it this week, add 7 days
+            if (daysUntil === 0) daysUntil = 7;
+            
+            specificDate = new Date(today);
+            specificDate.setDate(today.getDate() + daysUntil + 7); // Add 7 more days for 'next'
+            stayDuration = `Next ${days[i].charAt(0).toUpperCase() + days[i].slice(1)} (${specificDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`;
+            break;
+          }
+        }
+      }
+      // Handle 'weekend'
+      else if (lowerTranscript.includes('weekend')) {
+        // Calculate days until Friday
+        const daysUntilFriday = (5 - dayOfWeek + 7) % 7 || 7;
+        specificDate = new Date(today);
+        specificDate.setDate(today.getDate() + daysUntilFriday);
         stayDuration = 'weekend';
-      } else if (lowerTranscript.includes('week') || lowerTranscript.includes('7 day')) {
-        stayDuration = 'week';
+      }
+      // Handle 'tonight' or default
+      else {
+        stayDuration = 'tonight';
       }
       
       // Update state with the detected stay duration
       setGuidedVoiceSearch(prev => ({
         ...prev,
         stayDuration: stayDuration,
+        specificDate: specificDate,
+        exactQuery: prev.exactQuery + ' | ' + lowerTranscript, // Append the exact query
         step: 4 // Move to results step
       }));
       
@@ -822,16 +1001,39 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   
   // Process the complete guided search and show results
   const processCompleteGuidedSearch = () => {
-    const { roomType, bedType, stayDuration } = guidedVoiceSearch;
+    const { roomType, bedType, stayDuration, specificDate, exactQuery } = guidedVoiceSearch;
     
     // Build a query from the guided search parameters
     const query = `${bedType === 'Queen2Beds' ? 'double' : bedType} ${roomType} for ${stayDuration}`;
     console.log('Built query from guided search:', query);
+    console.log('Original user queries:', exactQuery);
     
-    // Process the query to get results
-    processVoiceSearch(query);
+    // Set the detected query for display in the watermark
+    setDetectedVoiceQuery({
+      query: query,
+      originalTranscript: exactQuery
+    });
     
-    // Reset guided search state
+    // Handle specific dates for future stays
+    if (specificDate) {
+      const checkInDate = new Date(specificDate);
+      const checkOutDate = new Date(specificDate);
+      checkOutDate.setDate(checkOutDate.getDate() + 1); // Default to 1 night stay
+      
+      // Format dates for the search
+      const formattedCheckIn = checkInDate.toISOString().split('T')[0];
+      const formattedCheckOut = checkOutDate.toISOString().split('T')[0];
+      
+      console.log(`Using specific dates: Check-in ${formattedCheckIn}, Check-out ${formattedCheckOut}`);
+      
+      // Process the search with specific dates
+      processVoiceSearch(query, formattedCheckIn, formattedCheckOut);
+    } else {
+      // Process the query normally for tonight, weekend, etc.
+      processVoiceSearch(query);
+    }
+    
+    // Reset guided search state but keep the query for display
     setGuidedVoiceSearch(prev => ({
       ...prev,
       active: false
@@ -1025,30 +1227,38 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   };
   
   // Process voice search query with complete state isolation
-  const processVoiceSearch = (query, searchId = null) => {
+  const processVoiceSearch = (query, specificCheckIn = null, specificCheckOut = null, searchId = null) => {
     // Force a complete reset of any previous state
     // This is a drastic measure but necessary to prevent result caching
     const forceReset = () => {
       console.log('Forcing complete state reset before processing new query');
-      // Clear any previous results from state
       setVoiceSearchResults(null);
-      // Force a small delay to ensure React has time to update
-      return new Promise(resolve => setTimeout(resolve, 50));
+      setShowVoiceSearchResults(false);
+      setVoiceSearchError(null);
+      setVoiceSearchQuery('');
     };
     
-    // Execute the reset and then process the query
-    forceReset().then(() => {
-      // Continue with processing
-      processVoiceSearchInternal(query, searchId);
-    });
+    forceReset();
+    setTimeout(() => {
+      processVoiceSearchInternal(query, specificCheckIn, specificCheckOut, searchId);
+      setShowVoiceSearchResults(true);
+    }, 100);
   };
   
   // Internal implementation of voice search processing with complete isolation
-  const processVoiceSearchInternal = (query, searchId = null) => {
+  const processVoiceSearchInternal = (query, specificCheckIn = null, specificCheckOut = null, searchId = null) => {
     // Don't process empty or very short queries
     if (!query || query.trim().length < 3) {
       console.log('Query too short, not processing');
       return;
+    }
+    
+    // Store the detected query for watermark display
+    if (!detectedVoiceQuery) {
+      setDetectedVoiceQuery({
+        query: query,
+        originalTranscript: query
+      });
     }
     
     // Convert query to lowercase for easier matching
@@ -2453,6 +2663,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             <h3>Voice Search Results</h3>
             <button onClick={closeVoiceSearchResults}>×</button>
           </div>
+          
+          {/* Query watermark removed as requested */}
+          
           <div className="voice-search-content">
             <div className="voice-search-query">You said: "{voiceSearchResults.query}"</div>
             
@@ -2562,10 +2775,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       {/* Floating Voice Search Button */}
       <button 
         className={`voice-search-button ${isButtonActive ? 'active' : 'inactive'}`}
-        onClick={startGuidedVoiceSearch}
-        aria-label="Start guided voice search"
+        onTouchStart={startImprovedVoiceRecognition}
+        onMouseDown={startImprovedVoiceRecognition}
+        onTouchEnd={() => recognitionRef.current && recognitionRef.current.stop()}
+        onMouseUp={() => recognitionRef.current && recognitionRef.current.stop()}
+        aria-label="Press and hold to talk"
       >
-        <i className="fas fa-microphone"></i>
+        <i className={`fas ${isButtonActive ? 'fa-microphone-alt' : 'fa-microphone'}`}></i>
       </button>
     </div>
   );
