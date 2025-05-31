@@ -41,6 +41,46 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     } catch (error) {
       console.error('Error loading rooms from local storage:', error);
     }
+    
+    // Automatically request microphone permission when app starts
+    if (('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window)) {
+      try {
+        // Create a temporary recognition instance just to trigger the permission prompt
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const tempRecognition = new SpeechRecognition();
+        
+        // Configure minimal settings
+        tempRecognition.lang = 'en-US';
+        tempRecognition.continuous = false;
+        tempRecognition.interimResults = false;
+        
+        // Add minimal handlers
+        tempRecognition.onstart = () => {
+          console.log('Microphone permission check started');
+          // Stop after a very short time - just enough to trigger the permission prompt
+          setTimeout(() => {
+            try {
+              tempRecognition.stop();
+            } catch (e) {
+              console.log('Error stopping temp recognition:', e);
+            }
+          }, 100);
+        };
+        
+        tempRecognition.onend = () => {
+          console.log('Microphone permission check completed');
+        };
+        
+        tempRecognition.onerror = (event) => {
+          console.log('Microphone permission check error:', event.error);
+        };
+        
+        // Start recognition to trigger permission prompt
+        tempRecognition.start();
+      } catch (error) {
+        console.error('Error requesting microphone permission:', error);
+      }
+    }
   }, []);  
   
   // Save selected rooms to local storage whenever they change
@@ -779,6 +819,16 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       processingTimeout = setTimeout(() => {
         // Process the enhanced transcript
         processVoiceSearch(processedTranscript);
+        
+        // Automatically stop the recognition after processing
+        try {
+          if (recognitionRef.current) {
+            recognitionRef.current.stop();
+            console.log('Voice recognition automatically stopped after processing');
+          }
+        } catch (e) {
+          console.error('Error stopping recognition after processing:', e);
+        }
       }, 800); // 800ms delay to ensure user has finished speaking
     };
     
@@ -791,9 +841,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     recognition.onerror = (event) => {
       console.error('Speech recognition error:', event.error);
       
-      // Handle iOS-specific errors
-      if (isIOS && event.error === 'not-allowed') {
-        alert('Please allow microphone access in your device settings to use voice search.');
+      // Handle errors silently without alerts
+      if (event.error === 'not-allowed') {
+        console.log('Microphone permission not granted');
       } else if (event.error === 'no-speech') {
         console.log('No speech detected');
       }
@@ -811,10 +861,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       setIsButtonActive(false);
       setIsListening(false);
       
-      // Show a helpful message for iOS users
-      if (isIOS) {
-        alert('Speech recognition failed to start. Please make sure you have granted microphone permissions in your device settings.');
-      }
+      // Log error silently without showing alerts
+      console.log('Speech recognition failed to start - will try again automatically');
     }
   };
   
