@@ -1256,113 +1256,33 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Check if this is an iOS device
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     
-    if (isIOS) {
-      // For iOS devices, use a simpler approach with a native alert
-      setTimeout(() => {
-        // Process the query
-        const results = processVoiceSearchInternalForIOS(query, specificCheckIn, specificCheckOut, searchId);
-        
-        // Show results in a native alert for iOS
-        if (results) {
-          const message = `Room: ${results.bedType} (${results.isSmoking ? 'Smoking' : 'Non-Smoking'})
-` +
-                         `Check-in: ${results.checkInDate.toLocaleDateString()}
-` +
-                         `Check-out: ${results.checkOutDate.toLocaleDateString()}
-` +
-                         `Total: $${results.total.toFixed(2)}`;
-          
-          alert(`Voice Search Results:\n${message}`);
-        }
-      }, 100);
-    } else {
-      // For non-iOS devices, use the modal approach
-      setTimeout(() => {
-        // Process the query
-        processVoiceSearchInternal(query, specificCheckIn, specificCheckOut, searchId);
-        
-        // Show the modal
+    // Process the query
+    setTimeout(() => {
+      // Process the query first
+      processVoiceSearchInternal(query, specificCheckIn, specificCheckOut, searchId);
+      
+      // Show the results
+      setShowVoiceSearchResults(true);
+      
+      // For iOS devices, we need to do some extra work to make the modal visible
+      if (isIOS) {
+        // Force iOS to recognize the modal
         setTimeout(() => {
-          console.log('Showing voice search results modal');
-          setShowVoiceSearchResults(true);
-        }, 300);
-      }, 100);
-    }
-  };
-  
-  // iOS-specific implementation for voice search processing
-  const processVoiceSearchInternalForIOS = (query, specificCheckIn = null, specificCheckOut = null, searchId = null) => {
-    // Don't process empty or very short queries
-    if (!query || query.trim().length < 3) {
-      console.log('Query too short, not processing');
-      return null;
-    }
-    
-    // Convert query to lowercase for easier matching
-    const lowerQuery = query.toLowerCase();
-    console.log('Processing iOS voice query:', lowerQuery);
-    
-    // Initialize results object
-    let results = {
-      query: query,
-      timestamp: Date.now(),
-      searchId: searchId || `search-${Date.now()}`,
-      nights: 1,
-      checkInDate: new Date(),
-      checkOutDate: new Date(new Date().getTime() + 24 * 60 * 60 * 1000),
-      bedType: 'Queen', // Default
-      hasJacuzzi: false,
-      isSmoking: false,
-      price: 0,
-      tax: 0,
-      total: 0
-    };
-    
-    // Extract room type (smoking/non-smoking)
-    if (lowerQuery.includes('smoking') && !lowerQuery.includes('non') && 
-        !lowerQuery.includes('no smoking')) {
-      results.isSmoking = true;
-    }
-    
-    // Extract bed type
-    if (lowerQuery.includes('king')) {
-      results.bedType = 'King';
-    } else if (lowerQuery.includes('double') || 
-              lowerQuery.includes('two bed') || 
-              lowerQuery.includes('2 bed')) {
-      results.bedType = 'Queen2Beds';
-    }
-    
-    // Extract jacuzzi preference
-    if (lowerQuery.includes('jacuzzi') || 
-        lowerQuery.includes('hot tub') || 
-        lowerQuery.includes('spa')) {
-      results.hasJacuzzi = true;
-    }
-    
-    // Extract dates
-    if (lowerQuery.includes('weekend')) {
-      // Find the next Friday
-      const dayOfWeek = results.checkInDate.getDay(); // 0 = Sunday, 6 = Saturday
-      const daysUntilFriday = (5 - dayOfWeek + 7) % 7;
-      results.checkInDate.setDate(results.checkInDate.getDate() + daysUntilFriday);
-      results.checkOutDate = new Date(results.checkInDate);
-      results.checkOutDate.setDate(results.checkOutDate.getDate() + 2); // Friday to Sunday
-      results.nights = 2;
-    } else if (specificCheckIn && specificCheckOut) {
-      results.checkInDate = new Date(specificCheckIn);
-      results.checkOutDate = new Date(specificCheckOut);
-      const diffTime = Math.abs(results.checkOutDate - results.checkInDate);
-      results.nights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    }
-    
-    // Calculate price
-    const basePrice = results.hasJacuzzi ? 159 : 129;
-    results.price = basePrice * results.nights;
-    results.tax = results.price * 0.15;
-    results.total = results.price + results.tax;
-    
-    return results;
+          // Get the modal element
+          const modal = document.getElementById('voiceSearchResults');
+          if (modal) {
+            // Force iOS to redraw the modal
+            modal.style.display = 'none';
+            setTimeout(() => {
+              modal.style.display = 'flex';
+              // Scroll to top to ensure visibility
+              window.scrollTo(0, 0);
+              document.body.style.overflow = 'hidden';
+            }, 10);
+          }
+        }, 100);
+      }
+    }, 100);
   };
   
   // Internal implementation of voice search processing with complete isolation
@@ -1795,12 +1715,35 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       console.log('Setting voice search results with unique ID:', results.uniqueId);
       setVoiceSearchResults(results);
       setShowVoiceSearchResults(true);
+      
+      // Also reset any active recognition
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+          recognitionRef.current = null;
+        } catch (e) {
+          console.log('Error cleaning up recognition:', e);
+        }
+      }
+      
+      // Reset button states
+      setIsListening(false);
+      setIsButtonActive(false);
+      
+      // Force a reflow for iOS
+      setTimeout(() => {
+        window.scrollTo(0, 1);
+        window.scrollTo(0, 0);
+      }, 100);
     }, 50);
   };
   
-  // Close voice search results and completely reset the state
+  // Close voice search results
   const closeVoiceSearchResults = () => {
     console.log('Closing voice search results modal');
+    
+    // Check if this is an iOS device
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     
     // Reset modal state
     setShowVoiceSearchResults(false);
@@ -1811,25 +1754,14 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Reset body overflow (important for iOS)
     document.body.style.overflow = 'auto';
     
-    // Also reset any active recognition
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.abort();
-        recognitionRef.current = null;
-      } catch (e) {
-        console.log('Error cleaning up recognition:', e);
-      }
+    // For iOS devices, add extra cleanup
+    if (isIOS) {
+      // Force a reflow for iOS
+      setTimeout(() => {
+        window.scrollTo(0, 1);
+        window.scrollTo(0, 0);
+      }, 100);
     }
-    
-    // Reset button states
-    setIsListening(false);
-    setIsButtonActive(false);
-    
-    // Force a reflow for iOS
-    setTimeout(() => {
-      window.scrollTo(0, 1);
-      window.scrollTo(0, 0);
-    }, 100);
   };
   
   // Handle card mouse move
@@ -2823,17 +2755,15 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         </div>
       )}
       
-      {/* Voice Search Results Popup */}
+      {/* Voice Search Results Popup - Simplified for iOS compatibility */}
       {showVoiceSearchResults && voiceSearchResults && (
-        <div className="voice-search-results">
+        <div className="voice-search-results" id="voiceSearchResults">
           <div className="voice-search-header">
             <h3>Voice Search Results</h3>
-            <button onClick={closeVoiceSearchResults}>×</button>
+            <button onClick={closeVoiceSearchResults} className="close-button">×</button>
           </div>
           
-          {/* Query watermark removed as requested */}
-          
-          <div className="voice-search-content">
+          <div className="voice-search-content" id="voiceSearchContent">
             <div className="voice-search-query">You said: "{voiceSearchResults.query}"</div>
             
             {voiceSearchResults.recognitionError ? (
