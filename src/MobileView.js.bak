@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import DatePicker from 'react-datepicker';
 import "react-datepicker/dist/react-datepicker.css";
 import './MobileView.css';
@@ -9,6 +9,37 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   const [selectedRooms, setSelectedRooms] = useState([]);
   const [showRoomSelector, setShowRoomSelector] = useState(false);
   const [availableRooms, setAvailableRooms] = useState([]);
+  
+  // Voice search state
+  const [isListening, setIsListening] = useState(false);
+  const [isButtonActive, setIsButtonActive] = useState(false);
+  const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
+  const [showVoiceSearchResults, setShowVoiceSearchResults] = useState(false);
+  const [voiceSearchResults, setVoiceSearchResults] = useState(null);
+  
+  // Reference to store the speech recognition instance
+  const recognitionRef = useRef(null);
+  
+  // Load selected rooms from local storage on component mount
+  useEffect(() => {
+    try {
+      const storedRooms = localStorage.getItem('selectedRooms');
+      if (storedRooms) {
+        setSelectedRooms(JSON.parse(storedRooms));
+      }
+    } catch (error) {
+      console.error('Error loading rooms from local storage:', error);
+    }
+  }, []);  
+  
+  // Save selected rooms to local storage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('selectedRooms', JSON.stringify(selectedRooms));
+    } catch (error) {
+      console.error('Error saving rooms to local storage:', error);
+    }
+  }, [selectedRooms]);
   const [activeFloor, setActiveFloor] = useState('ground'); // 'ground' or 'first'
   
   // State for saved stays
@@ -17,7 +48,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   const [activeTab, setActiveTab] = useState('short');
   
   // State for tooltip
-  const [hoveredRoom, setHoveredRoom] = useState(null);
+  const [hoveredCard, setHoveredCard] = useState(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   
   // Short stay state
@@ -46,6 +77,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   const [showShortStayPriceSummary, setShowShortStayPriceSummary] = useState(true);
   const [showOvernightPriceSummary, setShowOvernightPriceSummary] = useState(true);
   
+  // Current time state variables
+  const [currentTime, setCurrentTime] = useState('');
+  const [formattedCurrentDate, setFormattedCurrentDate] = useState('');
+  
   // Default check-in date (today at 3 PM)
   const defaultCheckIn = new Date();
   defaultCheckIn.setHours(15, 0, 0, 0);
@@ -58,16 +93,37 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   const [checkInDate, setCheckInDate] = useState(defaultCheckIn);
   const [checkOutDate, setCheckOutDate] = useState(defaultCheckOut);
   
-  // Calculate checkout time based on current time and extra hours
-  const calculateCheckoutTime = useCallback(() => {
+  // Update current date and time
+  const updateCurrentDateTime = useCallback(() => {
     const now = new Date();
-    const checkoutDate = new Date(now.getTime() + ((4 + extraHours) * 60 * 60 * 1000));
-    const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: true };
-    setCheckoutTime(checkoutDate.toLocaleTimeString('en-US', timeOptions));
     
-    // Also format current time
-    const checkinTime = now.toLocaleTimeString('en-US', timeOptions);
-    return { checkinTime, checkoutTime: checkoutDate.toLocaleTimeString('en-US', timeOptions) };
+    // Format date
+    const dateOptions = { year: 'numeric', month: 'long', day: 'numeric' };
+    setFormattedCurrentDate(now.toLocaleDateString('en-US', dateOptions));
+    
+    // Format time with seconds
+    const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+    const timeString = now.toLocaleTimeString('en-US', timeOptions);
+    setCurrentTime(timeString);
+    
+    // Don't update checkout time here - it will be handled by the extraHours useEffect
+  }, []);
+  
+  // Calculate checkout time based on current time and extra hours
+  const calculateCheckoutTime = useCallback((customNow = null) => {
+    const now = customNow || new Date();
+    
+    // Calculate checkout time (current time + 4 hours + extra hours)
+    const checkoutDate = new Date(now.getTime() + ((4 + extraHours) * 60 * 60 * 1000));
+    
+    // Format checkout time with seconds
+    const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+    const formattedCheckoutTime = checkoutDate.toLocaleTimeString('en-US', timeOptions);
+    
+    // Set state
+    setCheckoutTime(formattedCheckoutTime);
+    
+    return formattedCheckoutTime;
   }, [extraHours]);
   
   // Calculate short stay price
@@ -84,10 +140,15 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     const extraHoursCost = extraHours * hourlyRate;
     
     // Calculate tax (15% only for credit card payments, no tax for cash)
-    const taxAmount = paymentMethod === 'credit' ? baseRate * 0.15 : 0;
+    // Apply tax to both base rate and extra hours for credit card payments
+    let taxAmount = 0;
+    if (paymentMethod === 'credit') {
+      // Apply 15% tax to both base rate and extra hours
+      taxAmount = (baseRate + extraHoursCost) * 0.15;
+    }
     
-    // Total is base + tax + extra hours
-    const total = baseRate + taxAmount + extraHoursCost;
+    // Total is base + extra hours + tax
+    const total = baseRate + extraHoursCost + taxAmount;
     
     setTotalPrice(total);
     setTaxAmount(taxAmount);
@@ -189,10 +250,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       totalBasePrice += 10 * nights;
     }
     
-    // Calculate tax (always 15% regardless of payment method)
-    const taxAmount = totalBasePrice * 0.15;
-    
-    // Calculate extra hours cost
+    // Calculate extra hours cost first
     const hourlyRate = overnightRateType === 'regular' ? 
       shortStayPrices.extraHourRate.regular : 
       shortStayPrices.extraHourRate.discounted;
@@ -200,6 +258,17 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // For early check-in, overnightExtraHours is negative, so we need to use Math.abs
     const extraHoursCheckInCost = Math.abs(overnightExtraHours) * hourlyRate;
     const extraHoursCheckOutCost = overnightCheckoutExtraHours * hourlyRate;
+    const totalExtraHoursCost = extraHoursCheckInCost + extraHoursCheckOutCost;
+    
+    // Calculate tax based on payment method
+    let taxAmount;
+    if (overnightPayment === 'credit') {
+      // Apply 15% tax to both base price and extra hours for credit card
+      taxAmount = (totalBasePrice + totalExtraHoursCost) * 0.15;
+    } else {
+      // For cash payment, only apply tax to base price
+      taxAmount = totalBasePrice * 0.15;
+    }
     
     // Calculate total
     const totalPrice = totalBasePrice + taxAmount + extraHoursCheckInCost + extraHoursCheckOutCost;
@@ -218,19 +287,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     };
   }, [checkInDate, checkOutDate, hasJacuzziOvernight, overnightBedType, overnightExtraHours, overnightCheckoutExtraHours, overnightRateType, overnightPayment, prices, shortStayPrices]);
   
-  // Handle extra hours change for short stay
+  // Handle extra hours change for short stay - simplified like in pricecalculator project
   const handleExtraHoursChange = (change) => {
-    setExtraHours(prevHours => {
-      const newValue = Math.max(0, prevHours + change);
-      // Calculate and update checkout time immediately
-      const now = new Date();
-      const checkoutDate = new Date(now.getTime() + ((4 + newValue) * 60 * 60 * 1000));
-      const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: true };
-      const checkinTime = now.toLocaleTimeString('en-US', timeOptions);
-      const checkoutTimeStr = checkoutDate.toLocaleTimeString('en-US', timeOptions);
-      setCheckoutTime(checkoutTimeStr);
-      return newValue;
-    });
+    const newValue = Math.max(0, extraHours + change);
+    setExtraHours(newValue);
+    // Price calculation will happen in useEffect
   };
   
   // Handle overnight extra hours change
@@ -325,11 +386,42 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     }
   }, [currentDateTime, prices]);
   
-  // Update calculations when dependencies change
+  // Effect to initialize checkout time and set up timer for current time
   useEffect(() => {
-    calculateCheckoutTime();
+    // Initial update for current time
+    updateCurrentDateTime();
+    
+    // Initial update for checkout time (current time + 4 hours)
+    const now = new Date();
+    const checkoutDate = new Date(now.getTime() + ((4 + extraHours) * 60 * 60 * 1000));
+    const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+    const checkoutTimeStr = checkoutDate.toLocaleTimeString('en-US', timeOptions);
+    setCheckoutTime(checkoutTimeStr);
+    
+    // Initial price calculation
     calculateShortStayPrice();
-  }, [calculateCheckoutTime, calculateShortStayPrice]);
+    
+    // Set up timer to update only the current time every second
+    const timer = setInterval(() => {
+      updateCurrentDateTime();
+    }, 1000);
+    
+    // Cleanup timer on component unmount
+    return () => clearInterval(timer);
+  }, [updateCurrentDateTime, calculateShortStayPrice, extraHours]);
+  
+  // Update checkout time and price calculation when extraHours changes
+  useEffect(() => {
+    // Update checkout time based on current time and extra hours
+    const now = new Date();
+    const checkoutDate = new Date(now.getTime() + ((4 + extraHours) * 60 * 60 * 1000));
+    const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+    const checkoutTimeStr = checkoutDate.toLocaleTimeString('en-US', timeOptions);
+    setCheckoutTime(checkoutTimeStr);
+    
+    // Also update price calculation
+    calculateShortStayPrice();
+  }, [extraHours, calculateShortStayPrice]);
   
   // Clear short stay selections
   const clearShortStay = () => {
@@ -345,6 +437,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     setTotalPrice(0);
     calculateCheckoutTime();
     setShowShortStayPriceSummary(false);
+    
+    // Clear selected rooms from local storage
+    try {
+      localStorage.removeItem('selectedRooms');
+    } catch (error) {
+      console.error('Error clearing rooms from local storage:', error);
+    }
   };
   
   // Clear overnight stay selections
@@ -368,6 +467,14 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     setOvernightRateType('regular');
     setOvernightBedType('Queen');
     setShowOvernightPriceSummary(false);
+    
+    // Clear selected rooms from local storage
+    try {
+      localStorage.removeItem('selectedRooms');
+      setSelectedRooms([]);
+    } catch (error) {
+      console.error('Error clearing rooms from local storage:', error);
+    }
   };
   
   // Calculate overnight price info
@@ -398,7 +505,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       // Define room data according to specific room types
       const roomData = {
         // Ground floor (100s)
-        101: { bedType: 'Queen', isSmoking: false, hasJacuzzi: false },
+        101: { bedType: 'Queen', isSmoking: true, hasJacuzzi: false },
         102: { bedType: 'Queen', isSmoking: true, hasJacuzzi: false },
         103: { bedType: 'Queen2Beds', isSmoking: false, hasJacuzzi: false },
         104: { bedType: 'Queen', isSmoking: true, hasJacuzzi: false },
@@ -490,6 +597,647 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     }
   };
   
+  // Handle card mouse enter for tooltip
+  const handleCardMouseEnter = (room, e) => {
+    // Get base price based on jacuzzi option
+    let basePrice = room.hasJacuzzi ? dailyPrices.jacuzzi : dailyPrices.regular;
+    
+    // Add surcharge based on bed type, matching the logic in Multinights section
+    if (room.bedType === 'King') {
+      basePrice += 5; // $5 extra for King beds
+    } else if (room.bedType === 'Queen2Beds') {
+      basePrice += 10; // $10 extra for Queen 2 beds
+    }
+    
+    const tax = basePrice * 0.15; // 15% tax
+    const total = basePrice + tax;
+    
+    // Get the viewport width to adjust tooltip position
+    const viewportWidth = window.innerWidth;
+    const tooltipWidth = 110; // Width of our tooltip
+    const cursorX = e.clientX;
+    
+    // Adjust x position if tooltip would go off screen on the right
+    let adjustedX = cursorX;
+    if (cursorX + tooltipWidth > viewportWidth) {
+      adjustedX = cursorX - tooltipWidth;
+    }
+    
+    setHoveredCard({ room, basePrice, tax, total });
+    setMousePos({ x: adjustedX, y: e.clientY });
+  };
+  
+  // Handle card mouse leave
+  const handleCardMouseLeave = () => {
+    setHoveredCard(null);
+  };
+  
+  // Handle voice search button press
+  const handleVoiceButtonPress = (e) => {
+    e.preventDefault(); // Prevent default behavior
+    
+    // Check if speech recognition is supported
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('Speech recognition is not supported in your browser. Please try Chrome or Edge.');
+      return;
+    }
+    
+    console.log('Voice button pressed');
+    setIsButtonActive(true);
+    setIsListening(true);
+    
+    // Completely reset voice search state
+    setVoiceSearchQuery('');
+    setShowVoiceSearchResults(false); // Hide any previous results
+    setVoiceSearchResults(null); // Clear previous results
+    
+    // Initialize speech recognition
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
+    
+    recognition.lang = 'en-US';
+    recognition.continuous = true; // Keep listening while button is pressed
+    recognition.interimResults = true; // Get results as user speaks
+    
+    let transcript = '';
+    
+    recognition.onstart = () => {
+      console.log('Speech recognition started');
+    };
+    
+    recognition.onresult = (event) => {
+      // Get the latest transcript
+      transcript = '';
+      for (let i = 0; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      
+      // Update the transcript in state
+      setVoiceSearchQuery(transcript);
+      console.log('Current transcript:', transcript);
+    };
+    
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      if (event.error === 'no-speech') {
+        console.log('No speech detected');
+      }
+    };
+    
+    recognition.onend = () => {
+      console.log('Speech recognition ended');
+      setIsListening(false);
+      setIsButtonActive(false);
+    };
+    
+    // Start recognition
+    try {
+      recognition.start();
+      console.log('Recognition started');
+    } catch (error) {
+      console.error('Error starting recognition:', error);
+    }
+    
+    // Add event listeners for touch events on iOS
+    document.addEventListener('touchend', handleVoiceButtonRelease);
+    document.addEventListener('touchcancel', handleVoiceButtonRelease);
+  };
+  
+  // Handle voice search button release
+  const handleVoiceButtonRelease = (e) => {
+    if (e) e.preventDefault(); // Prevent default behavior
+    
+    console.log('Voice button released');
+    setIsButtonActive(false);
+    
+    // Stop the recognition
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+        console.log('Recognition stopped');
+      } catch (error) {
+        console.error('Error stopping recognition:', error);
+      }
+    }
+    
+    // Remove event listeners
+    document.removeEventListener('touchend', handleVoiceButtonRelease);
+    document.removeEventListener('touchcancel', handleVoiceButtonRelease);
+    
+    // Process the final transcript
+    setTimeout(() => {
+      // Get the latest transcript from state to avoid using cached data
+      const finalQuery = voiceSearchQuery;
+      console.log('Processing final query:', finalQuery);
+      
+      if (finalQuery && finalQuery.trim().length > 0) {
+        // Create a fresh processing context for each query
+        processVoiceSearch(finalQuery.trim());
+      } else {
+        // If no speech was detected, show a helpful message
+        const emptyResults = {
+          query: "No speech detected",
+          foundMatch: false,
+          noSpeechDetected: true,
+          timestamp: new Date().getTime() // Add timestamp to ensure uniqueness
+        };
+        setVoiceSearchResults(emptyResults);
+        setShowVoiceSearchResults(true);
+      }
+    }, 300);
+  };
+  
+  // Handle mouse events for desktop browsers
+  const handleMouseDown = (e) => {
+    e.preventDefault();
+    handleVoiceButtonPress(e);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+  
+  const handleMouseUp = (e) => {
+    e.preventDefault();
+    handleVoiceButtonRelease(e);
+    document.removeEventListener('mouseup', handleMouseUp);
+  };
+  
+  // Process voice search query
+  const processVoiceSearch = (query) => {
+    // Don't process empty or very short queries
+    if (!query || query.trim().length < 3) {
+      console.log('Query too short, not processing');
+      return;
+    }
+    
+    // Convert query to lowercase for easier matching
+    const lowerQuery = query.toLowerCase();
+    console.log('Processing voice query:', lowerQuery);
+    
+    // Define valid room types in the hotel
+    const validRoomTypes = {
+      'Queen': 'Standard Queen bed',
+      'King': 'King size bed (fits 3 people)',
+      'Queen2Beds': 'Queen room with 2 beds (fits 4 people)'
+    };
+    
+    // Define valid room combinations
+    const validCombinations = {
+      'Queen-Jacuzzi': true,     // Queen with Jacuzzi exists
+      'King-Jacuzzi': true,      // King with Jacuzzi exists
+      'Queen2Beds-Jacuzzi': false // Queen 2 Beds with Jacuzzi does NOT exist
+    };
+    
+    // Initialize results object with a timestamp to ensure uniqueness
+    let results = {
+      query: query,
+      timestamp: new Date().getTime(), // Add timestamp to prevent caching issues
+      nights: 1,
+      checkInDate: new Date(),
+      checkOutDate: new Date(new Date().getTime() + 24 * 60 * 60 * 1000),
+      bedType: 'Queen', // Default to Queen
+      hasJacuzzi: false,
+      isSmoking: false,
+      price: 0,
+      tax: 0,
+      total: 0,
+      dailyPrices: [], // Add array for daily price breakdown
+      foundMatch: false,
+      validRoomTypes: validRoomTypes, // Add valid room types for reference
+      validCombinations: validCombinations, // Add valid combinations for reference
+      invalidRoomType: false, // Flag for invalid room type
+      requestedInvalidType: '', // Store the invalid room type that was requested
+      invalidCombination: false, // Flag for invalid room combination
+      requestedInvalidCombination: '', // Store the invalid combination that was requested
+      isShortStay: false, // Flag for short stay
+      shortStayHours: 4, // Default short stay hours
+      extraHours: 0, // Extra hours for short stay
+      shortStayCheckoutTime: '', // Checkout time for short stay
+      cashPrice: 0, // Price with cash payment
+      creditCardPrice: 0 // Price with credit card payment
+    };
+      
+      // Find the first mentioned day
+      const firstDay = mentionedDays[0];
+      const firstDayIndex = dayIndices[firstDay];
+      
+      // Calculate days until the first mentioned day
+      let daysUntilFirstDay = firstDayIndex - currentDayIndex;
+      if (daysUntilFirstDay <= 0) daysUntilFirstDay += 7; // If it's in the past, go to next week
+      
+      // Set check-in date
+      const checkInDate = new Date(today);
+      checkInDate.setDate(today.getDate() + daysUntilFirstDay);
+      checkInDate.setHours(15, 0, 0, 0); // 3 PM check-in
+      results.checkInDate = checkInDate;
+      
+      // If multiple days mentioned, set check-out date based on the last day
+      if (mentionedDays.length > 1) {
+        const lastDay = mentionedDays[mentionedDays.length - 1];
+        const lastDayIndex = dayIndices[lastDay];
+        
+        // Calculate days between first and last day
+        let daysBetween = lastDayIndex - firstDayIndex;
+        if (daysBetween <= 0) daysBetween += 7; // If it wraps around to the next week
+        
+        // Set check-out date to the day AFTER the last mentioned night
+        // This ensures the last mentioned night is included in the stay
+        const checkOutDate = new Date(checkInDate);
+        checkOutDate.setDate(checkInDate.getDate() + daysBetween + 1); // Add 1 to include the last night
+        checkOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
+        results.checkOutDate = checkOutDate;
+        
+        // Calculate nights - add 1 to include the last night
+        results.nights = daysBetween + 1;
+      } else {
+        // If only one day mentioned, assume 1 night stay
+        const checkOutDate = new Date(checkInDate);
+        checkOutDate.setDate(checkInDate.getDate() + 1);
+        checkOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
+        results.checkOutDate = checkOutDate;
+        results.nights = 1;
+      }
+    }
+    
+    // Extract bed type with improved detection logic and validation
+    console.log('Voice query for bed type detection:', lowerQuery);
+    
+    // First, set default room type
+    let detectedBedType = 'Queen';
+    let invalidRoomTypeRequested = false;
+    let requestedInvalidType = '';
+    
+    // Check for invalid room types first
+    if (lowerQuery.includes('suite') || lowerQuery.includes('penthouse')) {
+      invalidRoomTypeRequested = true;
+      requestedInvalidType = lowerQuery.includes('suite') ? 'Suite' : 'Penthouse';
+      console.log('Invalid room type requested:', requestedInvalidType);
+    } else if (lowerQuery.includes('twin') || lowerQuery.includes('single')) {
+      invalidRoomTypeRequested = true;
+      requestedInvalidType = lowerQuery.includes('twin') ? 'Twin beds' : 'Single bed';
+      console.log('Invalid room type requested:', requestedInvalidType);
+    }
+    
+    // Create a more robust detection system for valid types
+    const containsKing = lowerQuery.includes('king');
+    const containsQueen = lowerQuery.includes('queen');
+    
+    // Improved detection for double beds - check for double without requiring 'queen'
+    const containsDoubleBed = 
+      lowerQuery.includes('double') || 
+      lowerQuery.includes('two beds') || 
+      lowerQuery.includes('2 beds') || 
+      (containsQueen && lowerQuery.includes('two')) || 
+      (containsQueen && lowerQuery.includes('2')) || 
+      (containsQueen && lowerQuery.includes('beds'));
+    
+    // Add detailed logging for debugging
+    console.log('Detection flags:', {
+      containsKing,
+      containsQueen,
+      containsDoubleBed,
+      query: lowerQuery
+    });
+    
+    // Apply detection logic with clear priority
+    if (containsDoubleBed) {
+      detectedBedType = 'Queen2Beds';
+      console.log('Detected: Queen 2 Beds');
+    } else if (containsQueen) {
+      detectedBedType = 'Queen';
+      console.log('Detected: Queen');
+    } else if (containsKing) {
+      detectedBedType = 'King';
+      console.log('Detected: King');
+    } else {
+      console.log('No specific bed type detected, defaulting to Queen');
+    }
+    
+    // Special case for 'double' without specifying bed type
+    if (lowerQuery.includes('double') && !containsQueen && !containsKing) {
+      console.log('Special case: Double without bed type specified');
+      detectedBedType = 'Queen2Beds';
+    }
+    
+    // Set the bed type and validation flags
+    results.bedType = detectedBedType;
+    results.invalidRoomType = invalidRoomTypeRequested;
+    results.requestedInvalidType = requestedInvalidType;
+    console.log('Final bed type selected:', results.bedType);
+    console.log('Invalid room type?', results.invalidRoomType);
+    
+    // Check for jacuzzi
+    if (lowerQuery.includes('jacuzzi') || lowerQuery.includes('hot tub') || lowerQuery.includes('spa')) {
+      results.hasJacuzzi = true;
+      
+      // Check for invalid combinations
+      const combinationKey = `${results.bedType}-Jacuzzi`;
+      console.log('Checking combination:', combinationKey);
+      
+      if (validCombinations[combinationKey] === false) {
+        console.log('Invalid combination detected:', combinationKey);
+        results.invalidCombination = true;
+        results.requestedInvalidCombination = `${results.bedType === 'Queen2Beds' ? 'Queen 2 Beds' : results.bedType} with Jacuzzi`;
+        
+        // Suggest an alternative
+        if (results.bedType === 'Queen2Beds') {
+          // If they asked for Queen 2 Beds with Jacuzzi (which doesn't exist),
+          // suggest either Queen with Jacuzzi or King with Jacuzzi
+          results.bedType = 'Queen';
+          results.hasJacuzzi = true;
+        }
+      }
+    }
+    
+    // Check for smoking preference
+    if (lowerQuery.includes('smoking')) {
+      results.isSmoking = true;
+    } else if (lowerQuery.includes('non-smoking') || lowerQuery.includes('non smoking')) {
+      results.isSmoking = false;
+    }
+    
+    // Calculate price based on extracted information
+    const roomPrices = results.hasJacuzzi ? 
+      { weekday: prices.weekday.withJacuzzi, friday: prices.friday.withJacuzzi, weekend: prices.weekend.withJacuzzi } :
+      { weekday: prices.weekday.withoutJacuzzi, friday: prices.friday.withoutJacuzzi, weekend: prices.weekend.withoutJacuzzi };
+    // Calculate base price for overnight stays
+    let stayBasePrice = 0;
+    const stayCheckInDateObj = new Date(results.checkInDate);
+    
+    // Check for short stay request
+    const shortStayRegex = /short stay|until|till|to (\d{1,2}(?::|\.|\s*)[0-5]\d\s*(?:am|pm|a\.m\.|p\.m\.|a|p)?)/i;
+    const timeRegex = /(\d{1,2}(?::|\.|\s*)[0-5]\d\s*(?:am|pm|a\.m\.|p\.m\.|a|p)?)|(?:\b(\d{1,2})\s*(?:am|pm|a\.m\.|p\.m\.|a|p)\b)/i;
+    
+    // Check if this is a short stay request
+    if (lowerQuery.includes('short stay') || 
+        lowerQuery.includes('until') || 
+        lowerQuery.includes('till') || 
+        (lowerQuery.includes('to') && timeRegex.test(lowerQuery))) {
+      
+      console.log('Short stay request detected');
+      results.isShortStay = true;
+      
+      // Extract time from query
+      let checkoutTime = null;
+      const timeMatch = lowerQuery.match(timeRegex);
+      
+      if (timeMatch) {
+        let timeStr = timeMatch[0];
+        console.log('Time found in query:', timeStr);
+        
+        // Parse the time string to get hours and minutes
+        let hours = 0;
+        let minutes = 0;
+        let isPM = false;
+        
+        // Check if time includes AM/PM
+        if (/pm|p\.m\.|p$/i.test(timeStr)) {
+          isPM = true;
+        }
+        
+        // Extract hours and minutes
+        const timeComponents = timeStr.match(/(\d{1,2})(?::|\.|\s*)(\d{2})?/i);
+        if (timeComponents) {
+          hours = parseInt(timeComponents[1], 10);
+          if (timeComponents[2]) {
+            minutes = parseInt(timeComponents[2], 10);
+          }
+          
+          // Convert to 24-hour format if PM
+          if (isPM && hours < 12) {
+            hours += 12;
+          }
+          // Convert 12 AM to 0 hours
+          if (!isPM && hours === 12) {
+            hours = 0;
+          }
+          
+          // Create checkout time
+          const now = new Date();
+          const checkoutDate = new Date(now);
+          checkoutDate.setHours(hours, minutes, 0, 0);
+          
+          // If the time is earlier than now, assume it's for tomorrow
+          if (checkoutDate <= now) {
+            checkoutDate.setDate(checkoutDate.getDate() + 1);
+          }
+          
+          checkoutTime = checkoutDate;
+          
+          // Format for display
+          const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: true };
+          results.shortStayCheckoutTime = checkoutDate.toLocaleTimeString('en-US', timeOptions);
+          
+          // Calculate hours difference
+          const diffMs = checkoutDate - now;
+          const diffHours = diffMs / (1000 * 60 * 60);
+          
+          // Calculate base hours and extra hours
+          if (diffHours <= 4) {
+            results.shortStayHours = Math.max(1, Math.ceil(diffHours));
+            results.extraHours = 0;
+          } else {
+            results.shortStayHours = 4;
+            results.extraHours = Math.ceil(diffHours - 4);
+          }
+          
+          console.log('Short stay hours:', results.shortStayHours, 'Extra hours:', results.extraHours);
+          
+          // Calculate prices for short stay
+          // Base price for the room type
+          let baseShortStayPrice = 0;
+          const dayOfWeek = now.getDay(); // 0 = Sunday, 6 = Saturday
+          const isWeekend = (dayOfWeek === 0 || dayOfWeek === 5 || dayOfWeek === 6); // Friday, Saturday, Sunday
+          
+          // Get base price based on room type and jacuzzi
+          if (results.bedType === 'Queen') {
+            baseShortStayPrice = results.hasJacuzzi ? shortStayPrices.queenJacuzzi : shortStayPrices.queen;
+          } else if (results.bedType === 'King') {
+            baseShortStayPrice = results.hasJacuzzi ? shortStayPrices.kingJacuzzi : shortStayPrices.king;
+          } else if (results.bedType === 'Queen2Beds') {
+            baseShortStayPrice = shortStayPrices.queen2Beds;
+          }
+          
+          // Apply weekend pricing if applicable (20% more on weekends)
+          if (isWeekend) {
+            baseShortStayPrice = baseShortStayPrice * 1.2;
+          }
+          
+          // Calculate extra hours cost
+          const extraHoursCost = results.extraHours * 15; // $15 per extra hour
+          
+          // Calculate total price
+          const totalBeforeTax = baseShortStayPrice + extraHoursCost;
+          const tax = totalBeforeTax * 0.15; // 15% tax
+          
+          // Set prices
+          results.price = totalBeforeTax;
+          results.tax = tax;
+          results.total = totalBeforeTax + tax;
+          
+          // Calculate cash and credit card prices
+          results.cashPrice = results.total;
+          results.creditCardPrice = results.total * 1.03; // 3% surcharge for credit card
+        }
+      }
+    }
+    
+    // Extract days of the week
+    const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    let checkInDay = -1;
+    let checkOutDay = -1;
+    
+    // For tracking mentioned days
+    const mentionedDays = [];
+    const dayIndices = {
+      'sunday': 0,
+      'monday': 1,
+      'tuesday': 2,
+      'wednesday': 3,
+      'thursday': 4,
+      'friday': 5,
+      'saturday': 6
+    };
+    
+    // Check for days of the week in the query
+    daysOfWeek.forEach((day) => {
+      if (lowerQuery.includes(day)) {
+        mentionedDays.push(day);
+        // If we haven't found a check-in day yet, this is the check-in day
+        if (checkInDay === -1) {
+          checkInDay = dayIndices[day];
+        } else {
+          // If we already found a check-in day, this is the check-out day
+          checkOutDay = dayIndices[day];
+        }
+      }
+    });
+    
+    // Process dates if days were mentioned
+    if (mentionedDays.length > 0) {
+      const today = new Date();
+      const currentDayIndex = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      
+      // Find the first mentioned day
+      const firstDay = mentionedDays[0];
+      const firstDayIndex = dayIndices[firstDay];
+      
+      // Calculate days until the first mentioned day
+      let daysUntilFirstDay = firstDayIndex - currentDayIndex;
+      if (daysUntilFirstDay <= 0) daysUntilFirstDay += 7; // If it's in the past, go to next week
+      
+      // Set check-in date
+      let stayCheckInDate = new Date(today);
+      stayCheckInDate.setDate(today.getDate() + daysUntilFirstDay);
+      stayCheckInDate.setHours(15, 0, 0, 0); // 3 PM check-in
+      results.checkInDate = stayCheckInDate;
+      
+      // If multiple days mentioned, set check-out date based on the last day
+      if (mentionedDays.length > 1) {
+        const lastDay = mentionedDays[mentionedDays.length - 1];
+        const lastDayIndex = dayIndices[lastDay];
+        
+        // Calculate days between first and last day
+        let daysBetween = lastDayIndex - firstDayIndex;
+        if (daysBetween <= 0) daysBetween += 7; // If it wraps around to the next week
+        
+        // Set check-out date to the day AFTER the last mentioned night
+        // This ensures the last mentioned night is included in the stay
+        const checkOutDate = new Date(stayCheckInDate);
+        checkOutDate.setDate(stayCheckInDate.getDate() + daysBetween + 1); // Add 1 to include the last night
+        checkOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
+        results.checkOutDate = checkOutDate;
+        
+        // Calculate nights - add 1 to include the last night
+        results.nights = daysBetween + 1;
+      } else {
+        // Default to one night stay if only one day is mentioned
+        const checkOutDate = new Date(stayCheckInDate);
+        checkOutDate.setDate(stayCheckInDate.getDate() + 1);
+        checkOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
+        results.checkOutDate = checkOutDate;
+        results.nights = 1;
+      }
+    }
+    
+    // Day names for display
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    
+    for (let i = 0; i < results.nights; i++) {
+      const currentDate = new Date(checkInDate);
+      currentDate.setDate(checkInDate.getDate() + i);
+      const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 6 = Saturday
+      let dayPrice = 0;
+      let dayType = '';
+      
+      if (dayOfWeek === 5) { // Friday
+        dayPrice = roomPrices.friday;
+        dayType = 'Friday';
+      } else if (dayOfWeek === 0 || dayOfWeek === 6) { // Sunday or Saturday
+        dayPrice = roomPrices.weekend;
+        dayType = 'Weekend';
+      } else { // Weekday
+        dayPrice = roomPrices.weekday;
+        dayType = 'Weekday';
+      }
+      
+      // Add bed type surcharge
+      let baseDayPrice = dayPrice;
+      if (results.bedType === 'King') {
+        dayPrice += 5; // $5 extra per night for King
+      } else if (results.bedType === 'Queen2Beds') {
+        dayPrice += 10; // $10 extra per night for Queen 2 Beds
+      }
+      
+      // Add to daily prices array
+      results.dailyPrices.push({
+        date: currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        dayOfWeek: dayNames[dayOfWeek],
+        dayType: dayType,
+        basePrice: baseDayPrice,
+        bedTypeSurcharge: dayPrice - baseDayPrice,
+        price: dayPrice
+      });
+      
+      stayBasePrice += dayPrice;
+    }
+    
+    // Calculate tax (15%)
+    const tax = stayBasePrice * 0.15;
+    
+    // Set price information
+    results.price = stayBasePrice;
+    results.tax = tax;
+    results.total = stayBasePrice + tax;
+    results.foundMatch = true;
+    
+    // Show results
+    setVoiceSearchResults(results);
+    setShowVoiceSearchResults(true);
+  };
+  
+  // Close voice search results
+  const closeVoiceSearchResults = () => {
+    setShowVoiceSearchResults(false);
+  };
+  
+  // Handle card mouse move
+  const handleCardMouseMove = (e) => {
+    if (hoveredCard) {
+      // Get the viewport width to adjust tooltip position
+      const viewportWidth = window.innerWidth;
+      const tooltipWidth = 110; // Width of our tooltip
+      const cursorX = e.clientX;
+      
+      // Adjust x position if tooltip would go off screen on the right
+      let adjustedX = cursorX;
+      if (cursorX + tooltipWidth > viewportWidth) {
+        adjustedX = cursorX - tooltipWidth;
+      }
+      
+      setMousePos({ x: adjustedX, y: e.clientY });
+    }
+  };
+  
   // Handle room removal from the SelectedRooms component
   const handleRemoveRoom = (roomId) => {
     setSelectedRooms(selectedRooms.filter(room => room.id !== roomId));
@@ -568,17 +1316,30 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       {/* Top bar with date and price */}
       <div className="iphone-top-bar">
         <div className="date-time">
+          <span className="day" style={dayStyle}>{currentDay}</span>
+          <span className="date">{currentDate}</span>
+        </div>
+        
+        {/* Voice Search Button - centered in top bar */}
+        <button 
+          className={`voice-search-button ${isButtonActive ? 'active' : 'inactive'}`}
+          onTouchStart={handleVoiceButtonPress}
+          onMouseDown={handleMouseDown}
+          aria-label="Press and hold to talk"
+        >
+          <span className="press-to-talk-text">
+            {isButtonActive ? 'Release when done' : 'Press & hold to talk'}
+          </span>
+          <i className={`fas ${isButtonActive ? 'fa-microphone-alt' : 'fa-microphone'}`}></i>
+        </button>
+        
+        <div className="daily-price">
+          <span className="price-label">Today's Room Prices</span>
+          <div className="price-value">${dailyPrices.regular} - ${dailyPrices.jacuzzi}</div>
+        </div>
       </div>
-      <div className="daily-price">
-        <span className="price-label">Today's Room Prices</span>
-        <span className="price-value">
-          ${prices.weekday.withoutJacuzzi} - ${prices.weekday.withJacuzzi}
-        </span>
-      </div>
-    </div>
-    
-    {/* Button container for select rooms and clear */}
-    {activeTab !== 'rooms' && (
+      
+      {/* Button container for select rooms and clear */}
       <div className="top-buttons-container">
         {activeTab === 'short' ? (
           <>
@@ -592,7 +1353,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               Clear
             </button>
           </>
-        ) : (
+        ) : activeTab === 'overnight' ? (
           <>
             <button className="add-stay-button" onClick={saveCurrentStay}>
               + Add Stay
@@ -604,43 +1365,28 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               Clear
             </button>
           </>
+        ) : (
+          // No buttons for rooms tab
+          <div></div>
         )}
       </div>
-    )}
-    
-    {/* Tabs */}
-    <div className="iphone-tabs">
-      <button 
-        className={`tab-button ${activeTab === 'short' ? 'active' : ''}`}
-        onClick={() => setActiveTab('short')}
-      >
-        Short Stay
-      </button>
-      <button 
-        className={`tab-button ${activeTab === 'overnight' ? 'active' : ''}`}
-        onClick={() => setActiveTab('overnight')}
-      >
-        Multiple Night
-      </button>
-      <button 
-        className={`tab-button ${activeTab === 'rooms' ? 'active' : ''}`}
-        onClick={() => setActiveTab('rooms')}
-      >
-        Rooms
-      </button>
-    </div>
-    
-    {/* Tab content */}
-    <div className="tab-content" data-tab={activeTab}>
       
-      {/* Selected Rooms Component */}
-      {selectedRooms.length > 0 && (
-        <SelectedRooms 
-          selectedRooms={selectedRooms} 
-          onRemoveRoom={handleRemoveRoom} 
-        />
-      )}
-          className={`tab-button ${activeTab === 'rooms' ? 'active' : ''}`}
+      {/* Tabs */}
+      <div className="tabs">
+        <button 
+          className={`tab ${activeTab === 'short' ? 'active' : ''}`}
+          onClick={() => setActiveTab('short')}
+        >
+          Short Stay
+        </button>
+        <button 
+          className={`tab ${activeTab === 'overnight' ? 'active' : ''}`}
+          onClick={() => setActiveTab('overnight')}
+        >
+          Multiple Nights
+        </button>
+        <button 
+          className={`tab ${activeTab === 'rooms' ? 'active' : ''}`}
           onClick={() => setActiveTab('rooms')}
         >
           Rooms
@@ -650,12 +1396,71 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       {/* Tab content */}
       <div className="tab-content" data-tab={activeTab}>
         
-        {/* Selected Rooms Component */}
-        {selectedRooms.length > 0 && (
+        {/* Selected Rooms Component - Only show in short stay tab */}
+        {activeTab === 'short' && selectedRooms.length > 0 && (
           <SelectedRooms 
             selectedRooms={selectedRooms} 
             onRemoveRoom={handleRemoveRoom} 
           />
+        )}
+        
+        {/* Rooms Tab Content */}
+        {activeTab === 'rooms' && (
+          <div className="rooms-tab-content">
+            <div className="floor-tabs">
+              <button 
+                className={`floor-tab ${activeFloor === 'ground' ? 'active' : ''}`}
+                onClick={() => setActiveFloor('ground')}
+              >
+                Ground Floor
+              </button>
+              <button 
+                className={`floor-tab ${activeFloor === 'first' ? 'active' : ''}`}
+                onClick={() => setActiveFloor('first')}
+              >
+                First Floor
+              </button>
+            </div>
+            
+            <div className="all-rooms-container">
+              {availableRooms
+                .filter(room => room.floor === (activeFloor === 'ground' ? 'ground' : 'first'))
+                .map(room => (
+                  <div 
+                    key={room.id}
+                    className="room-card-container"
+                    onMouseEnter={(e) => handleCardMouseEnter(room, e)}
+                    onMouseLeave={handleCardMouseLeave}
+                    onMouseMove={handleCardMouseMove}
+                  >
+                    <div 
+                      className={`room-card ${room.bedType === 'Queen' ? 'queen' : 
+                                 room.bedType === 'King' ? 'king' : 'queen-2-beds'} 
+                                 ${room.isSmoking ? 'smoking' : ''} 
+                                 ${room.hasJacuzzi ? 'jacuzzi' : ''}`}
+                    >
+                      <span className="room-number">{room.number}</span>
+                      <span className="room-type">
+                        {room.bedType === 'Queen' ? 'Queen' : 
+                         room.bedType === 'King' ? 'King' : 'Queen 2 Beds'}
+                      </span>
+                      <div className="room-features">
+                        {room.hasJacuzzi && <span className="feature jacuzzi">Jacuzzi</span>}
+                        <span className="feature smoking-status">
+                          {room.isSmoking ? 'Smoking' : 'Non-Smoking'}
+                        </span>
+                        <span className="feature capacity">
+                          {room.bedType === 'Queen' && '👤👤'}
+                          {room.bedType === 'King' && '👤👤👤'}
+                          {room.bedType === 'Queen2Beds' && '👤👤👤👤'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              }
+            </div>
+          </div>
         )}
         
         {/* Room Selector Modal */}
@@ -703,6 +1508,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                           {room.bedType === 'Queen' ? 'Queen' : 
                            room.bedType === 'King' ? 'King' : 'Queen 2B'}
                         </span>
+                        {room.hasJacuzzi && <div className="multiple-label">Multiple</div>}
                         {isSelected && <div className="selected-checkmark">✓</div>}
                       </div>
                     );
@@ -729,6 +1535,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                           {room.bedType === 'Queen' ? 'Queen' : 
                            room.bedType === 'King' ? 'King' : 'Queen 2B'}
                         </span>
+                        {room.hasJacuzzi && <div className="multiple-label">Multiple</div>}
                         {isSelected && <div className="selected-checkmark">✓</div>}
                       </div>
                     );
@@ -742,152 +1549,230 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         )}
 
         
-        {activeTab === 'short' ? (
+        {/* Short Stay Tab Content */}
+        {activeTab === 'short' && (
           <div className="short-stay-section">
-            <div className="option-group">
-              <label>Room Type</label>
-              <div className="toggle-buttons bed-type">
-                <button 
-                  className={bedType === 'Queen' ? 'active' : ''}
-                  onClick={() => setBedType('Queen')}
-                >
-                  Queen
-                </button>
-                <button 
-                  className={bedType === 'King' ? 'active' : ''}
-                  onClick={() => setBedType('King')}
-                >
-                  King
-                </button>
-                <button 
-                  className={bedType === 'Queen2Beds' ? 'active' : ''}
-                  onClick={() => setBedType('Queen2Beds')}
-                >
-                  Queen 2 Beds
-                </button>
-              </div>
-            </div>
-            
-            <div className="option-group">
-              <label>Jacuzzi</label>
-              <div className="toggle-buttons">
-                <button 
-                  className={!hasJacuzzi ? 'active' : ''}
-                  onClick={() => setHasJacuzzi(false)}
-                >
-                  No
-                </button>
-                <button 
-                  className={hasJacuzzi ? 'active' : ''}
-                  onClick={() => setHasJacuzzi(true)}
-                >
-                  Yes
-                </button>
-              </div>
-            </div>
-            
-            <div className="option-group">
-              <label>Smoking</label>
-              <div className="toggle-buttons">
-                <button 
-                  className={!isSmoking ? 'active' : ''}
-                  onClick={() => setIsSmoking(false)}
-                >
-                  Non-Smoking
-                </button>
-                <button 
-                  className={isSmoking ? 'active' : ''}
-                  onClick={() => setIsSmoking(true)}
-                >
-                  Smoking
-                </button>
-              </div>
-            </div>
-            
-            <div className="option-group">
-              <label>Payment Method</label>
-              <div className="toggle-buttons">
-                <button 
-                  className={paymentMethod === 'cash' ? 'active' : ''}
-                  onClick={() => setPaymentMethod('cash')}
-                >
-                  Cash
-                </button>
-                <button 
-                  className={paymentMethod === 'credit' ? 'active' : ''}
-                  onClick={() => setPaymentMethod('credit')}
-                >
-                  Credit Card
-                </button>
-              </div>
-            </div>
-            
-            <div className="option-group">
-              <label>Extra Hours</label>
-              <div className="counter-control">
-                <button className="minus-button" onClick={() => handleExtraHoursChange(-1)}>-</button>
-                <span>{extraHours}</span>
-                <button className="plus-button" onClick={() => handleExtraHoursChange(1)}>+</button>
-              </div>
-            </div>
-            
-            <div className="simple-time-display">
-              <div className="time-row">
-                <span className="time-label">Check-in:</span>
-                <span className="time-value">{new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
-              </div>
-              <div className="time-row">
-                <span className="time-label">Check-out:</span>
-                <span className="time-value">{checkoutTime}</span>
-              </div>
-            </div>
-            
-            <div className="option-group">
-              <label>Extra Hour Rate</label>
-              <div className="toggle-buttons">
-                <button 
-                  className={extraHourRate === 15 ? 'active' : ''}
-                  onClick={() => setExtraHourRate(15)}
-                >
-                  Regular ($15)
-                </button>
-                <button 
-                  className={extraHourRate === 10 ? 'active' : ''}
-                  onClick={() => setExtraHourRate(10)}
-                >
-                  Discounted ($10)
-                </button>
-              </div>
-            </div>
-            
+            <div className="short-stay-card-layout">
+              {/* Main options card */}
+              <div className="short-stay-main-card">
+                {/* Top row with Jacuzzi and Payment Method */}
+                <div className="short-stay-row">
+                  <div className="short-stay-option">
+                    <label><i className="fas fa-hot-tub" style={{"marginRight": "8px"}}></i>Jacuzzi</label>
+                    <div className="toggle-buttons">
+                      <button 
+                        className={!hasJacuzzi ? 'active' : ''}
+                        onClick={() => setHasJacuzzi(false)}
+                      >
+                        No
+                      </button>
+                      <button 
+                        className={hasJacuzzi ? 'active' : ''}
+                        onClick={() => setHasJacuzzi(true)}
+                      >
+                        Yes
+                      </button>
+                    </div>
+                  </div>
+                  <div className="short-stay-option">
+                    <label><i className="fas fa-credit-card" style={{"marginRight": "8px"}}></i>Payment</label>
+                    <div className="toggle-buttons">
+                      <button 
+                        className={paymentMethod === 'cash' ? 'active' : ''}
+                        onClick={() => setPaymentMethod('cash')}
+                      >
+                        Cash
+                      </button>
+                      <button 
+                        className={paymentMethod === 'credit' ? 'active' : ''}
+                        onClick={() => setPaymentMethod('credit')}
+                      >
+                        Card
+                      </button>
+                    </div>
+                  </div>
+                </div>
 
-            
-            {showShortStayPriceSummary && (
-              <div className="price-summary">
-                <div className="price-row">
-                  <span>Base Price:</span>
-                  <span>${basePrice.toFixed(2)}</span>
+                {/* Time display */}
+                <div className="short-stay-time-section">
+                  <div className="time-row">
+                    <span className="time-label">Check-in:</span>
+                    <span className="time-value">{currentTime}</span>
+                  </div>
+                  <div className="time-row">
+                    <span className="time-label">Check-out:</span>
+                    <span className="time-value">{checkoutTime}</span>
+                  </div>
                 </div>
-                {taxAmount > 0 && (
-                  <div className="price-row">
-                    <span>Tax (15%):</span>
-                    <span>${taxAmount.toFixed(2)}</span>
+                
+                {/* Bottom row with Extra Hours and Rate */}
+                <div className="short-stay-row">
+                  <div className="short-stay-option">
+                    <label>Extra Hours</label>
+                    <div className="counter-control">
+                      <button className="minus-button" onClick={() => handleExtraHoursChange(-1)}>-</button>
+                      <span>{extraHours}</span>
+                      <button className="plus-button" onClick={() => handleExtraHoursChange(1)}>+</button>
+                    </div>
+                    <div className="extra-hours-display">
+                      <div className="extra-hours-label">
+                        {extraHours > 0 ? `4+${extraHours} extra hours` : '4 hours'}
+                      </div>
+                      <div className="total-hours-display">
+                        Total: {4 + extraHours}hr
+                      </div>
+                    </div>
                   </div>
-                )}
-                {extraHours > 0 && (
-                  <div className="price-row">
-                    <span>Extra Hours ({extraHours} × ${extraHourRate}):</span>
-                    <span>${extraHoursCost.toFixed(2)}</span>
+                  <div className="short-stay-option">
+                    <label>Hour Rate</label>
+                    <div className="toggle-buttons">
+                      <button 
+                        className={extraHourRate === 15 ? 'active' : ''}
+                        onClick={() => setExtraHourRate(15)}
+                      >
+                        $15
+                      </button>
+                      <button 
+                        className={extraHourRate === 10 ? 'active' : ''}
+                        onClick={() => setExtraHourRate(10)}
+                      >
+                        $10
+                      </button>
+                    </div>
                   </div>
-                )}
-                <div className="price-row total">
-                  <span>Total:</span>
-                  <span>${totalPrice.toFixed(2)}</span>
                 </div>
               </div>
-            )}
+              
+              {/* Price summary card - always visible */}
+              <div className="price-summary-card">
+                <div className="price-summary">
+                  <div className="price-row">
+                    <span>Base Price:</span>
+                    <span>${basePrice.toFixed(2)}</span>
+                  </div>
+                  {extraHours > 0 && (
+                    <div className="price-row">
+                      <span>Extra ({extraHours}h):</span>
+                      <span>${(extraHours * extraHourRate).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {taxAmount > 0 && (
+                    <div className="price-row">
+                      <span>Tax (15%):</span>
+                      <span>${taxAmount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="price-row total">
+                    <span>Total:</span>
+                    <span>${totalPrice.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Pricing Grid Table */}
+              <div className="pricing-grid-container">
+                <table className="pricing-grid-table">
+                  <thead>
+                    <tr>
+                      <th></th>
+                      <th colSpan="2" className="jacuzzi-header">No Jacuzzi</th>
+                      <th colSpan="2" className="jacuzzi-header">Jacuzzi</th>
+                    </tr>
+                    <tr>
+                      <th></th>
+                      <th>Cash</th>
+                      <th>Credit card</th>
+                      <th>Cash</th>
+                      <th>Credit card</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td className="hours-column">4 hrs</td>
+                      <td>$60</td>
+                      <td>$69</td>
+                      <td>$90</td>
+                      <td>$104</td>
+                    </tr>
+                    <tr>
+                      <td className="hours-column">4+1 (5 hrs)</td>
+                      <td>$75</td>
+                      <td>$87</td>
+                      <td>$105</td>
+                      <td>$121</td>
+                    </tr>
+                    <tr>
+                      <td className="hours-column">4+2 (6 hrs)</td>
+                      <td>$90</td>
+                      <td>$104</td>
+                      <td>$120</td>
+                      <td>$138</td>
+                    </tr>
+                    <tr>
+                      <td className="hours-column">4+3 (7 hrs)</td>
+                      <td>$105</td>
+                      <td>$121</td>
+                      <td>$135</td>
+                      <td>$156</td>
+                    </tr>
+                    <tr>
+                      <td className="hours-column">4+4 (8 hrs)</td>
+                      <td>$120</td>
+                      <td>$138</td>
+                      <td>$150</td>
+                      <td>$173</td>
+                    </tr>
+                    <tr>
+                      <td className="hours-column">4+5 (9 hrs)</td>
+                      <td>$135</td>
+                      <td>$156</td>
+                      <td>$165</td>
+                      <td>$190</td>
+                    </tr>
+                    <tr>
+                      <td className="hours-column">4+6 (10 hrs)</td>
+                      <td>$150</td>
+                      <td>$173</td>
+                      <td>$180</td>
+                      <td>$207</td>
+                    </tr>
+                    <tr>
+                      <td className="hours-column">4+7 (11 hrs)</td>
+                      <td>$165</td>
+                      <td>$190</td>
+                      <td>$195</td>
+                      <td>$225</td>
+                    </tr>
+                    <tr>
+                      <td className="hours-column">4+8 (12 hrs)</td>
+                      <td>$180</td>
+                      <td>$207</td>
+                      <td>$210</td>
+                      <td>$242</td>
+                    </tr>
+                    <tr>
+                      <td className="hours-column">4+9 (13 hrs)</td>
+                      <td>$195</td>
+                      <td>$225</td>
+                      <td>$225</td>
+                      <td>$259</td>
+                    </tr>
+                    <tr>
+                      <td className="hours-column">4+10 (14 hrs)</td>
+                      <td>$210</td>
+                      <td>$242</td>
+                      <td>$240</td>
+                      <td>$276</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
-        ) : (
+        )}
+        
+        {/* Overnight Stay Tab Content */}
+        {activeTab === 'overnight' && (
           <div className="multi-night-section">
             <div className="date-pickers">
               <div className="date-picker-container">
@@ -938,7 +1823,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             </div>
             
             <div className="option-group">
-              <label>Jacuzzi</label>
+              <label><i className="fas fa-hot-tub" style={{"marginRight": "8px"}}></i>Jacuzzi</label>
               <div className="toggle-buttons">
                 <button 
                   className={!hasJacuzziOvernight ? 'active' : ''}
@@ -974,7 +1859,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             </div>
             
             <div className="option-group">
-              <label>Payment Method</label>
+              <label><i className="fas fa-credit-card" style={{"marginRight": "8px"}}></i>Payment Method</label>
               <div className="toggle-buttons">
                 <button 
                   className={overnightPayment === 'cash' ? 'active' : ''}
@@ -1145,11 +2030,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                       </div>
                       
                       <div className="saved-stay-price-container">
-                        <div className="price-row">
-                          <span>Base Price:</span>
-                          <span>${stay.basePrice.toFixed(2)}</span>
-                        </div>
-                        
                         {/* Daily price breakdown for saved stays */}
                         {!stay.isShortStay && stay.dailyPrices && stay.dailyPrices.length > 0 && (
                           <div className="daily-price-breakdown">
@@ -1200,133 +2080,206 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         )}
       </div>
       
-      {/* Main content wrapper to fill space */}
-      <div className="main-content">
-        {/* Rooms tab content */}
-        {activeTab === 'rooms' && (
-        <div className="rooms-tab-content">
-          <div className="floor-selector">
-            <button 
-              className={`floor-button ${activeFloor === 'ground' ? 'active' : ''}`}
-              onClick={() => setActiveFloor('ground')}
-            >
-              Ground Floor (100s)
-            </button>
-            <button 
-              className={`floor-button ${activeFloor === 'first' ? 'active' : ''}`}
-              onClick={() => setActiveFloor('first')}
-            >
-              First Floor (200s)
-            </button>
-          </div>
-          
-          <div className="rooms-grid">
-            {availableRooms
-              .filter(room => room.floor === activeFloor)
-              .map(room => {
-                // Calculate room price based on current day
-                const isWeekend = currentDay === 'Saturday' || currentDay === 'Sunday';
-                const isFriday = currentDay === 'Friday';
-                
-                let basePrice;
-                if (isWeekend) {
-                  basePrice = room.hasJacuzzi ? prices.weekend.withJacuzzi : prices.weekend.withoutJacuzzi;
-                } else if (isFriday) {
-                  basePrice = room.hasJacuzzi ? prices.friday.withJacuzzi : prices.friday.withoutJacuzzi;
-                } else {
-                  basePrice = room.hasJacuzzi ? prices.weekday.withJacuzzi : prices.weekday.withoutJacuzzi;
-                }
-                
-                const tax = basePrice * 0.15; // 15% tax
-                const total = basePrice + tax;
-                
-                // Room status class (all available in this view)
-                const statusClass = 'available';
-                
-                // Get bed type display name
-                const bedTypeDisplay = 
-                  room.bedType === 'Queen' ? 'Queen' : 
-                  room.bedType === 'King' ? 'King' : 'Queen 2 Beds';
-                
-                return (
-                  <div 
-                    key={room.id} 
-                    className={`room-card ${statusClass} ${room.hasJacuzzi ? 'jacuzzi' : ''} ${room.isSmoking ? 'smoking' : 'non-smoking'}`}
-                    onMouseEnter={(e) => {
-                      setHoveredRoom({
-                        id: room.id,
-                        basePrice,
-                        tax,
-                        total,
-                        bedType: bedTypeDisplay,
-                        hasJacuzzi: room.hasJacuzzi,
-                        isSmoking: room.isSmoking
-                      });
-                      setMousePos({ x: e.clientX, y: e.clientY });
-                    }}
-                    onMouseMove={(e) => {
-                      setMousePos({ x: e.clientX, y: e.clientY });
-                    }}
-                    onMouseLeave={() => setHoveredRoom(null)}
-                  >
-                    <div className="room-number">{room.number}</div>
-                    <div className="room-features">
-                      <span>{bedTypeDisplay}</span>
-                      <span>•</span>
-                      <span>{room.isSmoking ? 'Smoking' : 'Non-Smoking'}</span>
-                      {room.hasJacuzzi && (
-                        <>
-                          <span>•</span>
-                          <span>Jacuzzi</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-          </div>
-        </div>
-      )}
-      
-      {/* Price tooltip */}
-      {hoveredRoom && (
+      {/* Global tooltip that follows the mouse */}
+      {hoveredCard && (
         <div 
           className="price-tooltip" 
           style={{
             position: 'fixed',
-            top: mousePos.y - 120,
-            left: mousePos.x + 10,
+            top: mousePos.y - 100,
+            left: mousePos.x,
             transform: 'none',
             opacity: 1,
             visibility: 'visible',
             pointerEvents: 'none',
-            zIndex: 10000
+            zIndex: 10000,
+            width: '110px',
+            fontSize: '10px'
           }}
         >
-          <div className="tooltip-header">
-            <span>{hoveredRoom.bedType}</span>
-            <span>•</span>
-            <span>{hoveredRoom.isSmoking ? 'Smoking' : 'Non-Smoking'}</span>
-            {hoveredRoom.hasJacuzzi && (
-              <>
-                <span>•</span>
-                <span>Jacuzzi</span>
-              </>
-            )}
-          </div>
           <div className="price-row">
             <span>Base:</span>
-            <span>${hoveredRoom.basePrice.toFixed(2)}</span>
+            <span>${hoveredCard.basePrice.toFixed(2)}</span>
           </div>
           <div className="price-row">
             <span>Tax:</span>
-            <span>${hoveredRoom.tax.toFixed(2)}</span>
+            <span>${hoveredCard.tax.toFixed(2)}</span>
           </div>
           <div className="price-row total">
             <span>Total:</span>
-            <span>${hoveredRoom.total.toFixed(2)}</span>
+            <span>${hoveredCard.total.toFixed(2)}</span>
           </div>
           <div className="tooltip-arrow"></div>
+        </div>
+      )}
+      
+      {/* Voice Search Results Popup */}
+      {showVoiceSearchResults && voiceSearchResults && (
+        <div className="voice-search-results">
+          <div className="voice-search-header">
+            <h3>Voice Search Results</h3>
+            <button onClick={closeVoiceSearchResults}>×</button>
+          </div>
+          <div className="voice-search-content">
+            <div className="voice-search-query">You said: "{voiceSearchResults.query}"</div>
+            
+            {voiceSearchResults.noSpeechDetected ? (
+              <div className="no-speech-error">
+                <p><i className="fas fa-microphone-slash"></i></p>
+                <p><strong>No speech detected</strong></p>
+                <p>Please press and hold the microphone button and speak clearly.</p>
+              </div>
+            ) : voiceSearchResults.foundMatch ? (
+              <div>
+                {/* Show error message for invalid room types */}
+                {voiceSearchResults.invalidRoomType && (
+                  <div className="room-type-error">
+                    <p><strong>Sorry!</strong> We don't have {voiceSearchResults.requestedInvalidType} rooms available.</p>
+                    <p>Available room types:</p>
+                    <ul>
+                      {Object.entries(voiceSearchResults.validRoomTypes).map(([key, description]) => (
+                        <li key={key}><strong>{key === 'Queen2Beds' ? 'Queen 2 Beds' : key}:</strong> {description}</li>
+                      ))}
+                    </ul>
+                    <p>We've selected a {voiceSearchResults.bedType === 'Queen2Beds' ? 'Queen 2 Beds' : voiceSearchResults.bedType} room for your stay.</p>
+                  </div>
+                )}
+                
+                {/* Show error message for invalid room combinations */}
+                {voiceSearchResults.invalidCombination && (
+                  <div className="room-type-error">
+                    <p><strong>Sorry!</strong> We don't have {voiceSearchResults.requestedInvalidCombination} rooms available.</p>
+                    <p>Available room combinations with Jacuzzi:</p>
+                    <ul>
+                      {Object.entries(voiceSearchResults.validCombinations)
+                        .filter(([key, isValid]) => isValid && key.includes('Jacuzzi'))
+                        .map(([key]) => {
+                          const roomType = key.split('-')[0];
+                          return (
+                            <li key={key}>
+                              <strong>{roomType === 'Queen2Beds' ? 'Queen 2 Beds' : roomType} with Jacuzzi</strong>
+                            </li>
+                          );
+                        })}
+                    </ul>
+                    <p>We've selected a {voiceSearchResults.bedType === 'Queen2Beds' ? 'Queen 2 Beds' : voiceSearchResults.bedType} room with Jacuzzi for your stay.</p>
+                  </div>
+                )}
+                
+                <div>
+                  <strong>Stay Details:</strong>
+                  <ul>
+                    {voiceSearchResults.isShortStay ? (
+                      // Short stay details
+                      <>
+                        <li><strong>Short Stay</strong></li>
+                        <li>Today until {voiceSearchResults.shortStayCheckoutTime}</li>
+                        <li>Duration: {voiceSearchResults.shortStayHours} hour{voiceSearchResults.shortStayHours !== 1 ? 's' : ''}</li>
+                        {voiceSearchResults.extraHours > 0 && (
+                          <li>Extra Hours: {voiceSearchResults.extraHours}</li>
+                        )}
+                        <li>Room Type: {voiceSearchResults.bedType === 'Queen2Beds' ? 'Queen 2 Beds' : voiceSearchResults.bedType}</li>
+                        {/* Only show jacuzzi label if it was mentioned in the search query */}
+                        {voiceSearchResults.query.toLowerCase().includes('jacuzzi') || 
+                         voiceSearchResults.query.toLowerCase().includes('hot tub') || 
+                         voiceSearchResults.query.toLowerCase().includes('spa') ? (
+                          <li>{voiceSearchResults.hasJacuzzi ? 'With Jacuzzi' : 'No Jacuzzi'}</li>
+                        ) : null}
+                        <li>{voiceSearchResults.isSmoking ? 'Smoking' : 'Non-Smoking'}</li>
+                      </>
+                    ) : (
+                      // Regular overnight stay details
+                      <>
+                        <li>Check-in: {voiceSearchResults.checkInDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</li>
+                        <li>Check-out: {voiceSearchResults.checkOutDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</li>
+                        <li>Nights: {voiceSearchResults.nights}</li>
+                        <li>Room Type: {voiceSearchResults.bedType === 'Queen2Beds' ? 'Queen 2 Beds' : voiceSearchResults.bedType}</li>
+                        {/* Only show jacuzzi label if it was mentioned in the search query */}
+                        {voiceSearchResults.query.toLowerCase().includes('jacuzzi') || 
+                         voiceSearchResults.query.toLowerCase().includes('hot tub') || 
+                         voiceSearchResults.query.toLowerCase().includes('spa') ? (
+                          <li>{voiceSearchResults.hasJacuzzi ? 'With Jacuzzi' : 'No Jacuzzi'}</li>
+                        ) : null}
+                        <li>{voiceSearchResults.isSmoking ? 'Smoking' : 'Non-Smoking'}</li>
+                      </>
+                    )}
+                  </ul>
+                </div>
+                
+                <div className="voice-search-price-card">
+                  {voiceSearchResults.isShortStay ? (
+                    // Short stay pricing display with cash and credit card options
+                    <>
+                      {voiceSearchResults.extraHours > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <span>Extra Hours ({voiceSearchResults.extraHours}):</span>
+                          <span>${(voiceSearchResults.extraHours * 15).toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span>Base Price:</span>
+                        <span>${voiceSearchResults.price.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span>Tax (15%):</span>
+                        <span>${voiceSearchResults.tax.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.1em', marginTop: '5px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.2)', marginBottom: '15px' }}>
+                        <span>Total:</span>
+                        <span>${voiceSearchResults.total.toFixed(2)}</span>
+                      </div>
+                      
+                      {/* Payment options */}
+                      <div className="payment-options">
+                        <div className="payment-option cash">
+                          <div className="payment-option-header">Cash</div>
+                          <div className="payment-option-price">${voiceSearchResults.cashPrice.toFixed(2)}</div>
+                        </div>
+                        <div className="payment-option credit">
+                          <div className="payment-option-header">Credit Card</div>
+                          <div className="payment-option-price">${voiceSearchResults.creditCardPrice.toFixed(2)}</div>
+                          <div className="payment-option-note">+3% fee</div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    // Regular overnight stay pricing display
+                    <>
+                      {/* Daily price breakdown - only show if more than 1 night */}
+                      {voiceSearchResults.dailyPrices && voiceSearchResults.dailyPrices.length > 1 && (
+                        <div className="daily-price-breakdown">
+                          <div className="breakdown-header">Daily Price Breakdown:</div>
+                          {voiceSearchResults.dailyPrices.map((day, index) => (
+                            <div key={index} className="daily-price">
+                              <span>{day.dayOfWeek}, {day.date}</span>
+                              <span>${day.price.toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span>Base Price:</span>
+                        <span>${voiceSearchResults.price.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span>Tax (15%):</span>
+                        <span>${voiceSearchResults.tax.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.1em', marginTop: '5px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
+                        <span>Total:</span>
+                        <span>${voiceSearchResults.total.toFixed(2)}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div>Sorry, I couldn't understand your request. Please try again.</div>
+            )}
+          </div>
+          <div className="voice-search-footer">
+            <button className="voice-search-close-button" onClick={closeVoiceSearchResults}>Close</button>
+          </div>
         </div>
       )}
       

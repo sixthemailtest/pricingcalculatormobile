@@ -245,28 +245,30 @@
 
 /* Voice Search Button */
 .voice-search-button {
-  position: relative;
-  width: auto;
-  height: 36px;
-  padding: 0 15px;
-  border-radius: 18px;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
   background: linear-gradient(135deg, #4776E6, #8E54E9); /* Default blue-purple gradient */
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
   border: none;
-  box-shadow: 0 3px 10px rgba(71, 118, 230, 0.4);
+  box-shadow: 0 4px 15px rgba(71, 118, 230, 0.5);
   z-index: 1000;
   cursor: pointer;
-  transition: all 0.2s ease;
-  font-weight: bold;
-  font-size: 14px;
-  margin: 0 10px;
+  transition: all 0.3s ease;
   -webkit-touch-callout: none; /* Prevent iOS callout on long press */
   -webkit-user-select: none; /* Prevent text selection on iOS */
   user-select: none;
   touch-action: manipulation; /* Improve touch behavior */
+}
+
+.voice-search-button i {
+  font-size: 24px;
 }
 
 .press-to-talk-text {
@@ -412,6 +414,153 @@
 
 .no-speech-error p {
   margin: 8px 0;
+}
+
+/* Guided Voice Search Styles */
+.guided-voice-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+
+.guided-voice-container {
+  width: 90%;
+  max-width: 400px;
+  background-color: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.guided-voice-header {
+  background: linear-gradient(135deg, #4776E6, #8E54E9);
+  color: white;
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.guided-voice-header h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.guided-voice-header button {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.guided-voice-content {
+  padding: 20px;
+}
+
+.guided-voice-step {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.guided-voice-watermark {
+  font-size: 24px;
+  color: #a0aec0;
+  margin-bottom: 10px;
+}
+
+.guided-voice-value {
+  font-size: 28px;
+  font-weight: bold;
+  color: #4776E6;
+  margin: 10px 0;
+  min-height: 40px;
+}
+
+.guided-voice-instructions {
+  font-size: 16px;
+  color: #4a5568;
+  margin: 15px 0;
+}
+
+.guided-voice-mic-button {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4776E6, #8E54E9);
+  border: none;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 20px auto;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.guided-voice-mic-button.active {
+  background: linear-gradient(135deg, #FF0844, #FF3C5F);
+  transform: scale(1.1);
+  box-shadow: 0 6px 15px rgba(255, 8, 68, 0.3);
+}
+
+.guided-voice-mic-button i {
+  color: white;
+  font-size: 28px;
+}
+
+.guided-voice-progress {
+  display: flex;
+  justify-content: center;
+  margin: 20px 0 10px;
+}
+
+.guided-voice-progress-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #e2e8f0;
+  margin: 0 5px;
+}
+
+.guided-voice-progress-dot.active {
+  background-color: #4776E6;
+  transform: scale(1.2);
+}
+
+.guided-voice-progress-dot.completed {
+  background-color: #48BB78;
+}
+
+.guided-voice-footer {
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.guided-voice-footer button {
+  padding: 10px 20px;
+  border-radius: 6px;
+  border: none;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.guided-voice-skip-button {
+  background-color: #e2e8f0;
+  color: #4a5568;
+}
+
+.guided-voice-next-button {
+  background-color: #4776E6;
+  color: white;
 }
 
 .room-type-error p {

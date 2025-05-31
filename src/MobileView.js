@@ -17,6 +17,15 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   const [showVoiceSearchResults, setShowVoiceSearchResults] = useState(false);
   const [voiceSearchResults, setVoiceSearchResults] = useState(null);
   
+  // Guided voice search state
+  const [guidedVoiceSearch, setGuidedVoiceSearch] = useState({
+    active: false,
+    step: 1, // 1: Room type, 2: Bed type, 3: Stay duration
+    roomType: null, // 'smoking' or 'non-smoking'
+    bedType: null,  // 'Queen', 'King', or 'Queen2Beds'
+    stayDuration: null // 'tonight', 'weekend', or specific dates
+  });
+  
   // Reference to store the speech recognition instance
   const recognitionRef = useRef(null);
   
@@ -632,9 +641,51 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     setHoveredCard(null);
   };
   
-  // Handle voice search button press
-  const handleVoiceButtonPress = (e) => {
-    e.preventDefault(); // Prevent default behavior
+  // Initialize speech recognition on component mount
+  useEffect(() => {
+    // Pre-initialize speech recognition to avoid first-time delay
+    if (('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window)) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      // Just create the instance to warm up the API
+      const warmupRecognition = new SpeechRecognition();
+      console.log('Speech recognition pre-initialized');
+    }
+  }, []);
+  
+  // Create a new instance of speech recognition for each voice search attempt
+  const createNewRecognitionInstance = () => {
+    // Check if speech recognition is supported
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      return null;
+    }
+    
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    
+    // Configure recognition settings
+    recognition.lang = 'en-US';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 3;
+    
+    return recognition;
+  };
+  
+  // Start guided voice search
+  const startGuidedVoiceSearch = () => {
+    // Reset guided voice search state
+    setGuidedVoiceSearch({
+      active: true,
+      step: 1,
+      roomType: null,
+      bedType: null,
+      stayDuration: null
+    });
+  };
+  
+  // Handle voice button press for a specific guided step
+  const handleGuidedVoiceStep = (e) => {
+    e.preventDefault();
     
     // Check if speech recognition is supported
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -642,27 +693,38 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       return;
     }
     
-    console.log('Voice button pressed');
     setIsButtonActive(true);
     setIsListening(true);
     setVoiceSearchQuery('');
-    setShowVoiceSearchResults(false); // Hide any previous results
-    setVoiceSearchResults(null); // Clear previous results
     
-    // Initialize speech recognition
+    // Clean up any existing recognition instance
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+      } catch (e) {
+        console.log('Error cleaning up previous recognition:', e);
+      }
+    }
+    
+    // Create a new recognition instance
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognitionRef.current = recognition;
     
+    // Configure recognition settings
     recognition.lang = 'en-US';
-    recognition.continuous = true; // Keep listening while button is pressed
-    recognition.interimResults = true; // Get results as user speaks
+    recognition.continuous = true;
+    recognition.interimResults = true;
     
+    // Get the current step
+    const currentStep = guidedVoiceSearch.step;
+    console.log(`Starting voice recognition for step ${currentStep}`);
+    
+    // Create a variable to store the transcript
     let transcript = '';
-    
-    recognition.onstart = () => {
-      console.log('Speech recognition started');
-    };
     
     recognition.onresult = (event) => {
       // Get the latest transcript
@@ -673,91 +735,316 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       
       // Update the transcript in state
       setVoiceSearchQuery(transcript);
-      console.log('Current transcript:', transcript);
-    };
-    
-    recognition.onerror = (event) => {
-      console.error('Speech recognition error:', event.error);
-      if (event.error === 'no-speech') {
-        console.log('No speech detected');
-      }
+      console.log(`Current transcript for step ${currentStep}:`, transcript);
     };
     
     recognition.onend = () => {
-      console.log('Speech recognition ended');
+      console.log(`Recognition ended for step ${currentStep}`);
       setIsListening(false);
       setIsButtonActive(false);
+      
+      // Process the result based on the current step
+      processGuidedStepResult(transcript, currentStep);
     };
     
     // Start recognition
     try {
       recognition.start();
-      console.log('Recognition started');
+      console.log(`Recognition started for step ${currentStep}`);
     } catch (error) {
-      console.error('Error starting recognition:', error);
+      console.error(`Error starting recognition for step ${currentStep}:`, error);
+      setIsButtonActive(false);
+      setIsListening(false);
     }
-    
-    // Add event listeners for touch events on iOS
-    document.addEventListener('touchend', handleVoiceButtonRelease);
-    document.addEventListener('touchcancel', handleVoiceButtonRelease);
   };
   
-  // Handle voice search button release
-  const handleVoiceButtonRelease = (e) => {
-    if (e) e.preventDefault(); // Prevent default behavior
+  // Process the result of a guided voice step
+  const processGuidedStepResult = (transcript, step) => {
+    const lowerTranscript = transcript.toLowerCase();
     
-    console.log('Voice button released');
+    // Process based on the current step
+    if (step === 1) { // Room type (smoking/non-smoking)
+      let roomType = 'non-smoking'; // Default
+      
+      if (lowerTranscript.includes('smoking') && !lowerTranscript.includes('non') && 
+          !lowerTranscript.includes('no smoking')) {
+        roomType = 'smoking';
+      }
+      
+      // Update state with the detected room type
+      setGuidedVoiceSearch(prev => ({
+        ...prev,
+        roomType: roomType,
+        step: 2 // Move to next step
+      }));
+      
+    } else if (step === 2) { // Bed type
+      let bedType = 'Queen'; // Default
+      
+      if (lowerTranscript.includes('king')) {
+        bedType = 'King';
+      } else if (lowerTranscript.includes('double') || 
+                lowerTranscript.includes('two bed') || 
+                lowerTranscript.includes('2 bed')) {
+        bedType = 'Queen2Beds';
+      }
+      
+      // Update state with the detected bed type
+      setGuidedVoiceSearch(prev => ({
+        ...prev,
+        bedType: bedType,
+        step: 3 // Move to next step
+      }));
+      
+    } else if (step === 3) { // Stay duration
+      let stayDuration = 'tonight'; // Default
+      
+      if (lowerTranscript.includes('weekend') || 
+          lowerTranscript.includes('friday') && lowerTranscript.includes('sunday')) {
+        stayDuration = 'weekend';
+      } else if (lowerTranscript.includes('week') || lowerTranscript.includes('7 day')) {
+        stayDuration = 'week';
+      }
+      
+      // Update state with the detected stay duration
+      setGuidedVoiceSearch(prev => ({
+        ...prev,
+        stayDuration: stayDuration,
+        step: 4 // Move to results step
+      }));
+      
+      // Process the complete guided search
+      setTimeout(() => {
+        processCompleteGuidedSearch();
+      }, 500);
+    }
+  };
+  
+  // Process the complete guided search and show results
+  const processCompleteGuidedSearch = () => {
+    const { roomType, bedType, stayDuration } = guidedVoiceSearch;
+    
+    // Build a query from the guided search parameters
+    const query = `${bedType === 'Queen2Beds' ? 'double' : bedType} ${roomType} for ${stayDuration}`;
+    console.log('Built query from guided search:', query);
+    
+    // Process the query to get results
+    processVoiceSearch(query);
+    
+    // Reset guided search state
+    setGuidedVoiceSearch(prev => ({
+      ...prev,
+      active: false
+    }));
+  };
+  
+  // Skip the current step in guided search
+  const skipGuidedStep = () => {
+    setGuidedVoiceSearch(prev => ({
+      ...prev,
+      step: prev.step < 3 ? prev.step + 1 : 4
+    }));
+    
+    // If skipping the last step, process the complete search
+    if (guidedVoiceSearch.step === 3) {
+      setTimeout(() => {
+        processCompleteGuidedSearch();
+      }, 500);
+    }
+  };
+  
+  // Close the guided voice search
+  const closeGuidedVoiceSearch = () => {
+    setGuidedVoiceSearch({
+      active: false,
+      step: 1,
+      roomType: null,
+      bedType: null,
+      stayDuration: null
+    });
+  };
+  
+  // Handle voice search button press (original method)
+  const handleVoiceButtonPress = (e) => {
+    e.preventDefault(); // Prevent default behavior
+    
+    // Generate a unique ID for this voice search attempt
+    const searchSessionId = `voice-search-${Date.now()}`;
+    console.log(`Starting new voice search session: ${searchSessionId}`);
+    
+    // Check if speech recognition is supported
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      alert('Speech recognition is not supported in your browser. Please try Chrome or Edge.');
+      return;
+    }
+    
+    // Update UI state
+    setIsButtonActive(true);
+    setIsListening(true);
+    
+    // IMPORTANT: Reset all state variables to ensure a fresh start
+    setVoiceSearchQuery('');
+    setShowVoiceSearchResults(false);
+    setVoiceSearchResults(null);
+    
+    // Clean up any existing recognition instance
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+      } catch (e) {
+        console.log('Error cleaning up previous recognition:', e);
+      }
+    }
+    
+    // Create a fresh recognition instance
+    const recognition = createNewRecognitionInstance();
+    if (!recognition) {
+      console.error('Failed to create speech recognition instance');
+      return;
+    }
+    
+    // Store in ref for later access
+    recognitionRef.current = recognition;
+    
+    // Create a variable to store the transcript for this specific session
+    let sessionTranscript = '';
+    
+    recognition.onstart = () => {
+      console.log(`Recognition started for session ${searchSessionId}`);
+    };
+    
+    recognition.onresult = (event) => {
+      // Reset the transcript for this event
+      let currentTranscript = '';
+      
+      // Process all results
+      for (let i = 0; i < event.results.length; i++) {
+        currentTranscript += event.results[i][0].transcript;
+      }
+      
+      // Update the session transcript
+      sessionTranscript = currentTranscript;
+      
+      // Update the state with the current transcript
+      setVoiceSearchQuery(currentTranscript);
+      console.log(`Transcript for session ${searchSessionId}:`, currentTranscript);
+    };
+    
+    recognition.onerror = (event) => {
+      console.error(`Recognition error in session ${searchSessionId}:`, event.error);
+    };
+    
+    recognition.onend = () => {
+      console.log(`Recognition ended for session ${searchSessionId}`);
+      setIsListening(false);
+    };
+    
+    // Start recognition
+    try {
+      recognition.start();
+      console.log(`Recognition successfully started for session ${searchSessionId}`);
+    } catch (error) {
+      console.error(`Error starting recognition for session ${searchSessionId}:`, error);
+      setIsButtonActive(false);
+      setIsListening(false);
+    }
+    
+    // Add event listeners for button release
+    document.addEventListener('touchend', (event) => handleVoiceButtonRelease(event, searchSessionId, sessionTranscript));
+    document.addEventListener('touchcancel', (event) => handleVoiceButtonRelease(event, searchSessionId, sessionTranscript));
+    document.addEventListener('mouseup', (event) => handleVoiceButtonRelease(event, searchSessionId, sessionTranscript));
+  };
+  
+  // Handle voice search button release with session ID and transcript
+  const handleVoiceButtonRelease = (e, sessionId, sessionTranscript) => {
+    if (e) e.preventDefault();
+    
+    // Only process if this is the active button press
+    if (!isButtonActive) return;
+    
+    console.log(`Button released for session ${sessionId}`);
     setIsButtonActive(false);
     
-    // Stop the recognition
+    // Capture the current transcript from state as a fallback
+    const stateTranscript = voiceSearchQuery;
+    
+    // Use the session transcript if available, otherwise fall back to state
+    // This is crucial for preventing cross-session contamination
+    const finalTranscript = sessionTranscript || stateTranscript;
+    console.log(`Final transcript for session ${sessionId}:`, finalTranscript);
+    
+    // Stop recognition
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
-        console.log('Recognition stopped');
+        console.log(`Recognition stopped for session ${sessionId}`);
       } catch (error) {
-        console.error('Error stopping recognition:', error);
+        console.error(`Error stopping recognition for session ${sessionId}:`, error);
+      }
+      
+      // Clean up the recognition instance
+      try {
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current = null;
+      } catch (e) {
+        console.log(`Error cleaning up recognition for session ${sessionId}:`, e);
       }
     }
     
-    // Remove event listeners
+    // Remove all event listeners
     document.removeEventListener('touchend', handleVoiceButtonRelease);
     document.removeEventListener('touchcancel', handleVoiceButtonRelease);
+    document.removeEventListener('mouseup', handleVoiceButtonRelease);
     
-    // Process the final transcript
-    setTimeout(() => {
-      const finalQuery = voiceSearchQuery;
-      console.log('Processing final query:', finalQuery);
-      
-      if (finalQuery && finalQuery.trim().length > 0) {
-        processVoiceSearch(finalQuery);
-      } else {
-        // If no speech was detected, show a helpful message
-        const emptyResults = {
-          query: "No speech detected",
-          foundMatch: false,
-          noSpeechDetected: true
-        };
-        setVoiceSearchResults(emptyResults);
-        setShowVoiceSearchResults(true);
-      }
-    }, 300);
+    // Process the query
+    if (finalTranscript && finalTranscript.trim().length > 0) {
+      console.log(`Processing query for session ${sessionId}:`, finalTranscript.trim());
+      processVoiceSearch(finalTranscript.trim(), sessionId);
+    } else {
+      console.log(`No speech detected for session ${sessionId}`);
+      const emptyResults = {
+        query: "No speech detected",
+        foundMatch: false,
+        noSpeechDetected: true,
+        sessionId: sessionId,
+        timestamp: Date.now()
+      };
+      setVoiceSearchResults(emptyResults);
+      setShowVoiceSearchResults(true);
+    }
   };
-  
   // Handle mouse events for desktop browsers
   const handleMouseDown = (e) => {
     e.preventDefault();
     handleVoiceButtonPress(e);
-    document.addEventListener('mouseup', handleMouseUp);
   };
   
-  const handleMouseUp = (e) => {
-    e.preventDefault();
-    handleVoiceButtonRelease(e);
-    document.removeEventListener('mouseup', handleMouseUp);
+  // Process voice search query with complete state isolation
+  const processVoiceSearch = (query, searchId = null) => {
+    // Force a complete reset of any previous state
+    // This is a drastic measure but necessary to prevent result caching
+    const forceReset = () => {
+      console.log('Forcing complete state reset before processing new query');
+      // Clear any previous results from state
+      setVoiceSearchResults(null);
+      // Force a small delay to ensure React has time to update
+      return new Promise(resolve => setTimeout(resolve, 50));
+    };
+    
+    // Execute the reset and then process the query
+    forceReset().then(() => {
+      // Continue with processing
+      processVoiceSearchInternal(query, searchId);
+    });
   };
   
-  // Process voice search query
-  const processVoiceSearch = (query) => {
+  // Internal implementation of voice search processing with complete isolation
+  const processVoiceSearchInternal = (query, searchId = null) => {
     // Don't process empty or very short queries
     if (!query || query.trim().length < 3) {
       console.log('Query too short, not processing');
@@ -782,9 +1069,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       'Queen2Beds-Jacuzzi': false // Queen 2 Beds with Jacuzzi does NOT exist
     };
     
-    // Initialize results object
+    // Initialize results object with a timestamp and searchId to ensure uniqueness
     let results = {
       query: query,
+      timestamp: Date.now(), // Add timestamp to prevent caching issues
+      searchId: searchId || `search-${Date.now()}`, // Use provided searchId or generate a new one
       nights: 1,
       checkInDate: new Date(),
       checkOutDate: new Date(new Date().getTime() + 24 * 60 * 60 * 1000),
@@ -875,59 +1164,110 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Extract bed type with improved detection logic and validation
     console.log('Voice query for bed type detection:', lowerQuery);
     
-    // First, set default room type
-    let detectedBedType = 'Queen';
+    // Advanced NLP-based room type detection system
+    let detectedBedType = 'Queen'; // Default
     let invalidRoomTypeRequested = false;
     let requestedInvalidType = '';
     
+    // Define room type patterns with keywords, weights, and patterns
+    const roomTypePatterns = {
+      'Queen': {
+        keywords: ['queen', 'queens', 'queen bed', 'standard'],
+        patterns: [/\bqueen\b/i, /\bqueens\b/i, /\bqueen bed\b/i, /\bstandard\b/i],
+        weight: 0,
+        negations: [/\btwo queen\b/i, /\b2 queen\b/i, /\bdouble queen\b/i]
+      },
+      'King': {
+        keywords: ['king', 'kings', 'king bed', 'king size', 'large bed'],
+        patterns: [/\bking\b/i, /\bkings\b/i, /\bking bed\b/i, /\bking size\b/i, /\blarge bed\b/i],
+        weight: 0,
+        negations: []
+      },
+      'Queen2Beds': {
+        keywords: ['double', 'two beds', '2 beds', 'two queen', '2 queen', 'double queen', 'two bed', '2 bed', 'double bed'],
+        patterns: [/\bdouble\b/i, /\btwo beds?\b/i, /\b2 beds?\b/i, /\btwo queen\b/i, /\b2 queen\b/i, /\bdouble queen\b/i],
+        weight: 0,
+        negations: []
+      },
+      'Invalid': {
+        keywords: ['suite', 'penthouse', 'twin', 'single'],
+        patterns: [/\bsuite\b/i, /\bpenthouse\b/i, /\btwin\b/i, /\bsingle\b/i],
+        weight: 0,
+        negations: []
+      }
+    };
+    
+    // Calculate weights for each room type
+    for (const [roomType, data] of Object.entries(roomTypePatterns)) {
+      // Check for keyword matches
+      for (const keyword of data.keywords) {
+        if (lowerQuery.includes(keyword)) {
+          roomTypePatterns[roomType].weight += 1;
+          console.log(`Match found for ${roomType}: '${keyword}'`);
+        }
+      }
+      
+      // Check for pattern matches (more accurate with word boundaries)
+      for (const pattern of data.patterns) {
+        if (pattern.test(lowerQuery)) {
+          roomTypePatterns[roomType].weight += 2; // Patterns have higher weight
+          console.log(`Pattern match for ${roomType}: ${pattern}`);
+        }
+      }
+      
+      // Check for negations
+      for (const negation of data.negations) {
+        if (negation.test(lowerQuery)) {
+          roomTypePatterns[roomType].weight -= 3; // Strong negative weight
+          console.log(`Negation found for ${roomType}: ${negation}`);
+        }
+      }
+      
+      // Context-based adjustments
+      if (roomType === 'Queen2Beds') {
+        // If user mentions capacity for 3-4 people, boost Queen2Beds
+        if (/\b(for|fits|sleeps|accommodates)\s+([34]|three|four)\s+(people|persons|guests)\b/i.test(lowerQuery)) {
+          roomTypePatterns[roomType].weight += 3;
+          console.log(`Capacity context boost for ${roomType}`);
+        }
+      }
+    }
+    
     // Check for invalid room types first
-    if (lowerQuery.includes('suite') || lowerQuery.includes('penthouse')) {
+    if (roomTypePatterns['Invalid'].weight > 0) {
       invalidRoomTypeRequested = true;
-      requestedInvalidType = lowerQuery.includes('suite') ? 'Suite' : 'Penthouse';
+      
+      // Determine which invalid type was requested
+      if (lowerQuery.includes('suite')) requestedInvalidType = 'Suite';
+      else if (lowerQuery.includes('penthouse')) requestedInvalidType = 'Penthouse';
+      else if (lowerQuery.includes('twin')) requestedInvalidType = 'Twin beds';
+      else if (lowerQuery.includes('single')) requestedInvalidType = 'Single bed';
+      
       console.log('Invalid room type requested:', requestedInvalidType);
-    } else if (lowerQuery.includes('twin') || lowerQuery.includes('single')) {
-      invalidRoomTypeRequested = true;
-      requestedInvalidType = lowerQuery.includes('twin') ? 'Twin beds' : 'Single bed';
-      console.log('Invalid room type requested:', requestedInvalidType);
-    }
-    
-    // Create a more robust detection system for valid types
-    const containsKing = lowerQuery.includes('king');
-    const containsQueen = lowerQuery.includes('queen');
-    
-    // Improved detection for double beds - check for double without requiring 'queen'
-    const containsDoubleBed = 
-      lowerQuery.includes('double') || 
-      lowerQuery.includes('two beds') || 
-      lowerQuery.includes('2 beds') || 
-      (containsQueen && lowerQuery.includes('two')) || 
-      (containsQueen && lowerQuery.includes('2')) || 
-      (containsQueen && lowerQuery.includes('beds'));
-    
-    // Add detailed logging for debugging
-    console.log('Detection flags:', {
-      containsKing,
-      containsQueen,
-      containsDoubleBed,
-      query: lowerQuery
-    });
-    
-    // Apply detection logic with clear priority
-    if (containsDoubleBed) {
-      detectedBedType = 'Queen2Beds';
-      console.log('Detected: Queen 2 Beds');
-    } else if (containsQueen) {
-      detectedBedType = 'Queen';
-      console.log('Detected: Queen');
-    } else if (containsKing) {
-      detectedBedType = 'King';
-      console.log('Detected: King');
+      
+      // Suggest a suitable alternative
+      if (lowerQuery.includes('twin') || lowerQuery.includes('single')) {
+        detectedBedType = 'Queen2Beds'; // Suggest Queen2Beds for twin/single requests
+      }
     } else {
-      console.log('No specific bed type detected, defaulting to Queen');
+      // Find the room type with the highest weight
+      let highestWeight = -1;
+      let selectedType = 'Queen'; // Default
+      
+      for (const [roomType, data] of Object.entries(roomTypePatterns)) {
+        if (roomType !== 'Invalid' && data.weight > highestWeight) {
+          highestWeight = data.weight;
+          selectedType = roomType;
+        }
+      }
+      
+      // Only use detected type if we have reasonable confidence (weight > 0)
+      detectedBedType = highestWeight > 0 ? selectedType : 'Queen';
+      console.log(`Selected room type: ${detectedBedType} with confidence weight: ${highestWeight}`);
     }
     
-    // Special case for 'double' without specifying bed type
-    if (lowerQuery.includes('double') && !containsQueen && !containsKing) {
+    // Special case for 'double' without other context
+    if (lowerQuery.includes('double') && !lowerQuery.includes('queen') && !lowerQuery.includes('king')) {
       console.log('Special case: Double without bed type specified');
       detectedBedType = 'Queen2Beds';
     }
@@ -939,11 +1279,59 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     console.log('Final bed type selected:', results.bedType);
     console.log('Invalid room type?', results.invalidRoomType);
     
-    // Check for jacuzzi
-    if (lowerQuery.includes('jacuzzi') || lowerQuery.includes('hot tub') || lowerQuery.includes('spa')) {
-      results.hasJacuzzi = true;
+    // Advanced feature detection using NLP techniques
+    // Define feature patterns with keywords, patterns, and confidence scoring
+    const featurePatterns = {
+      'Jacuzzi': {
+        keywords: ['jacuzzi', 'hot tub', 'spa', 'whirlpool', 'jet tub'],
+        patterns: [/\bjacuzzi\b/i, /\bhot tub\b/i, /\bspa\b/i, /\bwhirlpool\b/i],
+        negations: [/\bno jacuzzi\b/i, /\bwithout jacuzzi\b/i, /\bno hot tub\b/i],
+        weight: 0
+      },
+      'Smoking': {
+        keywords: ['smoking', 'smoke', 'smoker'],
+        patterns: [/\bsmoking\b/i, /\bsmoker\b/i, /\bsmoke\b/i],
+        negations: [/\bnon[- ]smoking\b/i, /\bno smoking\b/i, /\bnot smoking\b/i],
+        weight: 0
+      }
+    };
+    
+    // Calculate weights for each feature
+    for (const [feature, data] of Object.entries(featurePatterns)) {
+      // Check for keyword matches
+      for (const keyword of data.keywords) {
+        if (lowerQuery.includes(keyword)) {
+          featurePatterns[feature].weight += 1;
+          console.log(`Match found for ${feature}: '${keyword}'`);
+        }
+      }
       
-      // Check for invalid combinations
+      // Check for pattern matches (more accurate with word boundaries)
+      for (const pattern of data.patterns) {
+        if (pattern.test(lowerQuery)) {
+          featurePatterns[feature].weight += 2; // Patterns have higher weight
+          console.log(`Pattern match for ${feature}: ${pattern}`);
+        }
+      }
+      
+      // Check for negations
+      for (const negation of data.negations) {
+        if (negation.test(lowerQuery)) {
+          featurePatterns[feature].weight = -3; // Strong negative weight overrides positives
+          console.log(`Negation found for ${feature}: ${negation}`);
+        }
+      }
+    }
+    
+    // Set feature values based on weights
+    results.hasJacuzzi = featurePatterns['Jacuzzi'].weight > 0;
+    results.isSmoking = featurePatterns['Smoking'].weight > 0;
+    
+    console.log(`Jacuzzi detection: ${results.hasJacuzzi} (weight: ${featurePatterns['Jacuzzi'].weight})`);
+    console.log(`Smoking detection: ${results.isSmoking} (weight: ${featurePatterns['Smoking'].weight})`);
+    
+    // Check for invalid combinations
+    if (results.hasJacuzzi) {
       const combinationKey = `${results.bedType}-Jacuzzi`;
       console.log('Checking combination:', combinationKey);
       
@@ -960,13 +1348,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           results.hasJacuzzi = true;
         }
       }
-    }
-    
-    // Check for smoking preference
-    if (lowerQuery.includes('smoking')) {
-      results.isSmoking = true;
-    } else if (lowerQuery.includes('non-smoking') || lowerQuery.includes('non smoking')) {
-      results.isSmoking = false;
     }
     
     // Calculate price based on extracted information
@@ -1029,14 +1410,49 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     results.total = basePrice + tax;
     results.foundMatch = true;
     
-    // Show results
-    setVoiceSearchResults(results);
-    setShowVoiceSearchResults(true);
+    // Set the final results with forced state update to prevent caching
+    results.foundMatch = true;
+    results.uniqueId = `result-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    
+    // Store the results in session storage as a backup
+    try {
+      const resultsKey = `voice-results-${results.uniqueId}`;
+      sessionStorage.setItem(resultsKey, JSON.stringify(results));
+      console.log(`Stored results in session storage with key: ${resultsKey}`);
+    } catch (e) {
+      console.error('Error storing results in session storage:', e);
+    }
+    
+    // Force a complete state reset before setting new results
+    setVoiceSearchResults(null);
+    
+    // Use setTimeout to ensure the state has been cleared before setting new results
+    setTimeout(() => {
+      console.log('Setting voice search results with unique ID:', results.uniqueId);
+      setVoiceSearchResults(results);
+      setShowVoiceSearchResults(true);
+    }, 50);
   };
   
-  // Close voice search results
+  // Close voice search results and completely reset the state
   const closeVoiceSearchResults = () => {
+    console.log('Completely resetting voice search state');
     setShowVoiceSearchResults(false);
+    setVoiceSearchResults(null);
+    setVoiceSearchQuery('');
+    
+    // Force cleanup of any lingering recognition instances
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current = null;
+      } catch (e) {
+        console.log('Error cleaning up recognition:', e);
+      }
+    }
   };
   
   // Handle card mouse move
@@ -1138,19 +1554,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           <span className="day" style={dayStyle}>{currentDay}</span>
           <span className="date">{currentDate}</span>
         </div>
-        
-        {/* Voice Search Button - centered in top bar */}
-        <button 
-          className={`voice-search-button ${isButtonActive ? 'active' : 'inactive'}`}
-          onTouchStart={handleVoiceButtonPress}
-          onMouseDown={handleMouseDown}
-          aria-label="Press and hold to talk"
-        >
-          <span className="press-to-talk-text">
-            {isButtonActive ? 'Release when done' : 'Press & hold to talk'}
-          </span>
-          <i className={`fas ${isButtonActive ? 'fa-microphone-alt' : 'fa-microphone'}`}></i>
-        </button>
         
         <div className="daily-price">
           <span className="price-label">Today's Room Prices</span>
@@ -1932,6 +2335,117 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         </div>
       )}
       
+      {/* Guided Voice Search Modal */}
+      {guidedVoiceSearch.active && (
+        <div className="guided-voice-modal">
+          <div className="guided-voice-container">
+            <div className="guided-voice-header">
+              <h3>Voice Search Assistant</h3>
+              <button onClick={closeGuidedVoiceSearch}>×</button>
+            </div>
+            
+            <div className="guided-voice-content">
+              {/* Progress Indicator */}
+              <div className="guided-voice-progress">
+                <div className={`guided-voice-progress-dot ${guidedVoiceSearch.step >= 1 ? 'active' : ''} ${guidedVoiceSearch.step > 1 ? 'completed' : ''}`}></div>
+                <div className={`guided-voice-progress-dot ${guidedVoiceSearch.step >= 2 ? 'active' : ''} ${guidedVoiceSearch.step > 2 ? 'completed' : ''}`}></div>
+                <div className={`guided-voice-progress-dot ${guidedVoiceSearch.step >= 3 ? 'active' : ''} ${guidedVoiceSearch.step > 3 ? 'completed' : ''}`}></div>
+              </div>
+              
+              {/* Step 1: Room Type */}
+              {guidedVoiceSearch.step === 1 && (
+                <div className="guided-voice-step">
+                  <div className="guided-voice-watermark">Room Type</div>
+                  <div className="guided-voice-value">{guidedVoiceSearch.roomType || 'Listening...'}</div>
+                  <div className="guided-voice-instructions">
+                    Press the microphone button and say "Smoking" or "Non-Smoking"
+                  </div>
+                  <button 
+                    className={`guided-voice-mic-button ${isButtonActive ? 'active' : ''}`}
+                    onTouchStart={handleGuidedVoiceStep}
+                    onMouseDown={handleGuidedVoiceStep}
+                    onTouchEnd={() => recognitionRef.current && recognitionRef.current.stop()}
+                    onMouseUp={() => recognitionRef.current && recognitionRef.current.stop()}
+                  >
+                    <i className={`fas ${isButtonActive ? 'fa-microphone-alt' : 'fa-microphone'}`}></i>
+                  </button>
+                </div>
+              )}
+              
+              {/* Step 2: Bed Type */}
+              {guidedVoiceSearch.step === 2 && (
+                <div className="guided-voice-step">
+                  <div className="guided-voice-watermark">Bed Type</div>
+                  <div className="guided-voice-value">
+                    {guidedVoiceSearch.bedType === 'Queen2Beds' ? 'Queen 2 Beds' : guidedVoiceSearch.bedType || 'Listening...'}
+                  </div>
+                  <div className="guided-voice-instructions">
+                    Press the microphone button and say "Queen", "King", or "Double"
+                  </div>
+                  <button 
+                    className={`guided-voice-mic-button ${isButtonActive ? 'active' : ''}`}
+                    onTouchStart={handleGuidedVoiceStep}
+                    onMouseDown={handleGuidedVoiceStep}
+                    onTouchEnd={() => recognitionRef.current && recognitionRef.current.stop()}
+                    onMouseUp={() => recognitionRef.current && recognitionRef.current.stop()}
+                  >
+                    <i className={`fas ${isButtonActive ? 'fa-microphone-alt' : 'fa-microphone'}`}></i>
+                  </button>
+                </div>
+              )}
+              
+              {/* Step 3: Stay Duration */}
+              {guidedVoiceSearch.step === 3 && (
+                <div className="guided-voice-step">
+                  <div className="guided-voice-watermark">Stay Duration</div>
+                  <div className="guided-voice-value">{guidedVoiceSearch.stayDuration || 'Listening...'}</div>
+                  <div className="guided-voice-instructions">
+                    Press the microphone button and say "Tonight", "Weekend", or specific dates
+                  </div>
+                  <button 
+                    className={`guided-voice-mic-button ${isButtonActive ? 'active' : ''}`}
+                    onTouchStart={handleGuidedVoiceStep}
+                    onMouseDown={handleGuidedVoiceStep}
+                    onTouchEnd={() => recognitionRef.current && recognitionRef.current.stop()}
+                    onMouseUp={() => recognitionRef.current && recognitionRef.current.stop()}
+                  >
+                    <i className={`fas ${isButtonActive ? 'fa-microphone-alt' : 'fa-microphone'}`}></i>
+                  </button>
+                </div>
+              )}
+              
+              {/* Step 4: Processing */}
+              {guidedVoiceSearch.step === 4 && (
+                <div className="guided-voice-step">
+                  <div className="guided-voice-watermark">Processing Your Request</div>
+                  <div className="guided-voice-value">
+                    <i className="fas fa-spinner fa-spin"></i>
+                  </div>
+                  <div className="guided-voice-instructions">
+                    Finding the perfect room for you...
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="guided-voice-footer">
+              {guidedVoiceSearch.step < 4 && (
+                <>
+                  <button className="guided-voice-skip-button" onClick={skipGuidedStep}>
+                    Skip
+                  </button>
+                  {guidedVoiceSearch.step === 3 && guidedVoiceSearch.roomType && guidedVoiceSearch.bedType && (
+                    <button className="guided-voice-next-button" onClick={processCompleteGuidedSearch}>
+                      Search
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Voice Search Results Popup */}
       {showVoiceSearchResults && voiceSearchResults && (
         <div className="voice-search-results">
@@ -1942,11 +2456,17 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           <div className="voice-search-content">
             <div className="voice-search-query">You said: "{voiceSearchResults.query}"</div>
             
-            {voiceSearchResults.noSpeechDetected ? (
+            {voiceSearchResults.recognitionError ? (
+              <div className="recognition-error">
+                <p><i className="fas fa-exclamation-circle"></i></p>
+                <p><strong>Speech recognition error</strong></p>
+                <p>There was a problem with the speech recognition service. Please try again.</p>
+              </div>
+            ) : voiceSearchResults.noSpeechDetected ? (
               <div className="no-speech-error">
                 <p><i className="fas fa-microphone-slash"></i></p>
                 <p><strong>No speech detected</strong></p>
-                <p>Please tap "Press to Talk" and speak clearly into your microphone.</p>
+                <p>Please press and hold the microphone button and speak clearly.</p>
               </div>
             ) : voiceSearchResults.foundMatch ? (
               <div>
@@ -2039,7 +2559,14 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         </div>
       )}
       
-      {/* Floating add button removed */}
+      {/* Floating Voice Search Button */}
+      <button 
+        className={`voice-search-button ${isButtonActive ? 'active' : 'inactive'}`}
+        onClick={startGuidedVoiceSearch}
+        aria-label="Start guided voice search"
+      >
+        <i className="fas fa-microphone"></i>
+      </button>
     </div>
   );
 }
