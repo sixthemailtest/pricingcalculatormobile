@@ -3104,9 +3104,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               <div>Sorry, I couldn't understand your request. Please try again.</div>
             )}
           </div>
-          <div className="voice-search-footer">
-            <button className="voice-search-close-button" onClick={closeVoiceSearchResults}>Close</button>
-          </div>
+          {/* Voice search footer removed as requested */}
         </div>
       )}
       
