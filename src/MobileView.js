@@ -698,6 +698,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       return;
     }
     
+    // Check if this is an iOS device
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    
     setIsButtonActive(true);
     setIsListening(true);
     setVoiceSearchQuery('');
@@ -724,7 +727,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     recognition.continuous = false; // Changed to false to get complete utterances
     recognition.interimResults = false; // Changed to false to get only final results
     
-    console.log('Starting improved voice recognition...');
+    // iOS-specific settings
+    if (isIOS) {
+      // These settings help with iOS recognition
+      recognition.maxAlternatives = 3; // Get multiple alternatives for better accuracy
+    }
+    
+    console.log('Starting improved voice recognition...', isIOS ? 'on iOS device' : 'on non-iOS device');
     
     recognition.onresult = (event) => {
       // Get the complete transcript
@@ -763,6 +772,20 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       setIsButtonActive(false);
     };
     
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
+      
+      // Handle iOS-specific errors
+      if (isIOS && event.error === 'not-allowed') {
+        alert('Please allow microphone access in your device settings to use voice search.');
+      } else if (event.error === 'no-speech') {
+        console.log('No speech detected');
+      }
+      
+      setIsListening(false);
+      setIsButtonActive(false);
+    };
+    
     // Start recognition
     try {
       recognition.start();
@@ -771,6 +794,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       console.error('Error starting voice recognition:', error);
       setIsButtonActive(false);
       setIsListening(false);
+      
+      // Show a helpful message for iOS users
+      if (isIOS) {
+        alert('Speech recognition failed to start. Please make sure you have granted microphone permissions in your device settings.');
+      }
     }
   };
   
@@ -1736,6 +1764,22 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         window.scrollTo(0, 0);
       }, 100);
     }, 50);
+  };
+  
+  // Handle voice button click (tap-to-start/tap-to-stop)
+  const handleVoiceButtonClick = () => {
+    // If already listening, stop recognition
+    if (isListening && recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+        console.log('Voice recognition stopped by user');
+      } catch (e) {
+        console.error('Error stopping recognition:', e);
+      }
+    } else {
+      // Otherwise, start recognition
+      startImprovedVoiceRecognition();
+    }
   };
   
   // Close voice search results
@@ -2869,16 +2913,14 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         </div>
       )}
       
-      {/* Floating Voice Search Button */}
+      {/* Floating Voice Search Button - Changed to tap-to-start/tap-to-stop for iOS compatibility */}
       <button 
         className={`voice-search-button ${isButtonActive ? 'active' : 'inactive'}`}
-        onTouchStart={startImprovedVoiceRecognition}
-        onMouseDown={startImprovedVoiceRecognition}
-        onTouchEnd={() => recognitionRef.current && recognitionRef.current.stop()}
-        onMouseUp={() => recognitionRef.current && recognitionRef.current.stop()}
-        aria-label="Press and hold to talk"
+        onClick={handleVoiceButtonClick}
+        aria-label={isListening ? 'Tap to stop' : 'Tap to start voice search'}
       >
         <i className={`fas ${isButtonActive ? 'fa-microphone-alt' : 'fa-microphone'}`}></i>
+        <span className="voice-button-label">{isListening ? 'Tap to stop' : 'Tap to talk'}</span>
       </button>
     </div>
   );

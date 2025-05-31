@@ -248,25 +248,24 @@
   position: fixed;
   bottom: 20px;
   right: 20px;
-  width: 60px;
-  height: 60px;
+  width: 70px;
+  height: 70px;
   border-radius: 50%;
   background: linear-gradient(135deg, #4776E6, #8E54E9); /* Default blue-purple gradient */
   display: flex;
-  align-items: center;
+  flex-direction: column;
   justify-content: center;
+  align-items: center;
   color: white;
+  font-size: 24px;
   border: none;
-  box-shadow: 0 4px 15px rgba(71, 118, 230, 0.5);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
   z-index: 1000;
   cursor: pointer;
-  transition: all 0.3s ease;
-  -webkit-touch-callout: none; /* Prevent iOS callout on long press */
-  -webkit-user-select: none; /* Prevent text selection on iOS */
-  user-select: none;
-  touch-action: manipulation; /* Improve touch behavior */
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent; /* Removes the tap highlight on iOS */
+  touch-action: manipulation; /* Improves touch handling */
 }
-
 .voice-search-button.active {
   background: linear-gradient(135deg, #ff416c, #ff4b2b); /* Red gradient when active */
   transform: scale(1.1);
@@ -297,6 +296,16 @@
 /* Inactive state - default state */
 .voice-search-button.inactive {
   background: linear-gradient(135deg, #4776E6, #8E54E9); /* Blue-purple when inactive */
+}
+
+/* Voice button label */
+.voice-button-label {
+  font-size: 10px;
+  margin-top: 5px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.9;
 }
 
 @keyframes pulse {
