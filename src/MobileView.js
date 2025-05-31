@@ -1983,8 +1983,22 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         console.log(`Single specific date detected: ${voiceCheckInDate.toDateString()}`);
       }
     }
+    // Check for "today and tomorrow" first
+    if (lowerQuery.includes('today') && lowerQuery.includes('tomorrow')) {
+      voiceCheckInDate = new Date(voiceToday);
+      voiceCheckInDate.setHours(15, 0, 0, 0); // 3 PM check-in today
+      
+      // Set check-out to the day after tomorrow at 11 AM
+      voiceCheckOutDate = new Date(voiceCheckInDate);
+      voiceCheckOutDate.setDate(voiceCheckInDate.getDate() + 2);
+      voiceCheckOutDate.setHours(11, 0, 0, 0);
+      
+      voiceNights = 2; // Today and tomorrow = 2 nights
+      dateDetected = true;
+      console.log('Detected "today and tomorrow" - setting 2 nights');
+    }
     // Check for "tomorrow"
-    else if (lowerQuery.includes('tomorrow')) {
+    else if (lowerQuery.includes('tomorrow') && !lowerQuery.includes('today')) {
       voiceCheckInDate = new Date(voiceToday);
       voiceCheckInDate.setDate(voiceToday.getDate() + 1);
       voiceCheckInDate.setHours(15, 0, 0, 0); // 3 PM check-in
@@ -1997,7 +2011,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       dateDetected = true;
     }
     // Check for "today"
-    else if (lowerQuery.includes('today')) {
+    else if (lowerQuery.includes('today') && !lowerQuery.includes('tomorrow')) {
       voiceCheckInDate = new Date(voiceToday);
       voiceCheckInDate.setHours(15, 0, 0, 0); // 3 PM check-in
       
