@@ -1357,7 +1357,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       checkOutDate: new Date(new Date().getTime() + 24 * 60 * 60 * 1000),
       bedType: 'Queen', // Default to Queen
       hasJacuzzi: false,
-      isSmoking: false,
+      isSmoking: false, // Always non-smoking by default
       price: 0,
       tax: 0,
       total: 0,
@@ -1371,31 +1371,184 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       requestedInvalidCombination: '' // Store the invalid combination that was requested
     };
     
+    // Enhanced date detection for voice search
+    const voiceToday = new Date();
+    let voiceCheckInDate = new Date(voiceToday);
+    let voiceCheckOutDate = new Date(voiceToday);
+    let voiceNights = 1;
+    let dateDetected = false;
+    
+    // Set default check-in to today at 3 PM and check-out to tomorrow at 11 AM
+    voiceCheckInDate.setHours(15, 0, 0, 0); // 3 PM check-in
+    voiceCheckOutDate.setDate(voiceToday.getDate() + 1);
+    voiceCheckOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
+    
     // Extract days of the week
     const daysOfWeek = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const dayIndices = {
+      'sunday': 0,
+      'monday': 1,
+      'tuesday': 2,
+      'wednesday': 3,
+      'thursday': 4,
+      'friday': 5,
+      'saturday': 6
+    };
     const mentionedDays = [];
     
+    // Define months for date parsing
+    const months = {
+      'january': 0, 'jan': 0,
+      'february': 1, 'feb': 1,
+      'march': 2, 'mar': 2,
+      'april': 3, 'apr': 3,
+      'may': 4,
+      'june': 5, 'jun': 5,
+      'july': 6, 'jul': 6,
+      'august': 7, 'aug': 7,
+      'september': 8, 'sep': 8, 'sept': 8,
+      'october': 9, 'oct': 9,
+      'november': 10, 'nov': 10,
+      'december': 11, 'dec': 11
+    };
+    
+    // Check for specific days
     daysOfWeek.forEach(day => {
       if (lowerQuery.includes(day)) {
         mentionedDays.push(day);
+        dateDetected = true;
       }
     });
     
-    // Set check-in and check-out dates based on mentioned days
-    if (mentionedDays.length > 0) {
-      const today = new Date();
-      const currentDayIndex = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    // Check for specific date mentions (e.g., "26th June")
+    let specificDateDetected = false;
+    const datePatterns = [
+      // Format: "26th June", "26 June", "June 26th", "June 26"
+      /\b(\d{1,2})(?:st|nd|rd|th)?\s+(?:of\s+)?(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b/i,
+      /\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i
+    ];
+    
+    let specificDay, specificMonth, specificYear;
+    
+    // Try each date pattern
+    for (const pattern of datePatterns) {
+      const match = lowerQuery.match(pattern);
+      if (match) {
+        if (match[1] && isNaN(parseInt(match[1]))) {
+          // Month is first (e.g., "June 26th")
+          specificMonth = months[match[1].toLowerCase()];
+          specificDay = parseInt(match[2]);
+        } else {
+          // Day is first (e.g., "26th June")
+          specificDay = parseInt(match[1]);
+          specificMonth = months[match[2].toLowerCase()];
+        }
+        
+        // Validate day of month
+        if (specificDay >= 1 && specificDay <= 31) {
+          specificDateDetected = true;
+          dateDetected = true;
+          break;
+        }
+      }
+    }
+    
+    // If specific date detected, set check-in and check-out dates
+    if (specificDateDetected) {
+      // Default to current year
+      specificYear = voiceToday.getFullYear();
       
-      // Map day names to day indices
-      const dayIndices = {
-        'sunday': 0,
-        'monday': 1,
-        'tuesday': 2,
-        'wednesday': 3,
-        'thursday': 4,
-        'friday': 5,
-        'saturday': 6
-      };
+      // If the month is earlier than current month, assume next year
+      if (specificMonth < voiceToday.getMonth()) {
+        specificYear++;
+      }
+      // If same month but day has passed, assume next year
+      else if (specificMonth === voiceToday.getMonth() && specificDay < voiceToday.getDate()) {
+        specificYear++;
+      }
+      
+      // Set check-in date to the specific date at 3 PM
+      voiceCheckInDate = new Date(specificYear, specificMonth, specificDay, 15, 0, 0, 0);
+      
+      // Set check-out date to the next day at 11 AM
+      voiceCheckOutDate = new Date(voiceCheckInDate);
+      voiceCheckOutDate.setDate(voiceCheckInDate.getDate() + 1);
+      voiceCheckOutDate.setHours(11, 0, 0, 0);
+      
+      voiceNights = 1;
+      console.log(`Specific date detected: ${voiceCheckInDate.toDateString()}`);
+    }
+    // Check for "tomorrow"
+    else if (lowerQuery.includes('tomorrow')) {
+      voiceCheckInDate = new Date(voiceToday);
+      voiceCheckInDate.setDate(voiceToday.getDate() + 1);
+      voiceCheckInDate.setHours(15, 0, 0, 0); // 3 PM check-in
+      
+      voiceCheckOutDate = new Date(voiceCheckInDate);
+      voiceCheckOutDate.setDate(voiceCheckInDate.getDate() + 1);
+      voiceCheckOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
+      
+      voiceNights = 1;
+      dateDetected = true;
+    }
+    // Check for "today"
+    else if (lowerQuery.includes('today')) {
+      voiceCheckInDate = new Date(voiceToday);
+      voiceCheckInDate.setHours(15, 0, 0, 0); // 3 PM check-in
+      
+      voiceCheckOutDate = new Date(voiceCheckInDate);
+      voiceCheckOutDate.setDate(voiceCheckInDate.getDate() + 1);
+      voiceCheckOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
+      
+      voiceNights = 1;
+      dateDetected = true;
+    }
+    // Check for "next week" with improved handling for "whole week" and similar phrases
+    else if (lowerQuery.includes('next week')) {
+      voiceCheckInDate = new Date(voiceToday);
+      voiceCheckInDate.setDate(voiceToday.getDate() + 7); // One week from today
+      voiceCheckInDate.setHours(15, 0, 0, 0); // 3 PM check-in
+      
+      // Check if user wants the "whole week" or similar phrases
+      const wholeWeekPhrases = ['whole week', 'full week', 'entire week', 'all week', 'week long'];
+      const isWholeWeek = wholeWeekPhrases.some(phrase => lowerQuery.includes(phrase));
+      
+      if (isWholeWeek) {
+        // Set to a full 7-night stay for "whole week"
+        voiceCheckOutDate = new Date(voiceCheckInDate);
+        voiceCheckOutDate.setDate(voiceCheckInDate.getDate() + 7);
+        voiceCheckOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
+        voiceNights = 7;
+      } else {
+        // Default to a 2-night weekend stay
+        voiceCheckOutDate = new Date(voiceCheckInDate);
+        voiceCheckOutDate.setDate(voiceCheckInDate.getDate() + 2);
+        voiceCheckOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
+        voiceNights = 2;
+      }
+      
+      dateDetected = true;
+    }
+    // Check for "weekend"
+    else if (lowerQuery.includes('weekend')) {
+      const currentDayIndex = voiceToday.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      let daysUntilFriday = 5 - currentDayIndex;
+      if (daysUntilFriday <= 0) daysUntilFriday += 7; // If it's Friday or after, go to next week
+      
+      voiceCheckInDate = new Date(voiceToday);
+      voiceCheckInDate.setDate(voiceToday.getDate() + daysUntilFriday);
+      voiceCheckInDate.setHours(15, 0, 0, 0); // 3 PM check-in
+      
+      voiceCheckOutDate = new Date(voiceCheckInDate);
+      voiceCheckOutDate.setDate(voiceCheckInDate.getDate() + 2); // Friday to Sunday
+      voiceCheckOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
+      
+      voiceNights = 2;
+      dateDetected = true;
+    }
+    // Process specific days of the week if mentioned
+    else if (mentionedDays.length > 0) {
+      const currentDayIndex = voiceToday.getDay(); // 0 = Sunday, 1 = Monday, etc.
       
       // Find the first mentioned day
       const firstDay = mentionedDays[0];
@@ -1406,38 +1559,86 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       if (daysUntilFirstDay <= 0) daysUntilFirstDay += 7; // If it's in the past, go to next week
       
       // Set check-in date
-      const checkInDate = new Date(today);
-      checkInDate.setDate(today.getDate() + daysUntilFirstDay);
-      checkInDate.setHours(15, 0, 0, 0); // 3 PM check-in
-      results.checkInDate = checkInDate;
+      voiceCheckInDate = new Date(voiceToday);
+      voiceCheckInDate.setDate(voiceToday.getDate() + daysUntilFirstDay);
+      voiceCheckInDate.setHours(15, 0, 0, 0); // 3 PM check-in
       
       // If multiple days mentioned, set check-out date based on the last day
       if (mentionedDays.length > 1) {
-        const lastDay = mentionedDays[mentionedDays.length - 1];
-        const lastDayIndex = dayIndices[lastDay];
+        // Sort the mentioned days to ensure they're in order of the week
+        const sortedDays = [...mentionedDays].sort((a, b) => dayIndices[a] - dayIndices[b]);
         
-        // Calculate days between first and last day
-        let daysBetween = lastDayIndex - firstDayIndex;
-        if (daysBetween <= 0) daysBetween += 7; // If it wraps around to the next week
+        // Find consecutive days to determine actual stay duration
+        let consecutiveDays = [];
+        let currentSequence = [sortedDays[0]];
+        
+        for (let i = 1; i < sortedDays.length; i++) {
+          const prevDayIndex = dayIndices[sortedDays[i-1]];
+          const currDayIndex = dayIndices[sortedDays[i]];
+          
+          // Check if days are consecutive or wrap around the week
+          if (currDayIndex === (prevDayIndex + 1) % 7) {
+            currentSequence.push(sortedDays[i]);
+          } else {
+            // Not consecutive, start a new sequence
+            if (currentSequence.length > consecutiveDays.length) {
+              consecutiveDays = [...currentSequence];
+            }
+            currentSequence = [sortedDays[i]];
+          }
+        }
+        
+        // Check if the last sequence is the longest
+        if (currentSequence.length > consecutiveDays.length) {
+          consecutiveDays = [...currentSequence];
+        }
+        
+        // If we found consecutive days, use them; otherwise use all mentioned days
+        const daysToUse = consecutiveDays.length > 1 ? consecutiveDays : sortedDays;
+        
+        // Calculate check-in based on first day in sequence
+        const firstSequenceDay = daysToUse[0];
+        const firstSequenceDayIndex = dayIndices[firstSequenceDay];
+        let daysUntilSequenceStart = firstSequenceDayIndex - currentDayIndex;
+        if (daysUntilSequenceStart <= 0) daysUntilSequenceStart += 7;
+        
+        voiceCheckInDate = new Date(voiceToday);
+        voiceCheckInDate.setDate(voiceToday.getDate() + daysUntilSequenceStart);
+        voiceCheckInDate.setHours(15, 0, 0, 0);
+        
+        // Calculate check-out based on last day in sequence
+        const lastSequenceDay = daysToUse[daysToUse.length - 1];
+        const lastSequenceDayIndex = dayIndices[lastSequenceDay];
+        
+        // Calculate the actual number of nights based on the mentioned days
+        let nightsCount = daysToUse.length;
         
         // Set check-out date to the day AFTER the last mentioned night
-        // This ensures the last mentioned night is included in the stay
-        const checkOutDate = new Date(checkInDate);
-        checkOutDate.setDate(checkInDate.getDate() + daysBetween + 1); // Add 1 to include the last night
-        checkOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
-        results.checkOutDate = checkOutDate;
+        voiceCheckOutDate = new Date(voiceCheckInDate);
+        voiceCheckOutDate.setDate(voiceCheckInDate.getDate() + nightsCount);
+        voiceCheckOutDate.setHours(11, 0, 0, 0);
         
-        // Calculate nights - add 1 to include the last night
-        results.nights = daysBetween + 1;
+        voiceNights = nightsCount;
       } else {
         // If only one day mentioned, assume 1 night stay
-        const checkOutDate = new Date(checkInDate);
-        checkOutDate.setDate(checkInDate.getDate() + 1);
-        checkOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
-        results.checkOutDate = checkOutDate;
-        results.nights = 1;
+        voiceCheckOutDate = new Date(voiceCheckInDate);
+        voiceCheckOutDate.setDate(voiceCheckInDate.getDate() + 1);
+        voiceCheckOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
+        voiceNights = 1;
       }
     }
+    
+    // Set the dates in the results object
+    results.checkInDate = voiceCheckInDate;
+    results.checkOutDate = voiceCheckOutDate;
+    results.nights = voiceNights;
+    
+    console.log('Date detection results:', {
+      checkInDate: voiceCheckInDate.toDateString(),
+      checkOutDate: voiceCheckOutDate.toDateString(),
+      nights: voiceNights,
+      dateDetected
+    });
     
     // Extract bed type with improved detection logic and validation
     console.log('Voice query for bed type detection:', lowerQuery);
@@ -1600,12 +1801,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         negations: [/\bno jacuzzi\b/i, /\bwithout jacuzzi\b/i, /\bno hot tub\b/i],
         weight: 0
       },
-      'Smoking': {
-        keywords: ['smoking', 'smoke', 'smoker'],
-        patterns: [/\bsmoking\b/i, /\bsmoker\b/i, /\bsmoke\b/i],
-        negations: [/\bnon[- ]smoking\b/i, /\bno smoking\b/i, /\bnot smoking\b/i],
-        weight: 0
-      }
+      // Removed smoking option as requested - default is non-smoking
     };
     
     // Calculate weights for each feature
@@ -1637,10 +1833,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     // Set feature values based on weights
     results.hasJacuzzi = featurePatterns['Jacuzzi'].weight > 0;
-    results.isSmoking = featurePatterns['Smoking'].weight > 0;
+    // Always set isSmoking to false as requested - non-smoking only
+    results.isSmoking = false;
     
     console.log(`Jacuzzi detection: ${results.hasJacuzzi} (weight: ${featurePatterns['Jacuzzi'].weight})`);
-    console.log(`Smoking detection: ${results.isSmoking} (weight: ${featurePatterns['Smoking'].weight})`);
+    console.log('Smoking detection: false (default non-smoking)');
     
     // Check for invalid combinations
     if (results.hasJacuzzi) {
