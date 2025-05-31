@@ -1286,7 +1286,73 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     recognition.onend = () => {
       console.log(`Recognition ended for session ${searchSessionId}`);
+      
+      // Get the final transcript before cleaning up
+      const finalTranscript = sessionTranscript || voiceSearchQuery;
+      
+      // Clean up the recognition instance
+      if (recognitionRef.current) {
+        try {
+          // Stop any active recognition
+          try {
+            recognitionRef.current.stop();
+            console.log('Stopped recognition in onend handler');
+          } catch (e) {
+            console.log('Error stopping recognition in onend:', e);
+          }
+          
+          // Clear all event handlers
+          recognitionRef.current.onresult = null;
+          recognitionRef.current.onend = null;
+          recognitionRef.current.onerror = null;
+          recognitionRef.current.onspeechend = null;
+          recognitionRef.current.onnomatch = null;
+          recognitionRef.current.onaudiostart = null;
+          recognitionRef.current.onaudioend = null;
+          recognitionRef.current.onsoundstart = null;
+          recognitionRef.current.onsoundend = null;
+          recognitionRef.current.onspeechstart = null;
+          
+          // Clear the reference
+          recognitionRef.current = null;
+        } catch (e) {
+          console.error('Error during recognition cleanup in onend:', e);
+        }
+      }
+      
+      // Update UI state
       setIsListening(false);
+      setIsButtonActive(false);
+      
+      // Remove all event listeners
+      const cleanupEventListeners = () => {
+        document.removeEventListener('touchend', handleVoiceButtonRelease);
+        document.removeEventListener('touchcancel', handleVoiceButtonRelease);
+        document.removeEventListener('mouseup', handleVoiceButtonRelease);
+      };
+      
+      try {
+        cleanupEventListeners();
+      } catch (e) {
+        console.error('Error cleaning up event listeners in onend:', e);
+      }
+      
+      // Process the voice search if we have a transcript
+      if (finalTranscript && finalTranscript.trim().length > 0) {
+        console.log(`Auto-processing query from onend: ${finalTranscript.trim()}`);
+        processVoiceSearch(finalTranscript.trim(), searchSessionId);
+      } else {
+        console.log('No speech detected in onend handler');
+        const emptyResults = {
+          query: "No speech detected",
+          foundMatch: false,
+          noSpeechDetected: true,
+          sessionId: searchSessionId,
+          timestamp: Date.now()
+        };
+        setVoiceSearchResults(emptyResults);
+        setShowVoiceSearchResults(true);
+      }
     };
     
     // Start recognition
