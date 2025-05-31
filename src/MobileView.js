@@ -1415,6 +1415,61 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       return;
     }
     
+    // CRITICAL CHECK: Direct check for "I want two rooms" or similar phrases
+    // This is a high-priority check that will override other processing
+    const twoRoomsDirectCheck = query.toLowerCase().trim();
+    let forceRoomQuantity = null;
+    
+    // Direct checks for the most common phrases
+    if (twoRoomsDirectCheck === 'i want two rooms' || 
+        twoRoomsDirectCheck === 'i want 2 rooms' ||
+        twoRoomsDirectCheck === 'i need two rooms' ||
+        twoRoomsDirectCheck === 'get two rooms' ||
+        twoRoomsDirectCheck === 'two rooms') {
+      console.log('DIRECT MATCH for "two rooms" phrase');
+      forceRoomQuantity = 2;
+    } else if (twoRoomsDirectCheck === 'i want three rooms' || 
+               twoRoomsDirectCheck === 'i want 3 rooms') {
+      console.log('DIRECT MATCH for "three rooms" phrase');
+      forceRoomQuantity = 3;
+    }
+    
+    // Pre-process the query to normalize common speech recognition variations
+    // This helps with phrases that might be transcribed differently than spoken
+    let processedQuery = query;
+    
+    // Common variations for "two rooms"
+    const twoRoomsVariations = [
+      'to rooms', 'too rooms', '2 room', 'to room', 'too room',
+      'two room', 'two-room', '2-room', 'second room', '2nd room',
+      'i want to rooms', 'i need to rooms', 'i want too rooms',
+      'i need too rooms', 'i want 2 room', 'i need 2 room'
+    ];
+    
+    // Check for variations and normalize them
+    for (const variation of twoRoomsVariations) {
+      if (processedQuery.toLowerCase().includes(variation)) {
+        console.log(`Found variation "${variation}" - normalizing to "two rooms"`);
+        // Replace the variation with the standard form
+        processedQuery = processedQuery.toLowerCase().replace(variation, 'two rooms');
+        // Also force the room quantity to 2
+        forceRoomQuantity = 2;
+        break;
+      }
+    }
+    
+    // Log the pre-processing result
+    if (processedQuery !== query) {
+      console.log(`Original query: "${query}"`);
+      console.log(`Processed query: "${processedQuery}"`);
+      query = processedQuery; // Use the processed query for further processing
+    }
+    
+    // If we have a forced room quantity, log it prominently
+    if (forceRoomQuantity !== null) {
+      console.log(`🔴 FORCED ROOM QUANTITY: ${forceRoomQuantity} 🔴`);
+    }
+    
     // Store the detected query for watermark display
     if (!detectedVoiceQuery) {
       setDetectedVoiceQuery({
@@ -1441,12 +1496,140 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       'Queen2Beds-Jacuzzi': false // Queen 2 Beds with Jacuzzi does NOT exist
     };
     
+    // Check for room quantity in the query (e.g., "I want 2 rooms", "I want two rooms", etc.)
+    // If we have a forced room quantity from the direct check, use that
+    let roomQuantity = forceRoomQuantity !== null ? forceRoomQuantity : 1;
+    
+    // Log if we're using a forced quantity
+    if (forceRoomQuantity !== null) {
+      console.log(`Using forced room quantity: ${roomQuantity}`);
+    }
+    
+    // Function to convert word numbers to numeric values
+    const wordToNumber = (word) => {
+      const wordMap = {
+        'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+        'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10
+      };
+      return wordMap[word.toLowerCase()] || 0;
+    };
+    
+    // Patterns for numeric values (e.g., "2 rooms")
+    const numericPatterns = [
+      /\b(\d+)\s+rooms?\b/i,                // "2 rooms"
+      /\bwant\s+(\d+)\s+rooms?\b/i,         // "want 2 rooms"
+      /\bneed\s+(\d+)\s+rooms?\b/i,         // "need 2 rooms"
+      /\booking\s+(\d+)\s+rooms?\b/i,       // "booking 2 rooms"
+      /\breserve\s+(\d+)\s+rooms?\b/i,      // "reserve 2 rooms"
+      /\breserving\s+(\d+)\s+rooms?\b/i,    // "reserving 2 rooms"
+      /\bget\s+(\d+)\s+rooms?\b/i           // "get 2 rooms"
+    ];
+    
+    // Patterns for word-based numbers (e.g., "two rooms")
+    const wordPatterns = [
+      /\b(one|two|three|four|five|six|seven|eight|nine|ten)\s+rooms?\b/i,                // "two rooms"
+      /\bwant\s+(one|two|three|four|five|six|seven|eight|nine|ten)\s+rooms?\b/i,         // "want two rooms"
+      /\bneed\s+(one|two|three|four|five|six|seven|eight|nine|ten)\s+rooms?\b/i,         // "need two rooms"
+      /\booking\s+(one|two|three|four|five|six|seven|eight|nine|ten)\s+rooms?\b/i,       // "booking two rooms"
+      /\breserve\s+(one|two|three|four|five|six|seven|eight|nine|ten)\s+rooms?\b/i,      // "reserve two rooms"
+      /\breserving\s+(one|two|three|four|five|six|seven|eight|nine|ten)\s+rooms?\b/i,    // "reserving two rooms"
+      /\bget\s+(one|two|three|four|five|six|seven|eight|nine|ten)\s+rooms?\b/i           // "get two rooms"
+    ];
+    
+    // Check numeric patterns first
+    for (const pattern of numericPatterns) {
+      const match = lowerQuery.match(pattern);
+      if (match && match[1]) {
+        const quantity = parseInt(match[1], 10);
+        if (quantity > 0 && quantity <= 10) { // Reasonable limit
+          roomQuantity = quantity;
+          console.log(`Detected numeric room quantity: ${roomQuantity}`);
+          break;
+        }
+      }
+    }
+    
+    // If no numeric match, check word patterns
+    if (roomQuantity === 1) {
+      for (const pattern of wordPatterns) {
+        const match = lowerQuery.match(pattern);
+        if (match && match[1]) {
+          const quantity = wordToNumber(match[1]);
+          if (quantity > 0) { // Already limited to 10 in the regex
+            roomQuantity = quantity;
+            console.log(`Detected word-based room quantity: ${roomQuantity}`);
+            break;
+          }
+        }
+      }
+    }
+    
+    // Add detailed logging to help debug
+    console.log(`Final room quantity detected: ${roomQuantity}`);
+    console.log(`Original query: "${query}"`);
+    console.log(`Lowercase query: "${lowerQuery}"`);
+    
+    // Add special cases for common phrases - this is more reliable than regex in some cases
+    // Map of phrases to their corresponding quantities
+    const specialPhrases = {
+      'i want two rooms': 2,
+      'want two rooms': 2,
+      'i need two rooms': 2,
+      'need two rooms': 2,
+      'get two rooms': 2,
+      'book two rooms': 2,
+      'reserve two rooms': 2,
+      'two rooms': 2,
+      'i want 2 rooms': 2,
+      'want 2 rooms': 2,
+      'i need 2 rooms': 2,
+      'need 2 rooms': 2,
+      'get 2 rooms': 2,
+      'book 2 rooms': 2,
+      'reserve 2 rooms': 2,
+      '2 rooms': 2,
+      'i want three rooms': 3,
+      'want three rooms': 3,
+      'i need three rooms': 3,
+      'need three rooms': 3,
+      'get three rooms': 3,
+      'book three rooms': 3,
+      'reserve three rooms': 3,
+      'three rooms': 3,
+      'i want 3 rooms': 3,
+      'want 3 rooms': 3,
+      'i need 3 rooms': 3,
+      'need 3 rooms': 3,
+      'get 3 rooms': 3,
+      'book 3 rooms': 3,
+      'reserve 3 rooms': 3,
+      '3 rooms': 3
+    };
+    
+    // Check if any special phrase is in the query
+    for (const [phrase, quantity] of Object.entries(specialPhrases)) {
+      if (lowerQuery.includes(phrase)) {
+        console.log(`Special phrase match: "${phrase}" -> ${quantity} rooms`);
+        roomQuantity = quantity;
+        break;
+      }
+    }
+    
+    // Final check for any mention of "two" or "2" with "room"
+    if (roomQuantity === 1 && 
+        ((lowerQuery.includes('two') && lowerQuery.includes('room')) || 
+         (lowerQuery.includes('2') && lowerQuery.includes('room')))) {
+      console.log('Fallback match for "two rooms"');
+      roomQuantity = 2;
+    }
+    
     // Initialize results object with a timestamp and searchId to ensure uniqueness
     let results = {
       query: query,
       timestamp: Date.now(), // Add timestamp to prevent caching issues
       searchId: searchId || `search-${Date.now()}`, // Use provided searchId or generate a new one
       nights: 1,
+      roomQuantity: roomQuantity, // Add room quantity to results
       checkInDate: new Date(),
       checkOutDate: new Date(new Date().getTime() + 24 * 60 * 60 * 1000),
       bedType: 'Queen', // Default to Queen
@@ -2212,13 +2395,24 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       basePrice += dayPrice;
     }
     
-    // Calculate tax (15%)
-    const tax = basePrice * 0.15;
+    // Store the single room price before applying quantity
+    const singleRoomBasePrice = basePrice;
+    const singleRoomTax = singleRoomBasePrice * 0.15;
+    const singleRoomTotal = singleRoomBasePrice + singleRoomTax;
+    
+    // Apply room quantity to the price
+    const totalBasePrice = singleRoomBasePrice * results.roomQuantity;
+    const totalTax = totalBasePrice * 0.15;
+    const grandTotal = totalBasePrice + totalTax;
     
     // Set price information
-    results.price = basePrice;
-    results.tax = tax;
-    results.total = basePrice + tax;
+    results.singleRoomPrice = singleRoomBasePrice; // Price for a single room
+    results.singleRoomTax = singleRoomTax;
+    results.singleRoomTotal = singleRoomTotal;
+    
+    results.price = totalBasePrice; // Total price for all rooms
+    results.tax = totalTax;
+    results.total = grandTotal;
     results.foundMatch = true;
     
     // Set the final results with forced state update to prevent caching
@@ -2268,6 +2462,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       setIsButtonActive(false);
       
       // Now show the results
+      console.log('Setting voice search results with room quantity:', results.roomQuantity);
+      console.log('Full results object:', JSON.stringify(results, null, 2));
       setVoiceSearchResults(results);
       setShowVoiceSearchResults(true);
       
@@ -3388,6 +3584,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                       <li>{voiceSearchResults.hasJacuzzi ? 'With Jacuzzi' : 'No Jacuzzi'}</li>
                     ) : null}
                     <li>{voiceSearchResults.isSmoking ? 'Smoking' : 'Non-Smoking'}</li>
+                    {/* Always show room quantity, highlighted if more than 1 */}
+                    <li className={voiceSearchResults.roomQuantity > 1 ? "room-quantity highlighted" : "room-quantity"} style={voiceSearchResults.roomQuantity > 1 ? {fontWeight: 'bold', color: '#ffcc00'} : {}}>
+                      Room Quantity: {voiceSearchResults.roomQuantity} {voiceSearchResults.roomQuantity === 1 ? 'room' : 'rooms'}
+                    </li>
                   </ul>
                 </div>
                 
@@ -3395,7 +3595,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                   {/* Daily price breakdown - only show if more than 1 night */}
                   {voiceSearchResults.dailyPrices && voiceSearchResults.dailyPrices.length > 1 && (
                     <div className="daily-price-breakdown">
-                      <div className="breakdown-header">Daily Price Breakdown:</div>
+                      <div className="breakdown-header">Daily Price Breakdown (per room):</div>
                       {voiceSearchResults.dailyPrices.map((day, index) => (
                         <div key={index} className="daily-price">
                           <span>{day.dayOfWeek}, {day.date}</span>
@@ -3404,18 +3604,47 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                       ))}
                     </div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span>Base Price:</span>
-                    <span>${voiceSearchResults.price.toFixed(2)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span>Tax (15%):</span>
-                    <span>${voiceSearchResults.tax.toFixed(2)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.1em', marginTop: '5px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
-                    <span>Total:</span>
-                    <span>${voiceSearchResults.total.toFixed(2)}</span>
-                  </div>
+                  
+                  {/* Show single room price if multiple rooms */}
+                  {voiceSearchResults.roomQuantity > 1 ? (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span>Price per room:</span>
+                        <span>${voiceSearchResults.singleRoomPrice.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontWeight: 'bold', backgroundColor: 'rgba(255, 204, 0, 0.2)', padding: '5px', borderRadius: '4px' }}>
+                        <span>Number of rooms:</span>
+                        <span>× {voiceSearchResults.roomQuantity}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontWeight: 'bold' }}>
+                        <span>Total base price:</span>
+                        <span>${voiceSearchResults.price.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span>Tax (15%):</span>
+                        <span>${voiceSearchResults.tax.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.1em', marginTop: '5px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
+                        <span>Grand Total:</span>
+                        <span>${voiceSearchResults.total.toFixed(2)}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span>Base Price:</span>
+                        <span>${voiceSearchResults.price.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span>Tax (15%):</span>
+                        <span>${voiceSearchResults.tax.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.1em', marginTop: '5px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
+                        <span>Total:</span>
+                        <span>${voiceSearchResults.total.toFixed(2)}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             ) : (
