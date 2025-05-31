@@ -1428,43 +1428,42 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       'december': 11, 'dec': 11
     };
     
-    // Check for specific days and handle "next [day]" pattern
-    const nextDayPattern = /\bnext\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi;
-    const nextDayMatches = [...lowerQuery.matchAll(nextDayPattern)];
-    let hasNextDayMention = false;
+    // COMPLETELY REWRITTEN DAY DETECTION LOGIC
+    // First, check if the query contains the word "next"
+    const hasNextKeyword = lowerQuery.includes('next');
     
-    // Check if the query contains "next" followed by multiple days (e.g., "next Monday, Wednesday and Friday")
-    const hasNextKeywordForMultipleDays = lowerQuery.includes('next') && 
-                                        daysOfWeek.filter(day => lowerQuery.includes(day)).length > 1;
+    // Check for specific days mentioned in the query
+    const mentionedDaysInQuery = daysOfWeek.filter(day => lowerQuery.includes(day));
+    console.log('Days mentioned in query:', mentionedDaysInQuery);
     
-    // Process "next [day]" mentions first
-    if (nextDayMatches.length > 0) {
-      nextDayMatches.forEach(match => {
-        const day = match[1].toLowerCase();
-        // Mark this day as a "next week" day
-        mentionedDays.push({ day, isNextWeek: true });
-        hasNextDayMention = true;
-        dateDetected = true;
+    // If we have days mentioned and the "next" keyword, process them
+    if (mentionedDaysInQuery.length > 0) {
+      dateDetected = true;
+      
+      // Check for specific "next [day]" pattern
+      const nextDayPattern = /\bnext\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi;
+      const nextDayMatches = [...lowerQuery.matchAll(nextDayPattern)];
+      const explicitNextDays = nextDayMatches.map(match => match[1].toLowerCase());
+      
+      // Determine if all days should be treated as "next week"
+      // This happens if:
+      // 1. The query has "next" and multiple days (e.g., "next Monday, Wednesday and Friday")
+      // 2. Any day is explicitly marked as "next" (e.g., "next Monday")
+      const allDaysAreNextWeek = 
+        (hasNextKeyword && mentionedDaysInQuery.length > 1) || 
+        (explicitNextDays.length > 0);
+      
+      // Process each mentioned day
+      mentionedDaysInQuery.forEach(day => {
+        // A day is "next week" if all days are next week or if it's explicitly marked as "next"
+        const isExplicitlyNext = explicitNextDays.includes(day);
+        const isNextWeek = allDaysAreNextWeek || isExplicitlyNext;
+        
+        mentionedDays.push({ day, isNextWeek });
       });
     }
     
-    // Then check for regular day mentions that aren't preceded by "next"
-    daysOfWeek.forEach(day => {
-      // Only add if not already added as a "next" day
-      const alreadyAdded = mentionedDays.some(item => item.day === day);
-      
-      if (!alreadyAdded && lowerQuery.includes(day) && 
-          // Make sure it's not preceded by "next"
-          !lowerQuery.includes(`next ${day}`)) {
-        // If the query has "next" and multiple days, treat all days as next week
-        // This handles cases like "next Monday, Wednesday and Friday"
-        const isNextWeek = hasNextKeywordForMultipleDays || hasNextDayMention;
-        mentionedDays.push({ day, isNextWeek });
-        dateDetected = true;
-      }
-    });
-    
-    console.log('Mentioned days:', mentionedDays);
+    console.log('Processed mentioned days:', mentionedDays);
     
     // Check for specific date mentions (e.g., "26th June")
     let specificDateDetected = false;
@@ -1650,165 +1649,96 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     }
     // Process specific days of the week if mentioned
     else if (mentionedDays.length > 0) {
-      const currentDayIndex = voiceToday.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      console.log('Processing multiple day mentions for check-in/check-out calculation');
       
-      // Extract day names from the objects for processing
-      const dayObjects = [...mentionedDays]; // Work with a copy
+      // Get the current day of the week (0-6, Sunday-Saturday)
+      const currentDayIndex = voiceToday.getDay();
+      console.log('Current day index:', currentDayIndex, '(', daysOfWeek[currentDayIndex], ')');
       
-      // Find the first mentioned day
-      const firstDayObj = dayObjects[0];
-      const firstDayIndex = dayIndices[firstDayObj.day];
+      // STEP 1: Convert day names to their indices and mark if they're for next week
+      const dayObjects = mentionedDays.map(d => ({
+        name: d.day,
+        index: dayIndices[d.day],
+        isNextWeek: d.isNextWeek
+      }));
       
-      // Calculate days until the first mentioned day, considering "next" keyword
-      let daysUntilFirstDay;
-      if (firstDayObj.isNextWeek) {
-        // For "next [day]", always use next week's day even if it's in the future this week
-        daysUntilFirstDay = (firstDayIndex - currentDayIndex + 7) % 7;
-        if (daysUntilFirstDay === 0) daysUntilFirstDay = 7; // If same day, go to next week
+      console.log('Day objects:', dayObjects);
+      
+      // STEP 2: Sort days chronologically
+      // First by week (current week first, next week second)
+      // Then by day index within each week
+      const sortedDays = [...dayObjects].sort((a, b) => {
+        if (a.isNextWeek !== b.isNextWeek) {
+          return a.isNextWeek ? 1 : -1; // Next week days come after current week days
+        }
+        return a.index - b.index; // Sort by day index within the same week
+      });
+      
+      console.log('Sorted days:', sortedDays);
+      
+      // STEP 3: Get the first and last days for check-in and check-out
+      const firstDay = sortedDays[0];
+      const lastDay = sortedDays[sortedDays.length - 1];
+      
+      console.log('First day:', firstDay.name, 'Last day:', lastDay.name);
+      
+      // STEP 4: Calculate the check-in date based on the first day
+      
+      // Calculate days until check-in
+      let daysUntilCheckIn;
+      if (firstDay.isNextWeek) {
+        // For "next [day]", find the day in the next week
+        daysUntilCheckIn = (firstDay.index - currentDayIndex + 7) % 7;
+        if (daysUntilCheckIn === 0) daysUntilCheckIn = 7; // If same day, go to next week
       } else {
-        // For regular days, use the next occurrence (this week if possible, next week if needed)
-        daysUntilFirstDay = firstDayIndex - currentDayIndex;
-        if (daysUntilFirstDay <= 0) daysUntilFirstDay += 7; // If it's in the past, go to next week
+        // For regular days, find the next occurrence
+        daysUntilCheckIn = firstDay.index - currentDayIndex;
+        if (daysUntilCheckIn <= 0) daysUntilCheckIn += 7; // If day has passed, go to next week
       }
       
       // Set check-in date
       voiceCheckInDate = new Date(voiceToday);
-      voiceCheckInDate.setDate(voiceToday.getDate() + daysUntilFirstDay);
+      voiceCheckInDate.setDate(voiceToday.getDate() + daysUntilCheckIn);
       voiceCheckInDate.setHours(15, 0, 0, 0); // 3 PM check-in
       
-      console.log(`Setting check-in to ${firstDayObj.day} (${firstDayObj.isNextWeek ? 'next week' : 'this/next week'}): ${voiceCheckInDate.toDateString()}`);
+      console.log('Check-in date:', voiceCheckInDate.toDateString(), 'Days until check-in:', daysUntilCheckIn);
       
-      // If multiple days mentioned, set check-out date based on the last day
-      if (dayObjects.length > 1) {
-        // Sort the mentioned days to ensure they're in order of the week
-        const sortedDays = [...dayObjects].sort((a, b) => dayIndices[a.day] - dayIndices[b.day]);
-        
-        // Find consecutive days to determine actual stay duration
-        let consecutiveDays = [];
-        let currentSequence = [sortedDays[0]];
-        
-        for (let i = 1; i < sortedDays.length; i++) {
-          const prevDayIndex = dayIndices[sortedDays[i-1].day];
-          const currDayIndex = dayIndices[sortedDays[i].day];
-          
-          // Check if days are consecutive or wrap around the week
-          if (currDayIndex === (prevDayIndex + 1) % 7) {
-            currentSequence.push(sortedDays[i]);
-          } else {
-            // Not consecutive, start a new sequence
-            if (currentSequence.length > consecutiveDays.length) {
-              consecutiveDays = [...currentSequence];
-            }
-            currentSequence = [sortedDays[i]];
-          }
-        }
-        
-        // Check if the last sequence is the longest
-        if (currentSequence.length > consecutiveDays.length) {
-          consecutiveDays = [...currentSequence];
-        }
-        
-        // Always use all mentioned days for calculating the stay duration
-        // This ensures we count from the first to the last mentioned day
-        const daysToUse = sortedDays;
-        
-        // Calculate check-in based on first day in sequence
-        const firstSequenceDay = daysToUse[0];
-        const firstSequenceDayIndex = dayIndices[firstSequenceDay.day];
-        
-        // Handle "next" keyword for the first day in sequence
-        let daysUntilSequenceStart;
-        if (firstSequenceDay.isNextWeek) {
-          // For "next [day]", always use next week's day
-          daysUntilSequenceStart = (firstSequenceDayIndex - currentDayIndex + 7) % 7;
-          if (daysUntilSequenceStart === 0) daysUntilSequenceStart = 7; // If same day, go to next week
-        } else {
-          // For regular days, use the next occurrence
-          daysUntilSequenceStart = firstSequenceDayIndex - currentDayIndex;
-          if (daysUntilSequenceStart <= 0) daysUntilSequenceStart += 7;
-        }
-        
-        voiceCheckInDate = new Date(voiceToday);
-        voiceCheckInDate.setDate(voiceToday.getDate() + daysUntilSequenceStart);
-        voiceCheckInDate.setHours(15, 0, 0, 0);
-        
-        // Calculate the actual number of nights based on the sequence
-        // For non-consecutive days like "Monday, Wednesday, Friday", we want to count from first to last day
-        let nightsCount;
-        
-        // For random days like "Monday, Wednesday, Friday", we want to count from first to last day
-        // Sort the days by their day index to ensure correct order
-        const sortedByIndex = [...daysToUse].sort((a, b) => {
-          // If one is next week and the other isn't, the next week one comes later
-          if (a.isNextWeek && !b.isNextWeek) return 1;
-          if (!a.isNextWeek && b.isNextWeek) return -1;
-          // Otherwise sort by day index
-          return dayIndices[a.day] - dayIndices[b.day];
-        });
-        
-        // Get the first and last day in the sorted sequence
-        const firstSortedDay = sortedByIndex[0];
-        const lastSortedDay = sortedByIndex[sortedByIndex.length - 1];
-        
-        // Calculate the day indices
-        const firstDayIdx = dayIndices[firstSortedDay.day];
-        const lastDayIdx = dayIndices[lastSortedDay.day];
-        
-        // For a full week (all 7 days mentioned)
-        if (daysToUse.length === 7 && 
-            daysOfWeek.every(day => daysToUse.some(d => d.day === day))) {
-          // Full week (all 7 days mentioned)
-          nightsCount = 7;
-          console.log('Full week detected (all 7 days mentioned)');
+      // STEP 5: Calculate the number of nights and check-out date
+      
+      // For random days like "Monday, Tuesday, Friday", we want to calculate
+      // from the first to the last mentioned day
+      let nightsCount;
+      
+      // If we have multiple days mentioned
+      if (sortedDays.length > 1) {
+        // If all days are in the same week
+        if (firstDay.isNextWeek === lastDay.isNextWeek) {
+          // Calculate nights from first to last day
+          let dayDiff = lastDay.index - firstDay.index;
+          if (dayDiff < 0) dayDiff += 7; // Handle week wrap-around
+          nightsCount = dayDiff + 1; // Add 1 because we're staying the last night too
         } 
-        // For consecutive days (e.g., "Monday, Tuesday, Wednesday")
-        else if (consecutiveDays.length > 1 && 
-                 // Make sure all days in the sequence have the same isNextWeek value
-                 consecutiveDays.every(d => d.isNextWeek === consecutiveDays[0].isNextWeek)) {
-          nightsCount = consecutiveDays.length;
-          console.log(`Consecutive days detected: ${consecutiveDays.map(d => d.day).join(', ')}`);
-        } 
-        // For any combination of days (consecutive or non-consecutive)
+        // If days span across weeks
         else {
-          // For cases like "Monday, Tuesday, Friday" or any other combination
-          // We want to calculate from the first to the last mentioned day
-          
-          // Get all the unique days mentioned
-          const uniqueDayIndices = [...new Set(daysToUse.map(d => dayIndices[d.day]))];
-          console.log('Unique day indices:', uniqueDayIndices);
-          
-          // Find the minimum and maximum day indices
-          const minDayIndex = Math.min(...uniqueDayIndices);
-          const maxDayIndex = Math.max(...uniqueDayIndices);
-          
-          // Calculate the span of days
-          let daySpan = maxDayIndex - minDayIndex;
-          if (daySpan < 0) daySpan += 7; // Handle week wrap-around
-          
-          // The number of nights is the span of days + 1 (to include the last day)
-          nightsCount = daySpan + 1;
-          
-          // For "next Monday Tuesday and Friday", this should be 5 nights
-          // (from Monday to Saturday morning)
-          console.log(`Multiple days from ${daysToUse[0].day} to ${daysToUse[daysToUse.length-1].day}, min: ${minDayIndex}, max: ${maxDayIndex}, nights: ${nightsCount}`);
+          // Calculate days in current week + days in next week
+          nightsCount = (7 - firstDay.index) + lastDay.index + 1;
         }
         
-        // Set check-out date to the day AFTER the last night
-        voiceCheckOutDate = new Date(voiceCheckInDate);
-        voiceCheckOutDate.setDate(voiceCheckInDate.getDate() + nightsCount);
-        voiceCheckOutDate.setHours(11, 0, 0, 0);
-        
-        voiceNights = nightsCount;
-        
-        console.log(`Multiple days detected: ${daysToUse.map(d => d.day).join(', ')}`);
-        console.log(`Setting check-out to: ${voiceCheckOutDate.toDateString()}, nights: ${voiceNights}`);
+        console.log('Multiple days detected:', sortedDays.map(d => d.name).join(', '));
       } else {
         // If only one day mentioned, assume 1 night stay
-        voiceCheckOutDate = new Date(voiceCheckInDate);
-        voiceCheckOutDate.setDate(voiceCheckInDate.getDate() + 1);
-        voiceCheckOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
-        voiceNights = 1;
+        nightsCount = 1;
       }
+      
+      console.log('Number of nights calculated:', nightsCount);
+      
+      // STEP 6: Set the check-out date based on check-in date + nights
+      voiceCheckOutDate = new Date(voiceCheckInDate);
+      voiceCheckOutDate.setDate(voiceCheckInDate.getDate() + nightsCount);
+      voiceCheckOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
+      
+      voiceNights = nightsCount;
+      console.log('Check-out date:', voiceCheckOutDate.toDateString(), 'Total nights:', voiceNights);
     }
     
     // Set the dates in the results object
@@ -3188,8 +3118,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           </div>
           
           <div className="voice-search-content" id="voiceSearchContent">
-            <div className="voice-search-query">You said: "{voiceSearchResults.query}"</div>
-            
             {voiceSearchResults.recognitionError ? (
               <div className="recognition-error">
                 <p><i className="fas fa-exclamation-circle"></i></p>
