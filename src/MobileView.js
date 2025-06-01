@@ -5376,8 +5376,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                         fontSize: '13px',
                         alignItems: 'center'
                       }}>
-                        <span style={{ fontSize: '11px' }}>Cash Total:</span>
-                        <span style={{ fontSize: '11px' }}>${(Number(voiceSearchResults.cashTotal) || 0).toFixed(2)}</span>
+                        <span style={{ fontSize: '11px' }}>Total:</span>
+                        <span style={{ fontSize: '11px' }}>${(Number(voiceSearchResults.total) || 0).toFixed(2)}</span>
                       </div>
                     </>
                   ) : (
