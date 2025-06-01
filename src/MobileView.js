@@ -1570,19 +1570,25 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // First, try to match the full pattern with explicit AM/PM
     // Handle various formats including "5.AM", "5 AM", "5:00 AM", etc.
     // Also handle "I want" and "I need" phrases
-    const amPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay)\s+(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*|\.)?(?:am|a\.m\.|a)\b/i;
-    const pmPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay)\s+(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*|\.)?(?:pm|p\.m\.|p)\b/i;
+    // Include patterns for just "room till X" without explicit "short stay"
+    const amPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay|(?:room|king|queen|bed)(?:\s+\w+){0,3})\s+(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*|\.)?(?:am|a\.m\.|a)\b/i;
+    const pmPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay|(?:room|king|queen|bed)(?:\s+\w+){0,3})\s+(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*|\.)?(?:pm|p\.m\.|p)\b/i;
     
     // Then fall back to the generic pattern without explicit AM/PM
-    const genericPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay)\s+(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*(?:hrs|hours|hr|hour|o'clock))?\b/i;
+    const genericPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay|(?:room|king|queen|bed)(?:\s+\w+){0,3})\s+(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*(?:hrs|hours|hr|hour|o'clock))?\b/i;
     
     // Additional patterns for jacuzzi short stays
-    const amJacuzziPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay)\s+(?:with\s+jacuzzi|jacuzzi)\s+(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*|\.)?(?:am|a\.m\.|a)\b/i;
-    const pmJacuzziPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay)\s+(?:with\s+jacuzzi|jacuzzi)\s+(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*|\.)?(?:pm|p\.m\.|p)\b/i;
-    const genericJacuzziPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay)\s+(?:with\s+jacuzzi|jacuzzi)\s+(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*(?:hrs|hours|hr|hour|o'clock))?\b/i;
+    const amJacuzziPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay|(?:room|king|queen|bed)(?:\s+\w+){0,3})\s+(?:with\s+jacuzzi|jacuzzi)\s+(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*|\.)?(?:am|a\.m\.|a)\b/i;
+    const pmJacuzziPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay|(?:room|king|queen|bed)(?:\s+\w+){0,3})\s+(?:with\s+jacuzzi|jacuzzi)\s+(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*|\.)?(?:pm|p\.m\.|p)\b/i;
+    const genericJacuzziPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay|(?:room|king|queen|bed)(?:\s+\w+){0,3})\s+(?:with\s+jacuzzi|jacuzzi)\s+(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*(?:hrs|hours|hr|hour|o'clock))?\b/i;
     
     // Pattern for short stay with jacuzzi but no specific time (default to 3 PM)
-    const jacuzziNoTimePattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay)\s+(?:with\s+jacuzzi|jacuzzi)\b/i;
+    const jacuzziNoTimePattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay|(?:room|king|queen|bed)(?:\s+\w+){0,3})\s+(?:with\s+jacuzzi|jacuzzi)\b/i;
+    
+    // Additional patterns for just time mentions that imply short stay
+    const justTimeAmPattern = /\b(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*|\.)?(?:am|a\.m\.|a)\b/i;
+    const justTimePmPattern = /\b(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*|\.)?(?:pm|p\.m\.|p)\b/i;
+    const justTimeGenericPattern = /\b(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*(?:hrs|hours|hr|hour|o'clock))?\b/i;
     
     // First check for Jacuzzi patterns with explicit AM/PM
     const amJacuzziMatch = queryLower.match(amJacuzziPattern);
@@ -1649,6 +1655,57 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       console.log('Jacuzzi No Time Match:', jacuzziNoTimeMatch);
       // Default to 3 PM (15:00) for checkout time
       processShortStayVoiceSearch(query, 15, searchId, false, true, true);
+      return;
+    }
+    
+    // Check for patterns that just mention time without explicitly saying "short stay"
+    // First check for explicit AM time
+    const justTimeAmMatch = queryLower.match(justTimeAmPattern);
+    if (justTimeAmMatch && justTimeAmMatch[1]) {
+      console.log('Just time mention with AM detected - treating as short stay');
+      console.log('Just Time AM Match:', justTimeAmMatch);
+      console.log('Hour:', parseInt(justTimeAmMatch[1], 10));
+      
+      // Check if query contains jacuzzi
+      const hasJacuzzi = ['jacuzzi', 'hot tub', 'spa', 'whirlpool', 'jet tub'].some(term => 
+        queryLower.includes(term)
+      );
+      
+      processShortStayVoiceSearch(query, parseInt(justTimeAmMatch[1], 10), searchId, true, false, hasJacuzzi);
+      return;
+    }
+    
+    // Then check for explicit PM time
+    const justTimePmMatch = queryLower.match(justTimePmPattern);
+    if (justTimePmMatch && justTimePmMatch[1]) {
+      console.log('Just time mention with PM detected - treating as short stay');
+      console.log('Just Time PM Match:', justTimePmMatch);
+      console.log('Hour:', parseInt(justTimePmMatch[1], 10));
+      
+      // Check if query contains jacuzzi
+      const hasJacuzzi = ['jacuzzi', 'hot tub', 'spa', 'whirlpool', 'jet tub'].some(term => 
+        queryLower.includes(term)
+      );
+      
+      processShortStayVoiceSearch(query, parseInt(justTimePmMatch[1], 10), searchId, false, true, hasJacuzzi);
+      return;
+    }
+    
+    // Finally check for generic time (no AM/PM)
+    const justTimeGenericMatch = queryLower.match(justTimeGenericPattern);
+    if (justTimeGenericMatch && justTimeGenericMatch[1]) {
+      console.log('Just time mention without AM/PM detected - treating as short stay');
+      console.log('Just Time Generic Match:', justTimeGenericMatch);
+      console.log('Hour:', parseInt(justTimeGenericMatch[1], 10));
+      
+      // Check if query contains jacuzzi
+      const hasJacuzzi = ['jacuzzi', 'hot tub', 'spa', 'whirlpool', 'jet tub'].some(term => 
+        queryLower.includes(term)
+      );
+      
+      // For generic time, assume PM for hours 1-11 (more common for short stays)
+      const isPM = (parseInt(justTimeGenericMatch[1], 10) >= 1 && parseInt(justTimeGenericMatch[1], 10) < 12);
+      processShortStayVoiceSearch(query, parseInt(justTimeGenericMatch[1], 10), searchId, !isPM, isPM, hasJacuzzi);
       return;
     }
     
