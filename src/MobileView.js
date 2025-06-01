@@ -874,7 +874,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     // Set up silence detection
     let silenceTimer = null;
-    const silenceTimeout = 3500; // 3.5 seconds of silence will auto-stop
+    const silenceTimeout = 5000; // 5 seconds of silence will auto-stop
     
     // Function to reset silence timer
     const resetSilenceTimer = () => {
@@ -1383,7 +1383,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     // Set up silence detection
     let silenceTimer = null;
-    const silenceTimeout = 3500; // 3.5 seconds of silence will auto-stop
+    const silenceTimeout = 5000; // 5 seconds of silence will auto-stop
   
     // Function to reset silence timer
     const resetSilenceTimer = () => {
@@ -3698,11 +3698,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       // Ensure hours is a valid number
       hours = parseInt(hours) || 0;
       
-      // Validate the hours (0-6 hours allowed)
+      // Validate the hours (0-9 hours allowed to enable check-in as early as 6:00 AM)
       if (hours < 0) {
         hours = 0;
-      } else if (hours > 6) {
-        hours = 6;
+      } else if (hours > 9) {
+        hours = 9;
       }
       
       console.log(`Setting early check-in hours to ${hours}`);
@@ -4898,10 +4898,60 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                   <ul style={{ paddingLeft: '16px', marginTop: '6px', fontSize: '12px' }}>
                     <li>Check-in: {voiceSearchResults.isShortStay && voiceSearchResults.formattedCheckInTime ? 
                       voiceSearchResults.formattedCheckInTime : 
-                      (voiceSearchResults.checkInDate ? voiceSearchResults.checkInDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) : 'Not set')}</li>
+                      (voiceSearchResults.checkInDate ? 
+                        <>
+                          {voiceSearchResults.checkInDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                          {voiceSearchResults.earlyCheckInHours > 0 ? (
+                            <span style={{ fontSize: '10px', marginLeft: '4px', color: '#dc3545', fontWeight: 'bold' }}>
+                              {(() => {
+                                // Standard check-in is 3:00 PM (15:00 in 24-hour format)
+                                // Allow early check-in as early as 6:00 AM (9 hours before 3:00 PM)
+                                const hour = 15 - voiceSearchResults.earlyCheckInHours;
+                                if (hour <= 0) {
+                                  // Handle hours before noon
+                                  const adjustedHour = (hour + 12) % 12 || 12;
+                                  return `(${adjustedHour}:00 AM)`;
+                                } else if (hour < 12) {
+                                  // Handle hours before noon
+                                  return `(${hour}:00 AM)`;
+                                } else if (hour === 12) {
+                                  // Noon
+                                  return `(12:00 PM)`;
+                                } else {
+                                  // Afternoon hours
+                                  return `(${hour - 12}:00 PM)`;
+                                }
+                              })()}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '10px', marginLeft: '4px', color: '#666' }}>(3:00 PM)</span>
+                          )}
+                        </> : 'Not set')}</li>
                     <li>Check-out: {voiceSearchResults.isShortStay && voiceSearchResults.formattedCheckOutTime ? 
                       voiceSearchResults.formattedCheckOutTime : 
-                      (voiceSearchResults.checkOutDate ? voiceSearchResults.checkOutDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) : 'Not set')}</li>
+                      (voiceSearchResults.checkOutDate ? 
+                        <>
+                          {voiceSearchResults.checkOutDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                          {voiceSearchResults.lateCheckOutHours > 0 ? (
+                            <span style={{ fontSize: '10px', marginLeft: '4px', color: '#dc3545', fontWeight: 'bold' }}>
+                              {(() => {
+                                const hour = 11 + voiceSearchResults.lateCheckOutHours;
+                                if (hour < 12) {
+                                  // Morning hours
+                                  return `(${hour}:00 AM)`;
+                                } else if (hour === 12) {
+                                  // Noon
+                                  return `(12:00 PM)`;
+                                } else {
+                                  // Afternoon hours
+                                  return `(${hour - 12}:00 PM)`;
+                                }
+                              })()}
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '10px', marginLeft: '4px', color: '#666' }}>(11:00 AM)</span>
+                          )}
+                        </> : 'Not set')}</li>
                     {voiceSearchResults.isShortStay ? (
                       <>
                         <li>Duration: {4 + voiceSearchResults.extraHours} hours {voiceSearchResults.extraHours > 0 ? `(Base: 4 hours + ${voiceSearchResults.extraHours} extra)` : ''}</li>
@@ -5170,7 +5220,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                                     setVoiceSearchResults(updatedResults);
                                   }
                                 }}
-                                disabled={voiceSearchResults.earlyCheckInHours >= 6}
+                                disabled={voiceSearchResults.earlyCheckInHours >= 9}
                                 style={{
                                   width: '22px',
                                   height: '22px',
@@ -5178,12 +5228,12 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  backgroundColor: voiceSearchResults.earlyCheckInHours >= 6 ? '#ccc' : '#28a745',
+                                  backgroundColor: voiceSearchResults.earlyCheckInHours >= 9 ? '#ccc' : '#28a745',
                                   color: 'white',
                                   border: 'none',
                                   borderRadius: '4px',
                                   marginLeft: '6px',
-                                  cursor: voiceSearchResults.earlyCheckInHours >= 6 ? 'not-allowed' : 'pointer',
+                                  cursor: voiceSearchResults.earlyCheckInHours >= 9 ? 'not-allowed' : 'pointer',
                                   fontSize: '12px',
                                   fontWeight: 'bold'
                                 }}
