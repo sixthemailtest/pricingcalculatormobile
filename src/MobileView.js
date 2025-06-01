@@ -3488,6 +3488,43 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     }
   };
   
+  // Update room quantity in voice search results and recalculate prices
+  const updateVoiceSearchRoomQuantity = (newQuantity) => {
+    // Validate the new quantity (should be between 1 and 5)
+    if (newQuantity < 1 || newQuantity > 5) return;
+    
+    console.log(`Updating room quantity from ${voiceSearchResults.roomQuantity} to ${newQuantity}`);
+    
+    // Only proceed if we have voice search results and it's not a short stay
+    if (!voiceSearchResults || voiceSearchResults.isShortStay) return;
+    
+    // Create a copy of the current results
+    const updatedResults = { ...voiceSearchResults };
+    
+    // Update the room quantity
+    updatedResults.roomQuantity = newQuantity;
+    
+    // Recalculate prices based on the new quantity
+    const singleRoomPrice = updatedResults.singleRoomPrice || (updatedResults.price / voiceSearchResults.roomQuantity);
+    
+    // Update base price
+    updatedResults.price = singleRoomPrice * newQuantity;
+    
+    // Recalculate tax (15%)
+    updatedResults.tax = updatedResults.price * 0.15;
+    
+    // Update total price
+    updatedResults.total = updatedResults.price + updatedResults.tax;
+    
+    // Add a refresh timestamp to force React to treat this as a completely new object
+    updatedResults.refreshTimestamp = Date.now();
+    
+    // Update the state with the new results
+    setVoiceSearchResults(updatedResults);
+    
+    console.log('Updated voice search results with new room quantity:', updatedResults);
+  };
+  
   // Close voice search results
   const closeVoiceSearchResults = () => {
     console.log('Closing voice search results modal');
@@ -3497,17 +3534,16 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       applyVoiceSearchResults(voiceSearchResults);
     }
     
+    // Hide the modal
+    setShowVoiceSearchResults(false);
+    
+    // Clear the results after a short delay to allow for animation
+    setTimeout(() => {
+      setVoiceSearchResults(null);
+    }, 300);
+    
     // Check if this is an iOS device
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    
-    // Reset modal state
-    setShowVoiceSearchResults(false);
-    setVoiceSearchResults(null);
-    setVoiceSearchQuery('');
-    setVoiceSearchError(null);
-    
-    // Reset body overflow (important for iOS)
-    document.body.style.overflow = 'auto';
     
     // For iOS devices, add extra cleanup
     if (isIOS) {
@@ -4572,10 +4608,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                   <strong>Stay Details:</strong>
                   <ul>
                     <li>Check-in: {voiceSearchResults.isShortStay ? 
-                      `${voiceSearchResults.checkInDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}` : 
+                      `${voiceSearchResults.checkInDate.getHours() % 12 || 12}:${String(voiceSearchResults.checkInDate.getMinutes()).padStart(2, '0')} ${voiceSearchResults.checkInDate.getHours() >= 12 ? 'PM' : 'AM'}` : 
                       voiceSearchResults.checkInDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</li>
                     <li>Check-out: {voiceSearchResults.isShortStay ? 
-                      `${voiceSearchResults.checkOutDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}` : 
+                      `${voiceSearchResults.checkOutDate.getHours() % 12 || 12}:${String(voiceSearchResults.checkOutDate.getMinutes()).padStart(2, '0')} ${voiceSearchResults.checkOutDate.getHours() >= 12 ? 'PM' : 'AM'}` : 
                       voiceSearchResults.checkOutDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</li>
                     {voiceSearchResults.isShortStay ? (
                       <>
@@ -4599,7 +4635,54 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                         <li>{voiceSearchResults.isSmoking ? 'Smoking' : 'Non-Smoking'}</li>
                         {/* Always show room quantity, highlighted if more than 1 */}
                         <li className={voiceSearchResults.roomQuantity > 1 ? "room-quantity highlighted" : "room-quantity"} style={voiceSearchResults.roomQuantity > 1 ? {fontWeight: 'bold', color: '#ffcc00'} : {}}>
-                          Room Quantity: {voiceSearchResults.roomQuantity} {voiceSearchResults.roomQuantity === 1 ? 'room' : 'rooms'}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span>Room Quantity:</span>
+                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                              <button 
+                                onClick={() => updateVoiceSearchRoomQuantity(voiceSearchResults.roomQuantity - 1)}
+                                disabled={voiceSearchResults.roomQuantity <= 1}
+                                style={{
+                                  width: '24px',
+                                  height: '24px',
+                                  padding: '0',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  backgroundColor: voiceSearchResults.roomQuantity <= 1 ? '#ccc' : '#007bff',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  marginRight: '8px',
+                                  cursor: voiceSearchResults.roomQuantity <= 1 ? 'not-allowed' : 'pointer',
+                                  fontSize: '16px'
+                                }}
+                              >
+                                -
+                              </button>
+                              <span style={{ margin: '0 8px' }}>{voiceSearchResults.roomQuantity} {voiceSearchResults.roomQuantity === 1 ? 'room' : 'rooms'}</span>
+                              <button 
+                                onClick={() => updateVoiceSearchRoomQuantity(voiceSearchResults.roomQuantity + 1)}
+                                disabled={voiceSearchResults.roomQuantity >= 5}
+                                style={{
+                                  width: '24px',
+                                  height: '24px',
+                                  padding: '0',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  backgroundColor: voiceSearchResults.roomQuantity >= 5 ? '#ccc' : '#007bff',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  marginLeft: '8px',
+                                  cursor: voiceSearchResults.roomQuantity >= 5 ? 'not-allowed' : 'pointer',
+                                  fontSize: '16px'
+                                }}
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
                         </li>
                       </>
                     )}
