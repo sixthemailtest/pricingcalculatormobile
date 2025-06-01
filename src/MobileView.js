@@ -1617,7 +1617,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Pattern for just 'short stay' with no specific time (default to 4 hours)
     const justShortStayPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay)\b/i;
     
-    // Patterns for specific hour durations
+    // Patterns for specific hour durations - two patterns to catch both standalone and embedded mentions
+    const standaloneHoursPattern = /^\s*(?:for\s+)?(\d{1,2})\s*(?:hrs|hours|hr|hour)\s*(?:stay)?\s*$/i;
     const specificHoursPattern = /\b(\d{1,2})\s*(?:hrs|hours|hr|hour)\b/i;
     const specificHoursJacuzziPattern = /\b(\d{1,2})\s*(?:hrs|hours|hr|hour)\s+(?:with\s+jacuzzi|jacuzzi)\b/i;
     const jacuzziSpecificHoursPattern = /\b(?:with\s+jacuzzi|jacuzzi)\s+(\d{1,2})\s*(?:hrs|hours|hr|hour)\b/i;
@@ -1743,6 +1744,23 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       // Use processShortStayVoiceSearch with the calculated checkout hour
       const isPM = checkoutHour >= 12;
       processShortStayVoiceSearch(query, isPM ? (checkoutHour === 12 ? 12 : checkoutHour % 12) : checkoutHour, searchId, !isPM, isPM, true);
+      return;
+    }
+    
+    // First check for standalone hour mentions (e.g., just "9 hrs")
+    const standaloneHoursMatch = queryLower.match(standaloneHoursPattern);
+    if (standaloneHoursMatch && standaloneHoursMatch[1]) {
+      const hours = parseInt(standaloneHoursMatch[1], 10);
+      console.log(`Standalone hours detected: ${hours} hours`);
+      
+      // Get current time
+      const currentTime = new Date();
+      // Calculate checkout time (current time + specified hours)
+      const checkoutHour = (currentTime.getHours() + hours) % 24;
+      
+      // Use processShortStayVoiceSearch with the calculated checkout hour
+      const isPM = checkoutHour >= 12;
+      processShortStayVoiceSearch(query, isPM ? (checkoutHour === 12 ? 12 : checkoutHour % 12) : checkoutHour, searchId, !isPM, isPM, false);
       return;
     }
     
