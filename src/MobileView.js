@@ -19,7 +19,39 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
-  const [voiceSearchResults, setVoiceSearchResults] = useState(null);
+  const [voiceSearchResults, setVoiceSearchResults] = useState({
+    showModal: false,
+    foundMatch: false,
+    query: '',
+    checkInDate: null,
+    checkOutDate: null,
+    nights: 0,
+    bedType: '',
+    hasJacuzzi: false,
+    price: 0,
+    tax: 0,
+    total: 0,
+    isShortStay: false,
+    basePrice: 0,
+    extraHours: 0,
+    extraHoursCost: 0,
+    cashTotal: 0,
+    creditTax: 0,
+    creditTotal: 0,
+    dailyPrices: [],
+    earlyCheckInHours: 0,
+    lateCheckOutHours: 0,
+    earlyCheckInCost: 0,
+    lateCheckOutCost: 0,
+    roomQuantity: 1,
+    singleRoomPrice: 0,
+    singleRoomTax: 0,
+    singleRoomTotal: 0,
+    invalidCombination: false,
+    requestedInvalidCombination: '',
+    validCombinations: {},
+    refreshTimestamp: Date.now()
+  });
   const [showVoiceSearchResults, setShowVoiceSearchResults] = useState(false);
   const [voiceSearchError, setVoiceSearchError] = useState(null);
   const [detectedVoiceQuery, setDetectedVoiceQuery] = useState(null);
@@ -189,38 +221,30 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   const [checkInDate, setCheckInDate] = useState(defaultCheckIn);
   const [checkOutDate, setCheckOutDate] = useState(defaultCheckOut);
   
-  // Update current date and time
-  const updateCurrentDateTime = useCallback(() => {
+  // Update current date and time - EXACT COPY from pricecalculator project
+  const updateCurrentDateTime = () => {
     const now = new Date();
     
     // Format date
     const dateOptions = { year: 'numeric', month: 'long', day: 'numeric' };
     setFormattedCurrentDate(now.toLocaleDateString('en-US', dateOptions));
     
-    // Format time with seconds
+    // Format time WITH seconds - EXACT COPY from pricecalculator
     const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
     const timeString = now.toLocaleTimeString('en-US', timeOptions);
     setCurrentTime(timeString);
     
-    // Don't update checkout time here - it will be handled by the extraHours useEffect
-  }, []);
+    // Also update checkout time when current time changes - EXACT COPY from pricecalculator
+    calculateCheckoutTime(now);
+  };
   
-  // Calculate checkout time based on current time and extra hours
-  const calculateCheckoutTime = useCallback((customNow = null) => {
-    const now = customNow || new Date();
-    
-    // Calculate checkout time (current time + 4 hours + extra hours)
+  // Calculate checkout time - EXACT COPY from pricecalculator project
+  const calculateCheckoutTime = (currentTimeDate = null) => {
+    const now = currentTimeDate || new Date();
     const checkoutDate = new Date(now.getTime() + ((4 + extraHours) * 60 * 60 * 1000));
-    
-    // Format checkout time with seconds
     const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
-    const formattedCheckoutTime = checkoutDate.toLocaleTimeString('en-US', timeOptions);
-    
-    // Set state
-    setCheckoutTime(formattedCheckoutTime);
-    
-    return formattedCheckoutTime;
-  }, [extraHours]);
+    setCheckoutTime(checkoutDate.toLocaleTimeString('en-US', timeOptions));
+  };
   
   // Calculate short stay price
   const calculateShortStayPrice = useCallback(() => {
@@ -482,42 +506,26 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     }
   }, [currentDateTime, prices]);
   
-  // Effect to initialize checkout time and set up timer for current time
+  // Initialize date and time on component mount and set up timer - EXACT COPY from pricecalculator
   useEffect(() => {
-    // Initial update for current time
-    updateCurrentDateTime();
+    updateCurrentDateTime(); // Initial update
     
-    // Initial update for checkout time (current time + 4 hours)
-    const now = new Date();
-    const checkoutDate = new Date(now.getTime() + ((4 + extraHours) * 60 * 60 * 1000));
-    const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
-    const checkoutTimeStr = checkoutDate.toLocaleTimeString('en-US', timeOptions);
-    setCheckoutTime(checkoutTimeStr);
-    
-    // Initial price calculation
-    calculateShortStayPrice();
-    
-    // Set up timer to update only the current time every second
+    // Set up timer to update every second
     const timer = setInterval(() => {
       updateCurrentDateTime();
     }, 1000);
     
     // Cleanup timer on component unmount
     return () => clearInterval(timer);
-  }, [updateCurrentDateTime, calculateShortStayPrice, extraHours]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
-  // Update checkout time and price calculation when extraHours changes
+  // Update calculations when relevant state changes - EXACT COPY from pricecalculator
   useEffect(() => {
-    // Update checkout time based on current time and extra hours
-    const now = new Date();
-    const checkoutDate = new Date(now.getTime() + ((4 + extraHours) * 60 * 60 * 1000));
-    const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
-    const checkoutTimeStr = checkoutDate.toLocaleTimeString('en-US', timeOptions);
-    setCheckoutTime(checkoutTimeStr);
-    
-    // Also update price calculation
+    calculateCheckoutTime();
     calculateShortStayPrice();
-  }, [extraHours, calculateShortStayPrice]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extraHours, hasJacuzzi, paymentMethod, extraHourRate, currentTime]);
   
   // Clear short stay selections
   const clearShortStay = () => {
@@ -3069,10 +3077,16 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       
       // Add a refresh timestamp to force React to treat this as a completely new object
       // This is critical for ensuring the UI updates when only room quantity changes
+      // Initialize early check-in and late check-out properties if not already present
+      // This ensures these properties are always available for overnight stays
       const refreshedResults = {
         ...results,
         refreshTimestamp: Date.now(),
-        forceRefresh: Math.random() // Add random value to ensure state is always seen as different
+        forceRefresh: Math.random(), // Add random value to ensure state is always seen as different
+        earlyCheckInHours: results.earlyCheckInHours || 0,
+        lateCheckOutHours: results.lateCheckOutHours || 0,
+        earlyCheckInCost: results.earlyCheckInCost || 0,
+        lateCheckOutCost: results.lateCheckOutCost || 0
       };
       
       // Now show the results
@@ -3105,6 +3119,17 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         window.scrollTo(0, 0);
       }, 100);
     }, 50);
+  };
+  
+  // Helper function to format time without seconds
+  const formatTimeWithoutSeconds = (date) => {
+    if (!date) return 'Not set';
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12; // Convert 0 to 12 for 12 AM
+    const displayMinutes = String(minutes).padStart(2, '0');
+    return `${displayHours}:${displayMinutes} ${ampm}`;
   };
   
   // Process short stay voice search
@@ -3163,11 +3188,12 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     // Always use the actual current time when the function is called
     const currentTime = new Date();
-    console.log(`Current time: ${currentTime.toLocaleString()}`);
+    console.log(`Current time: ${currentTime.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`);    
     
     // Create checkout time based on target hour with minutes set to 00
     const checkoutTime = new Date(currentTime);
     console.log(`Setting checkout time to exactly ${targetHour}:00`);
+    // Explicitly set seconds and milliseconds to 0 to ensure no seconds are displayed
     checkoutTime.setHours(targetHour, 0, 0, 0);
     
     // Special handling for AM hours (3 AM, 4 AM, 5 AM, etc.)
@@ -3187,10 +3213,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     }
     
     // Log the AM/PM status for debugging
-    console.log(`Checkout hour: ${targetHour}, isPM: ${isPM}, Final checkout time: ${checkoutTime.toLocaleString()}`);
+    console.log(`Checkout hour: ${targetHour}, isPM: ${isPM}, Final checkout time: ${checkoutTime.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`);    
     console.log(`Checkout time in 12-hour format: ${checkoutTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`);
     
-    console.log(`Checkout time: ${checkoutTime.toLocaleString()}`);
+    console.log(`Checkout time: ${checkoutTime.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`);    
     
     // Calculate duration in hours directly from current time to checkout time
     // We need to count the full hours, including the partial first hour
@@ -3220,7 +3246,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     console.log(`Raw hours calculation: ${rawHours} hours`);
     console.log(`Rounded to: ${durationHours} hours`);
-    console.log(`From ${currentTime.toLocaleTimeString()} to ${checkoutTime.toLocaleTimeString()}`);
+    console.log(`From ${currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} to ${checkoutTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`);
     
     // Special case: if we're at exactly X:00 and checking out at Y:00,
     // the hours should be Y-X (not counting the next day case)
@@ -3295,13 +3321,40 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     const shortStayCreditTotal = shortStayBaseRate + shortStayExtraHoursCost + shortStayCreditTaxAmount;
     
     // Create results object
+    // Instead of using Date objects for display times, create formatted time strings
+    // This matches how the original pricecalculator project handles times
+    
+    // Format the check-in time as a string (hours:minutes AM/PM)
+    const checkInHours = currentTime.getHours();
+    const checkInMinutes = currentTime.getMinutes();
+    const checkInAmPm = checkInHours >= 12 ? 'PM' : 'AM';
+    const checkInDisplayHours = checkInHours % 12 || 12; // Convert 0 to 12 for 12 AM
+    const checkInDisplayMinutes = String(checkInMinutes).padStart(2, '0');
+    const formattedCheckInTime = `${checkInDisplayHours}:${checkInDisplayMinutes} ${checkInAmPm}`;
+    
+    // Format the check-out time as a string (hours:minutes AM/PM)
+    const checkOutHours = checkoutTime.getHours();
+    const checkOutMinutes = checkoutTime.getMinutes();
+    const checkOutAmPm = checkOutHours >= 12 ? 'PM' : 'AM';
+    const checkOutDisplayHours = checkOutHours % 12 || 12; // Convert 0 to 12 for 12 AM
+    const checkOutDisplayMinutes = String(checkOutMinutes).padStart(2, '0');
+    const formattedCheckOutTime = `${checkOutDisplayHours}:${checkOutDisplayMinutes} ${checkOutAmPm}`;
+    
+    console.log(`Formatted check-in time: ${formattedCheckInTime}`);
+    console.log(`Formatted check-out time: ${formattedCheckOutTime}`);
+    
+    // Store the original Date objects for calculations and the formatted strings for display
     const results = {
       query: query,
       timestamp: Date.now(),
       searchId: searchId || `search-${Date.now()}`,
       roomQuantity: 1, // Default to 1 room
+      // Store both the Date objects and formatted strings
       checkInDate: currentTime,
       checkOutDate: checkoutTime,
+      // Add formatted time strings for display
+      formattedCheckInTime: formattedCheckInTime,
+      formattedCheckOutTime: formattedCheckOutTime,
       bedType: detectedBedType,
       hasJacuzzi: shortStayHasJacuzzi,
       isSmoking: false, // Default to non-smoking
@@ -3507,40 +3560,204 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   };
   
   // Update room quantity in voice search results and recalculate prices
-  const updateVoiceSearchRoomQuantity = (newQuantity) => {
-    // Validate the new quantity (should be between 1 and 5)
-    if (newQuantity < 1 || newQuantity > 5) return;
+  const updateVoiceSearchRoomQuantity = (quantity) => {
+    console.log(`updateVoiceSearchRoomQuantity called with quantity=${quantity}`);
     
-    console.log(`Updating room quantity from ${voiceSearchResults.roomQuantity} to ${newQuantity}`);
+    // Ensure quantity is a valid number
+    quantity = parseInt(quantity) || 1;
     
-    // Only proceed if we have voice search results and it's not a short stay
-    if (!voiceSearchResults || voiceSearchResults.isShortStay) return;
+    // Validate the quantity (1-5 rooms allowed)
+    if (quantity < 1) {
+      quantity = 1;
+    } else if (quantity > 5) {
+      quantity = 5;
+    }
     
-    // Create a copy of the current results
-    const updatedResults = { ...voiceSearchResults };
+    console.log(`Setting room quantity to ${quantity}`);
     
-    // Update the room quantity
-    updatedResults.roomQuantity = newQuantity;
+    try {
+      // Create a copy of the current results using spread operator to preserve Date objects
+      const updatedResults = { ...voiceSearchResults };
+      
+      // Update the room quantity
+      updatedResults.roomQuantity = quantity;
+      
+      // Make sure all required properties exist to avoid undefined errors
+      if (!updatedResults.singleRoomPrice) {
+        updatedResults.singleRoomPrice = updatedResults.price / (updatedResults.roomQuantity || 1);
+      }
+      
+      // Calculate new price based on quantity
+      updatedResults.price = updatedResults.singleRoomPrice * quantity;
+      
+      // Calculate tax (15%)
+      updatedResults.tax = updatedResults.price * 0.15;
+      
+      // Make sure these properties exist
+      if (typeof updatedResults.earlyCheckInCost === 'undefined') {
+        updatedResults.earlyCheckInCost = 0;
+      }
+      
+      if (typeof updatedResults.lateCheckOutCost === 'undefined') {
+        updatedResults.lateCheckOutCost = 0;
+      }
+      
+      // Update total price
+      updatedResults.total = updatedResults.price + updatedResults.tax + 
+                           updatedResults.earlyCheckInCost + 
+                           updatedResults.lateCheckOutCost;
+      
+      // Update cash total if it exists
+      if (typeof updatedResults.cashTotal !== 'undefined') {
+        updatedResults.cashTotal = updatedResults.total;
+      }
+      
+      // Update credit card totals if they exist
+      if (typeof updatedResults.creditTax !== 'undefined') {
+        updatedResults.creditTax = updatedResults.total * 0.15;
+        updatedResults.creditTotal = updatedResults.total + updatedResults.creditTax;
+      }
+      
+      // Ensure all values are numbers to avoid toFixed errors
+      updatedResults.price = Number(updatedResults.price) || 0;
+      updatedResults.tax = Number(updatedResults.tax) || 0;
+      updatedResults.total = Number(updatedResults.total) || 0;
+      
+      console.log(`Room quantity updated: ${quantity}, new price: $${updatedResults.price.toFixed(2)}, new total: $${updatedResults.total.toFixed(2)}`);
+      
+      // Force a complete refresh
+      updatedResults.refreshTimestamp = Date.now();
+      updatedResults.forceRefresh = Math.random();
+      
+      // Update the state with the new results
+      setVoiceSearchResults(updatedResults);
+    } catch (error) {
+      console.error('Error updating room quantity:', error);
+    }
+  };
+  
+  // Update early check-in hours in voice search results and recalculate prices
+  const updateVoiceSearchEarlyCheckIn = (hours) => {
+    console.log(`updateVoiceSearchEarlyCheckIn called with hours=${hours}`);
     
-    // Recalculate prices based on the new quantity
-    const singleRoomPrice = updatedResults.singleRoomPrice || (updatedResults.price / voiceSearchResults.roomQuantity);
+    try {
+      // Ensure hours is a valid number
+      hours = parseInt(hours) || 0;
+      
+      // Validate the hours (0-6 hours allowed)
+      if (hours < 0) {
+        hours = 0;
+      } else if (hours > 6) {
+        hours = 6;
+      }
+      
+      console.log(`Setting early check-in hours to ${hours}`);
+      
+      // Create a copy of the current results using spread operator to preserve Date objects
+      const updatedResults = { ...voiceSearchResults };
+      
+      // Update the early check-in hours
+      updatedResults.earlyCheckInHours = hours;
+      
+      // Calculate cost: $15 per hour
+      const hourlyRate = 15;
+      updatedResults.earlyCheckInCost = hours * hourlyRate;
+      
+      // Make sure all required properties exist
+      if (typeof updatedResults.price === 'undefined' || isNaN(updatedResults.price)) {
+        updatedResults.price = 0;
+      }
+      
+      if (typeof updatedResults.tax === 'undefined' || isNaN(updatedResults.tax)) {
+        updatedResults.tax = 0;
+      }
+      
+      if (typeof updatedResults.lateCheckOutCost === 'undefined' || isNaN(updatedResults.lateCheckOutCost)) {
+        updatedResults.lateCheckOutCost = 0;
+      }
+      
+      // Update total price
+      updatedResults.total = updatedResults.price + updatedResults.tax + 
+                            updatedResults.earlyCheckInCost + 
+                            updatedResults.lateCheckOutCost;
+      
+      // Ensure all values are numbers to avoid toFixed errors
+      updatedResults.earlyCheckInCost = Number(updatedResults.earlyCheckInCost) || 0;
+      updatedResults.total = Number(updatedResults.total) || 0;
+      
+      console.log(`Early check-in updated: ${hours} hours, cost: $${updatedResults.earlyCheckInCost.toFixed(2)}, new total: $${updatedResults.total.toFixed(2)}`);
+      
+      // Force a complete refresh
+      updatedResults.refreshTimestamp = Date.now();
+      updatedResults.forceRefresh = Math.random();
+      
+      // Update the state with the new results
+      setVoiceSearchResults(updatedResults);
+    } catch (error) {
+      console.error('Error updating early check-in hours:', error);
+    }
+  };
+  
+  // Update late check-out hours in voice search results and recalculate prices
+  const updateVoiceSearchLateCheckOut = (hours) => {
+    console.log(`updateVoiceSearchLateCheckOut called with hours=${hours}`);
     
-    // Update base price
-    updatedResults.price = singleRoomPrice * newQuantity;
-    
-    // Recalculate tax (15%)
-    updatedResults.tax = updatedResults.price * 0.15;
-    
-    // Update total price
-    updatedResults.total = updatedResults.price + updatedResults.tax;
-    
-    // Add a refresh timestamp to force React to treat this as a completely new object
-    updatedResults.refreshTimestamp = Date.now();
-    
-    // Update the state with the new results
-    setVoiceSearchResults(updatedResults);
-    
-    console.log('Updated voice search results with new room quantity:', updatedResults);
+    try {
+      // Ensure hours is a valid number
+      hours = parseInt(hours) || 0;
+      
+      // Validate the hours (0-12 hours allowed)
+      if (hours < 0) {
+        hours = 0;
+      } else if (hours > 12) {
+        hours = 12;
+      }
+      
+      console.log(`Setting late check-out hours to ${hours}`);
+      
+      // Create a copy of the current results using spread operator to preserve Date objects
+      const updatedResults = { ...voiceSearchResults };
+      
+      // Update the late check-out hours
+      updatedResults.lateCheckOutHours = hours;
+      
+      // Calculate cost: $15 per hour
+      const hourlyRate = 15;
+      updatedResults.lateCheckOutCost = hours * hourlyRate;
+      
+      // Make sure all required properties exist
+      if (typeof updatedResults.price === 'undefined' || isNaN(updatedResults.price)) {
+        updatedResults.price = 0;
+      }
+      
+      if (typeof updatedResults.tax === 'undefined' || isNaN(updatedResults.tax)) {
+        updatedResults.tax = 0;
+      }
+      
+      if (typeof updatedResults.earlyCheckInCost === 'undefined' || isNaN(updatedResults.earlyCheckInCost)) {
+        updatedResults.earlyCheckInCost = 0;
+      }
+      
+      // Update total price
+      updatedResults.total = updatedResults.price + updatedResults.tax + 
+                            updatedResults.earlyCheckInCost + 
+                            updatedResults.lateCheckOutCost;
+      
+      // Ensure all values are numbers to avoid toFixed errors
+      updatedResults.lateCheckOutCost = Number(updatedResults.lateCheckOutCost) || 0;
+      updatedResults.total = Number(updatedResults.total) || 0;
+      
+      console.log(`Late check-out updated: ${hours} hours, cost: $${updatedResults.lateCheckOutCost.toFixed(2)}, new total: $${updatedResults.total.toFixed(2)}`);
+      
+      // Force a complete refresh
+      updatedResults.refreshTimestamp = Date.now();
+      updatedResults.forceRefresh = Math.random();
+      
+      // Update the state with the new results
+      setVoiceSearchResults(updatedResults);
+    } catch (error) {
+      console.error('Error updating late check-out hours:', error);
+    }
   };
   
   // Close voice search results
@@ -4623,14 +4840,14 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                 )}
                 
                 <div>
-                  <strong>Stay Details:</strong>
-                  <ul>
-                    <li>Check-in: {voiceSearchResults.isShortStay ? 
-                      `${voiceSearchResults.checkInDate.getHours() % 12 || 12}:${String(voiceSearchResults.checkInDate.getMinutes()).padStart(2, '0')} ${voiceSearchResults.checkInDate.getHours() >= 12 ? 'PM' : 'AM'}` : 
-                      voiceSearchResults.checkInDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</li>
-                    <li>Check-out: {voiceSearchResults.isShortStay ? 
-                      `${voiceSearchResults.checkOutDate.getHours() % 12 || 12}:${String(voiceSearchResults.checkOutDate.getMinutes()).padStart(2, '0')} ${voiceSearchResults.checkOutDate.getHours() >= 12 ? 'PM' : 'AM'}` : 
-                      voiceSearchResults.checkOutDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</li>
+                  <strong style={{ fontSize: '13px' }}>Stay Details:</strong>
+                  <ul style={{ paddingLeft: '16px', marginTop: '6px', fontSize: '12px' }}>
+                    <li>Check-in: {voiceSearchResults.isShortStay && voiceSearchResults.formattedCheckInTime ? 
+                      voiceSearchResults.formattedCheckInTime : 
+                      (voiceSearchResults.checkInDate ? voiceSearchResults.checkInDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) : 'Not set')}</li>
+                    <li>Check-out: {voiceSearchResults.isShortStay && voiceSearchResults.formattedCheckOutTime ? 
+                      voiceSearchResults.formattedCheckOutTime : 
+                      (voiceSearchResults.checkOutDate ? voiceSearchResults.checkOutDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) : 'Not set')}</li>
                     {voiceSearchResults.isShortStay ? (
                       <>
                         <li>Duration: {4 + voiceSearchResults.extraHours} hours {voiceSearchResults.extraHours > 0 ? `(Base: 4 hours + ${voiceSearchResults.extraHours} extra)` : ''}</li>
@@ -4651,71 +4868,423 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                           <li>{voiceSearchResults.hasJacuzzi ? 'With Jacuzzi' : 'No Jacuzzi'}</li>
                         ) : null}
                         <li>{voiceSearchResults.isSmoking ? 'Smoking' : 'Non-Smoking'}</li>
-                        {/* Always show room quantity, highlighted if more than 1 */}
+                        {/* Room Quantity - Only show for overnight stays */}
                         <li className={voiceSearchResults.roomQuantity > 1 ? "room-quantity highlighted" : "room-quantity"} style={voiceSearchResults.roomQuantity > 1 ? {fontWeight: 'bold', color: '#ffcc00'} : {}}>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span>Room Quantity:</span>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '12px' }}>Room Quantity:</span>
                             <div style={{ display: 'flex', alignItems: 'center' }}>
                               <button 
-                                onClick={() => updateVoiceSearchRoomQuantity(voiceSearchResults.roomQuantity - 1)}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  console.log('Room quantity minus button clicked');
+                                  
+                                  if (voiceSearchResults && voiceSearchResults.roomQuantity > 1) {
+                                    // Direct state update with simple calculation
+                                    const newQuantity = voiceSearchResults.roomQuantity - 1;
+                                    
+                                    // Create a simple copy with only the necessary updates
+                                    const updatedResults = { ...voiceSearchResults };
+                                    updatedResults.roomQuantity = newQuantity;
+                                    
+                                    if (updatedResults.isShortStay) {
+                                      // For short stay bookings
+                                      // Store single room values if not already stored
+                                      if (!updatedResults.singleBasePrice) {
+                                        updatedResults.singleBasePrice = Number(updatedResults.basePrice) || 0;
+                                      }
+                                      if (!updatedResults.singleExtraHoursCost) {
+                                        updatedResults.singleExtraHoursCost = Number(updatedResults.extraHoursCost) || 0;
+                                      }
+                                      
+                                      // Update all price fields for short stay
+                                      updatedResults.basePrice = Number(updatedResults.singleBasePrice) * newQuantity;
+                                      updatedResults.extraHoursCost = Number(updatedResults.singleExtraHoursCost) * newQuantity;
+                                      updatedResults.cashTotal = updatedResults.basePrice + updatedResults.extraHoursCost;
+                                      updatedResults.creditTax = updatedResults.cashTotal * 0.15;
+                                      updatedResults.creditTotal = updatedResults.cashTotal + updatedResults.creditTax;
+                                      updatedResults.total = updatedResults.cashTotal;
+                                    } else {
+                                      // For overnight stays
+                                      // Simple price calculation
+                                      if (updatedResults.singleRoomPrice) {
+                                        updatedResults.price = Number(updatedResults.singleRoomPrice) * newQuantity;
+                                        updatedResults.tax = Number(updatedResults.price) * 0.15;
+                                        updatedResults.total = Number(updatedResults.price) + 
+                                                             Number(updatedResults.tax) + 
+                                                             Number(updatedResults.earlyCheckInCost || 0) + 
+                                                             Number(updatedResults.lateCheckOutCost || 0);
+                                      }
+                                    }
+                                    
+                                    // Force refresh
+                                    updatedResults.refreshTimestamp = Date.now();
+                                    
+                                    // Update state directly
+                                    setVoiceSearchResults(updatedResults);
+                                    console.log('Decreased room quantity to:', newQuantity);
+                                  }
+                                }}
                                 disabled={voiceSearchResults.roomQuantity <= 1}
                                 style={{
-                                  width: '24px',
-                                  height: '24px',
+                                  width: '22px',
+                                  height: '22px',
                                   padding: '0',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  backgroundColor: voiceSearchResults.roomQuantity <= 1 ? '#ccc' : '#007bff',
+                                  backgroundColor: '#dc3545',
                                   color: 'white',
                                   border: 'none',
                                   borderRadius: '4px',
-                                  marginRight: '8px',
+                                  marginRight: '6px',
                                   cursor: voiceSearchResults.roomQuantity <= 1 ? 'not-allowed' : 'pointer',
-                                  fontSize: '16px'
+                                  fontSize: '12px',
+                                  fontWeight: 'bold'
                                 }}
                               >
                                 -
                               </button>
-                              <span style={{ margin: '0 8px' }}>{voiceSearchResults.roomQuantity} {voiceSearchResults.roomQuantity === 1 ? 'room' : 'rooms'}</span>
+                              <span style={{ margin: '0 6px', fontSize: '12px'}}>{voiceSearchResults.roomQuantity} {voiceSearchResults.roomQuantity === 1 ? 'room' : 'rooms'}</span>
                               <button 
-                                onClick={() => updateVoiceSearchRoomQuantity(voiceSearchResults.roomQuantity + 1)}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  console.log('Room quantity plus button clicked');
+                                  
+                                  if (voiceSearchResults && voiceSearchResults.roomQuantity < 10) {
+                                    // Direct state update with simple calculation
+                                    const newQuantity = voiceSearchResults.roomQuantity + 1;
+                                    
+                                    // Create a simple copy with only the necessary updates
+                                    const updatedResults = { ...voiceSearchResults };
+                                    updatedResults.roomQuantity = newQuantity;
+                                    
+                                    if (updatedResults.isShortStay) {
+                                      // For short stay bookings
+                                      // Store single room values if not already stored
+                                      if (!updatedResults.singleBasePrice) {
+                                        updatedResults.singleBasePrice = Number(updatedResults.basePrice) || 0;
+                                      }
+                                      if (!updatedResults.singleExtraHoursCost) {
+                                        updatedResults.singleExtraHoursCost = Number(updatedResults.extraHoursCost) || 0;
+                                      }
+                                      
+                                      // Update all price fields for short stay
+                                      updatedResults.basePrice = Number(updatedResults.singleBasePrice) * newQuantity;
+                                      updatedResults.extraHoursCost = Number(updatedResults.singleExtraHoursCost) * newQuantity;
+                                      updatedResults.cashTotal = updatedResults.basePrice + updatedResults.extraHoursCost;
+                                      updatedResults.creditTax = updatedResults.cashTotal * 0.15;
+                                      updatedResults.creditTotal = updatedResults.cashTotal + updatedResults.creditTax;
+                                      updatedResults.total = updatedResults.cashTotal;
+                                    } else {
+                                      // For overnight stays
+                                      // Simple price calculation
+                                      if (updatedResults.singleRoomPrice) {
+                                        updatedResults.price = Number(updatedResults.singleRoomPrice) * newQuantity;
+                                        updatedResults.tax = Number(updatedResults.price) * 0.15;
+                                        updatedResults.total = Number(updatedResults.price) + 
+                                                             Number(updatedResults.tax) + 
+                                                             Number(updatedResults.earlyCheckInCost || 0) + 
+                                                             Number(updatedResults.lateCheckOutCost || 0);
+                                      }
+                                    }
+                                    
+                                    // Force refresh
+                                    updatedResults.refreshTimestamp = Date.now();
+                                    
+                                    // Update state directly
+                                    setVoiceSearchResults(updatedResults);
+                                    console.log('Increased room quantity to:', newQuantity);
+                                  }
+                                }}
                                 disabled={voiceSearchResults.roomQuantity >= 5}
                                 style={{
-                                  width: '24px',
-                                  height: '24px',
+                                  width: '22px',
+                                  height: '22px',
                                   padding: '0',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  backgroundColor: voiceSearchResults.roomQuantity >= 5 ? '#ccc' : '#007bff',
+                                  backgroundColor: voiceSearchResults.roomQuantity >= 5 ? '#ccc' : '#28a745',
                                   color: 'white',
                                   border: 'none',
                                   borderRadius: '4px',
-                                  marginLeft: '8px',
+                                  marginLeft: '6px',
                                   cursor: voiceSearchResults.roomQuantity >= 5 ? 'not-allowed' : 'pointer',
-                                  fontSize: '16px'
+                                  fontSize: '12px',
+                                  fontWeight: 'bold'
                                 }}
                               >
                                 +
                               </button>
                             </div>
                           </div>
+
+                        </li>
+                        {/* Early Check-in - Only show for overnight stays */}
+                        <li className={voiceSearchResults.earlyCheckInHours > 0 ? "early-checkin highlighted" : "early-checkin"} style={voiceSearchResults.earlyCheckInHours > 0 ? {fontWeight: 'bold', color: '#ffcc00'} : {}}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '12px' }}>Early Check-in:</span>
+                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                              <button 
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  console.log('Early check-in minus button clicked');
+                                  
+                                  // Direct state update with simple calculation
+                                  const currentHours = parseInt(voiceSearchResults.earlyCheckInHours) || 0;
+                                  if (currentHours > 0) {
+                                    const newHours = currentHours - 1;
+                                    
+                                    // Create a simple copy with only the necessary updates
+                                    const updatedResults = { ...voiceSearchResults };
+                                    updatedResults.earlyCheckInHours = newHours;
+                                    
+                                    // Simple cost calculation
+                                    updatedResults.earlyCheckInCost = Number(newHours * 15);
+                                    
+                                    // Make sure all values are numbers
+                                    const price = Number(updatedResults.price || 0);
+                                    const tax = Number(updatedResults.tax || 0);
+                                    const lateCheckOutCost = Number(updatedResults.lateCheckOutCost || 0);
+                                    
+                                    // Update total
+                                    updatedResults.total = price + tax + updatedResults.earlyCheckInCost + lateCheckOutCost;
+                                    
+                                    // Force refresh
+                                    updatedResults.refreshTimestamp = Date.now();
+                                    
+                                    // Update state directly
+                                    console.log('Decreasing early check-in to', newHours, 'hours');
+                                    setVoiceSearchResults(updatedResults);
+                                  }
+                                }}
+                                style={{
+                                  width: '22px',
+                                  height: '22px',
+                                  padding: '0',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  backgroundColor: '#dc3545',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  marginRight: '6px',
+                                  cursor: 'pointer',
+                                  fontSize: '12px',
+                                  fontWeight: 'bold'
+                                }}
+                              >
+                                -
+                              </button>
+                              <span style={{ margin: '0 6px', fontSize: '12px'}}>{voiceSearchResults.earlyCheckInHours} {voiceSearchResults.earlyCheckInHours === 1 ? 'hour' : 'hours'}</span>
+                              <button 
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  console.log('Early check-in plus button clicked');
+                                  
+                                  // Direct state update with simple calculation
+                                  const currentHours = parseInt(voiceSearchResults.earlyCheckInHours) || 0;
+                                  if (currentHours < 6) {
+                                    const newHours = currentHours + 1;
+                                    
+                                    // Create a simple copy with only the necessary updates
+                                    const updatedResults = { ...voiceSearchResults };
+                                    updatedResults.earlyCheckInHours = newHours;
+                                    
+                                    // Simple cost calculation
+                                    updatedResults.earlyCheckInCost = Number(newHours * 15);
+                                    
+                                    // Make sure all values are numbers
+                                    const price = Number(updatedResults.price || 0);
+                                    const tax = Number(updatedResults.tax || 0);
+                                    const lateCheckOutCost = Number(updatedResults.lateCheckOutCost || 0);
+                                    
+                                    // Update total
+                                    updatedResults.total = price + tax + updatedResults.earlyCheckInCost + lateCheckOutCost;
+                                    
+                                      // Force refresh
+                                    updatedResults.refreshTimestamp = Date.now();
+                                    updatedResults.forceRefresh = Math.random();
+                                    
+                                    // Update state directly
+                                    console.log('Increasing early check-in to', newHours, 'hours');
+                                    setVoiceSearchResults(updatedResults);
+                                  }
+                                }}
+                                disabled={voiceSearchResults.earlyCheckInHours >= 6}
+                                style={{
+                                  width: '22px',
+                                  height: '22px',
+                                  padding: '0',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  backgroundColor: voiceSearchResults.earlyCheckInHours >= 6 ? '#ccc' : '#28a745',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  marginLeft: '6px',
+                                  cursor: voiceSearchResults.earlyCheckInHours >= 6 ? 'not-allowed' : 'pointer',
+                                  fontSize: '12px',
+                                  fontWeight: 'bold'
+                                }}
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+
+                        </li>
+                        
+                        {/* Late Check-out - Only show for overnight stays */}
+                        <li className={voiceSearchResults.lateCheckOutHours > 0 ? "late-checkout highlighted" : "late-checkout"} style={voiceSearchResults.lateCheckOutHours > 0 ? {fontWeight: 'bold', color: '#ffcc00'} : {}}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                            <span style={{ fontSize: '12px' }}>Late Check-out:</span>
+                            <div style={{ display: 'flex', alignItems: 'center' }}>
+                              <button 
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  console.log('Late check-out minus button clicked');
+                                  
+                                  // Direct state update with simple calculation
+                                  const currentHours = parseInt(voiceSearchResults.lateCheckOutHours) || 0;
+                                  if (currentHours > 0) {
+                                    const newHours = currentHours - 1;
+                                    
+                                    // Create a simple copy with only the necessary updates
+                                    const updatedResults = { ...voiceSearchResults };
+                                    updatedResults.lateCheckOutHours = newHours;
+                                    
+                                    // Simple cost calculation
+                                    updatedResults.lateCheckOutCost = Number(newHours * 15);
+                                    
+                                    // Make sure all values are numbers
+                                    const price = Number(updatedResults.price || 0);
+                                    const tax = Number(updatedResults.tax || 0);
+                                    const earlyCheckInCost = Number(updatedResults.earlyCheckInCost || 0);
+                                    
+                                    // Update total
+                                    updatedResults.total = price + tax + earlyCheckInCost + updatedResults.lateCheckOutCost;
+                                    
+                                    // Force refresh
+                                    updatedResults.refreshTimestamp = Date.now();
+                                    updatedResults.forceRefresh = Math.random();
+                                    
+                                    // Update state directly
+                                    console.log('Decreasing late check-out to', newHours, 'hours');
+                                    setVoiceSearchResults(updatedResults);
+                                  }
+                                }}
+                                disabled={voiceSearchResults.lateCheckOutHours <= 0}
+                                style={{
+                                  width: '22px',
+                                  height: '22px',
+                                  padding: '0',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  backgroundColor: voiceSearchResults.lateCheckOutHours <= 0 ? '#ccc' : '#dc3545',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  marginRight: '6px',
+                                  cursor: voiceSearchResults.lateCheckOutHours <= 0 ? 'not-allowed' : 'pointer',
+                                  fontSize: '12px',
+                                  fontWeight: 'bold'
+                                }}
+                              >
+                                -
+                              </button>
+                              <span style={{ margin: '0 6px', fontSize: '12px'}}>{voiceSearchResults.lateCheckOutHours} {voiceSearchResults.lateCheckOutHours === 1 ? 'hour' : 'hours'}</span>
+                              <button 
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  console.log('Late check-out plus button clicked');
+                                  
+                                  // Direct state update with simple calculation
+                                  const currentHours = parseInt(voiceSearchResults.lateCheckOutHours) || 0;
+                                  if (currentHours < 12) {
+                                    const newHours = currentHours + 1;
+                                    
+                                    // Create a simple copy with only the necessary updates
+                                    const updatedResults = { ...voiceSearchResults };
+                                    updatedResults.lateCheckOutHours = newHours;
+                                    
+                                    // Simple cost calculation
+                                    updatedResults.lateCheckOutCost = Number(newHours * 15);
+                                    
+                                    // Make sure all values are numbers
+                                    const price = Number(updatedResults.price || 0);
+                                    const tax = Number(updatedResults.tax || 0);
+                                    const earlyCheckInCost = Number(updatedResults.earlyCheckInCost || 0);
+                                    
+                                    // Update total
+                                    updatedResults.total = price + tax + earlyCheckInCost + updatedResults.lateCheckOutCost;
+                                    
+                                    // Force refresh
+                                    updatedResults.refreshTimestamp = Date.now();
+                                    updatedResults.forceRefresh = Math.random();
+                                    
+                                    // Update state directly
+                                    console.log('Increasing late check-out to', newHours, 'hours');
+                                    setVoiceSearchResults(updatedResults);
+                                  }
+                                }}
+                                disabled={voiceSearchResults.lateCheckOutHours >= 12}
+                                style={{
+                                  width: '22px',
+                                  height: '22px',
+                                  padding: '0',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  backgroundColor: voiceSearchResults.lateCheckOutHours >= 12 ? '#ccc' : '#28a745',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  marginLeft: '6px',
+                                  cursor: voiceSearchResults.lateCheckOutHours >= 12 ? 'not-allowed' : 'pointer',
+                                  fontSize: '12px',
+                                  fontWeight: 'bold'
+                                }}
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+
                         </li>
                       </>
                     )}
                   </ul>
                 </div>
                 
-                <div className="voice-search-price-card">
+                <div className="voice-search-price-card" style={{ 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  justifyContent: 'space-between', 
+                  padding: '12px', 
+                  backgroundColor: '#007bff', 
+                  color: 'white', 
+                  borderRadius: '8px', 
+                  marginTop: '12px',
+                  fontSize: '11px'
+                }}>
                   {/* Daily price breakdown - only show if more than 1 night */}
                   {voiceSearchResults.dailyPrices && voiceSearchResults.dailyPrices.length > 1 && (
                     <div className="daily-price-breakdown">
-                      <div className="breakdown-header">Daily Price Breakdown (per room):</div>
+                      <div className="breakdown-header" style={{ fontSize: '12px' }}>Daily Price Breakdown (per room):</div>
                       {voiceSearchResults.dailyPrices.map((day, index) => (
                         <div key={index} className="daily-price">
-                          <span>{day.dayOfWeek}, {day.date}</span>
-                          <span>${day.price.toFixed(2)}</span>
+                          <span style={{ fontSize: '11px' }}>{day.dayOfWeek}, {day.date}</span>
+                          <span style={{ fontSize: '11px' }}>${day.price.toFixed(2)}</span>
                         </div>
                       ))}
                     </div>
@@ -4725,70 +5294,122 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                   {voiceSearchResults.isShortStay ? (
                     <>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85em' }}>
-                        <span>Base Rate (4 hours{voiceSearchResults.hasJacuzzi ? ' with Jacuzzi' : ''}):</span>
-                        <span>${voiceSearchResults.basePrice.toFixed(2)}</span>
+                        <span style={{ fontSize: '11px' }}>Base Rate (4 hours{voiceSearchResults.hasJacuzzi ? ' with Jacuzzi' : ''}):</span>
+                        <span style={{ fontSize: '11px' }}>${(Number(voiceSearchResults.basePrice) || 0).toFixed(2)}</span>
                       </div>
                       {voiceSearchResults.extraHours > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85em' }}>
-                          <span>Extra Hours ({voiceSearchResults.extraHours} @ ${(shortStayPrices.extraHourRate.regular).toFixed(2)}/hr):</span>
-                          <span>${voiceSearchResults.extraHoursCost.toFixed(2)}</span>
+                          <span style={{ fontSize: '11px' }}>Extra Hours ({voiceSearchResults.extraHours} @ ${(Number(shortStayPrices?.extraHourRate?.regular) || 0).toFixed(2)}/hr):</span>
+                          <span style={{ fontSize: '11px' }}>${(Number(voiceSearchResults.extraHoursCost) || 0).toFixed(2)}</span>
                         </div>
                       )}
                       
                       {/* Cash price */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '0.9em', marginTop: '10px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.2)', backgroundColor: 'rgba(0,255,0,0.1)', padding: '6px', borderRadius: '4px' }}>
-                        <span>Cash Total:</span>
-                        <span>${voiceSearchResults.cashTotal.toFixed(2)}</span>
+                      <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        marginTop: '12px',
+                        paddingTop: '8px',
+                        borderTop: '1px solid rgba(255, 255, 255, 0.3)',
+                        fontWeight: 'bold',
+                        fontSize: '13px',
+                        alignItems: 'center'
+                      }}>
+                        <span style={{ fontSize: '11px' }}>Total:</span>
+                        <span style={{ fontSize: '11px' }}>${(Number(voiceSearchResults.total) || 0).toFixed(2)}</span>
                       </div>
                       
                       {/* Credit card price with tax */}
                       <div style={{ marginTop: '10px', backgroundColor: 'rgba(0,0,255,0.1)', padding: '6px', borderRadius: '4px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85em' }}>
-                          <span>Credit Card Tax (15%):</span> 
-                          <span>${voiceSearchResults.creditTax.toFixed(2)}</span>
+                          <span style={{ fontSize: '11px' }}>Credit Card Tax (15%):</span> 
+                          <span style={{ fontSize: '11px' }}>${(Number(voiceSearchResults.creditTax) || 0).toFixed(2)}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '0.9em' }}>
-                          <span>Credit Card Total:</span>
-                          <span>${voiceSearchResults.creditTotal.toFixed(2)}</span>
+                          <span style={{ fontSize: '11px' }}>Credit Card Total:</span>
+                          <span style={{ fontSize: '11px' }}>${(Number(voiceSearchResults.creditTotal) || 0).toFixed(2)}</span>
                         </div>
                       </div>
                     </>
                   ) : voiceSearchResults.roomQuantity > 1 ? (
                     <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <span>Price per room:</span>
-                        <span>${voiceSearchResults.singleRoomPrice.toFixed(2)}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
+                        <span style={{ fontSize: '11px' }}>Price per room:</span>
+                        <span style={{ fontSize: '11px' }}>${(Number(voiceSearchResults.singleRoomPrice) || 0).toFixed(2)}</span>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontWeight: 'bold', backgroundColor: 'rgba(255, 204, 0, 0.2)', padding: '5px', borderRadius: '4px' }}>
-                        <span>Number of rooms:</span>
-                        <span>× {voiceSearchResults.roomQuantity}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontWeight: 'bold', backgroundColor: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '4px', alignItems: 'center' }}>
+                        <span style={{ fontSize: '11px' }}>Number of rooms:</span>
+                        <span style={{ fontSize: '11px' }}>{voiceSearchResults.roomQuantity}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontWeight: 'bold' }}>
-                        <span>Total base price:</span>
-                        <span>${voiceSearchResults.price.toFixed(2)}</span>
+                        <span style={{ fontSize: '11px' }}>Total base price:</span>
+                        <span style={{ fontSize: '11px' }}>${(Number(voiceSearchResults.price) || 0).toFixed(2)}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <span>Tax (15%):</span>
-                        <span>${voiceSearchResults.tax.toFixed(2)}</span>
+                        <span style={{ fontSize: '11px' }}>Tax (15%):</span>
+                        <span style={{ fontSize: '11px' }}>${(Number(voiceSearchResults.tax) || 0).toFixed(2)}</span>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.1em', marginTop: '5px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
-                        <span>Grand Total:</span>
-                        <span>${voiceSearchResults.total.toFixed(2)}</span>
+                      
+                      {/* Show early check-in cost if applicable */}
+                      {voiceSearchResults.earlyCheckInHours > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', backgroundColor: 'rgba(255, 204, 0, 0.2)', padding: '5px', borderRadius: '4px' }}>
+                          <span style={{ fontSize: '11px' }}>Early Check-in ({voiceSearchResults.earlyCheckInHours} {voiceSearchResults.earlyCheckInHours === 1 ? 'hour' : 'hours'} @ $15/hr):</span>
+                          <span style={{ fontSize: '11px' }}>${voiceSearchResults.earlyCheckInCost.toFixed(2)}</span>
+                        </div>
+                      )}
+                      
+                      {/* Show late check-out cost if applicable */}
+                      {voiceSearchResults.lateCheckOutHours > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', backgroundColor: 'rgba(255, 204, 0, 0.2)', padding: '5px', borderRadius: '4px' }}>
+                          <span style={{ fontSize: '11px' }}>Late Check-out ({voiceSearchResults.lateCheckOutHours} {voiceSearchResults.lateCheckOutHours === 1 ? 'hour' : 'hours'} @ $15/hr):</span>
+                          <span style={{ fontSize: '11px' }}>${voiceSearchResults.lateCheckOutCost.toFixed(2)}</span>
+                        </div>
+                      )}
+                      
+                      <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'space-between', 
+                        marginTop: '12px',
+                        paddingTop: '8px',
+                        borderTop: '1px solid rgba(255, 255, 255, 0.3)',
+                        fontWeight: 'bold',
+                        fontSize: '13px',
+                        alignItems: 'center'
+                      }}>
+                        <span style={{ fontSize: '11px' }}>Cash Total:</span>
+                        <span style={{ fontSize: '11px' }}>${(Number(voiceSearchResults.cashTotal) || 0).toFixed(2)}</span>
                       </div>
                     </>
                   ) : (
                     <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <span>Base Price:</span>
-                        <span>${voiceSearchResults.price.toFixed(2)}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', alignItems: 'center' }}>
+                        <span style={{ fontSize: '11px' }}>Base Price:</span>
+                        <span style={{ fontSize: '11px' }}>${(Number(voiceSearchResults.price) || 0).toFixed(2)}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <span>Tax (15%):</span>
-                        <span>${voiceSearchResults.tax.toFixed(2)}</span>
+                        <span style={{ fontSize: '11px' }}>Tax (15%):</span>
+                        <span style={{ fontSize: '11px' }}>${(Number(voiceSearchResults.tax) || 0).toFixed(2)}</span>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.1em', marginTop: '5px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
-                        <span>Total:</span>
-                        <span>${voiceSearchResults.total.toFixed(2)}</span>
+                      
+                      {/* Show early check-in cost if applicable */}
+                      {voiceSearchResults.earlyCheckInHours > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', backgroundColor: 'rgba(255, 204, 0, 0.2)', padding: '5px', borderRadius: '4px' }}>
+                          <span style={{ fontSize: '11px' }}>Early Check-in ({voiceSearchResults.earlyCheckInHours} {voiceSearchResults.earlyCheckInHours === 1 ? 'hour' : 'hours'} @ $15/hr):</span>
+                          <span style={{ fontSize: '11px' }}>${voiceSearchResults.earlyCheckInCost.toFixed(2)}</span>
+                        </div>
+                      )}
+                      
+                      {/* Show late check-out cost if applicable */}
+                      {voiceSearchResults.lateCheckOutHours > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', backgroundColor: 'rgba(255, 204, 0, 0.2)', padding: '5px', borderRadius: '4px' }}>
+                          <span style={{ fontSize: '11px' }}>Late Check-out ({voiceSearchResults.lateCheckOutHours} {voiceSearchResults.lateCheckOutHours === 1 ? 'hour' : 'hours'} @ $15/hr):</span>
+                          <span style={{ fontSize: '11px' }}>${voiceSearchResults.lateCheckOutCost.toFixed(2)}</span>
+                        </div>
+                      )}
+                      
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '13px', marginTop: '5px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
+                        <span style={{ fontSize: '11px' }}>Total:</span>
+                        <span style={{ fontSize: '11px' }}>${voiceSearchResults.total.toFixed(2)}</span>
                       </div>
                     </>
                   )}
