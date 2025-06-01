@@ -4726,7 +4726,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                       {/* Credit card price with tax */}
                       <div style={{ marginTop: '10px', backgroundColor: 'rgba(0,0,255,0.1)', padding: '6px', borderRadius: '4px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85em' }}>
-                          <span>Credit Card Tax (15%):</span>
+                          <span>Credit Card Tax (15%):</span> 
                           <span>${voiceSearchResults.creditTax.toFixed(2)}</span>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '0.9em' }}>
