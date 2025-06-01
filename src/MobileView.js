@@ -1564,8 +1564,32 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   const processVoiceSearchInternal = (query, specificCheckIn = null, specificCheckOut = null, searchId = null) => {
     if (!query || query.trim().length < 3) return;
     
+    // Function to check if query contains overnight stay keywords
+    const containsOvernightKeywords = (query) => {
+      const overnightKeywords = [
+        'night', 'tonight', 'tomorrow', 'next day', 'overnight',
+        'monday night', 'tuesday night', 'wednesday night', 'thursday night',
+        'friday night', 'saturday night', 'sunday night',
+        'for tonight', 'for tomorrow', 'for next', 'next week', 'next month',
+        'check out tomorrow', 'check-out tomorrow', 'for tuesday', 'for wednesday',
+        'for thursday', 'for friday', 'for saturday', 'for sunday', 'for monday'
+      ];
+      
+      return overnightKeywords.some(keyword => query.includes(keyword));
+    };
+    
     // Check for short stay queries first
     const queryLower = query.toLowerCase();
+    
+    // Check if query is likely for an overnight stay
+    const isLikelyOvernightStay = containsOvernightKeywords(queryLower);
+    console.log(`Checking if query is for overnight stay: ${isLikelyOvernightStay}`);
+    
+    // If the query contains overnight keywords, skip short stay processing
+    if (isLikelyOvernightStay) {
+      console.log('Query contains overnight stay keywords, not processing as short stay');
+      // Continue with regular voice search processing (will fall through to overnight processing)
+    } else {
     
     // First, try to match the full pattern with explicit AM/PM
     // Handle various formats including "5.AM", "5 AM", "5:00 AM", etc.
@@ -1708,6 +1732,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       processShortStayVoiceSearch(query, parseInt(justTimeGenericMatch[1], 10), searchId, !isPM, isPM, hasJacuzzi);
       return;
     }
+    
+    } // End of else block for short stay processing
     
     // Note: We already checked for empty queries at the beginning of the function
     
