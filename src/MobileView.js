@@ -759,7 +759,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     // Configure recognition settings
     recognition.lang = 'en-US';
-    recognition.continuous = true;
+    recognition.continuous = false; // Changed to false to auto-stop when speech ends
     recognition.interimResults = true;
     recognition.maxAlternatives = 3;
     
@@ -783,7 +783,49 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     startImprovedVoiceRecognition();
   };
   
-  // Improved voice recognition that captures complete phrases
+  // Helper function to safely stop and cleanup recognition instance
+  const stopAndCleanupRecognition = (source) => {
+    console.log(`Stopping and cleaning up recognition (source: ${source})`);
+    if (recognitionRef.current) {
+      try {
+        // First try to abort which is more aggressive
+        recognitionRef.current.abort();
+      } catch (e) {
+        console.log('Error aborting recognition:', e);
+        // If abort fails, try stop
+        try {
+          recognitionRef.current.stop();
+        } catch (e2) {
+          console.log('Error stopping recognition:', e2);
+        }
+      }
+      
+      // Clean up all event handlers
+      try {
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onspeechstart = null;
+        recognitionRef.current.onspeechend = null;
+        recognitionRef.current.onstart = null;
+      } catch (e) {
+        console.log('Error cleaning up recognition event handlers:', e);
+      }
+      
+      // Clear the reference
+      recognitionRef.current = null;
+      
+      // Update UI state
+      setIsListening(false);
+      setIsButtonActive(false);
+      
+      console.log(`Recognition cleanup complete (source: ${source})`);
+    } else {
+      console.log(`No active recognition to clean up (source: ${source})`);
+    }
+  };
+  
+  // Improved voice recognition with auto-stop and wave animation
   const startImprovedVoiceRecognition = () => {
     // Check if speech recognition is supported
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -805,6 +847,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         recognitionRef.current.onresult = null;
         recognitionRef.current.onend = null;
         recognitionRef.current.onerror = null;
+        recognitionRef.current.onspeechstart = null;
+        recognitionRef.current.onspeechend = null;
       } catch (e) {
         console.log('Error cleaning up previous recognition:', e);
       }
@@ -817,7 +861,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     // Configure recognition settings for better accuracy
     recognition.lang = 'en-US';
-    recognition.continuous = false; // Changed to false to get complete utterances
+    recognition.continuous = false; // Set to false to enable auto-stop
     recognition.interimResults = false; // Changed to false to get only final results
     
     // iOS-specific settings
@@ -828,11 +872,44 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     console.log('Starting improved voice recognition...', isIOS ? 'on iOS device' : 'on non-iOS device');
     
+    // Set up silence detection
+    let silenceTimer = null;
+    const silenceTimeout = 2000; // 2 seconds of silence will auto-stop
+    
+    // Function to reset silence timer
+    const resetSilenceTimer = () => {
+      if (silenceTimer) clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(() => {
+        console.log('Silence detected, auto-stopping recognition');
+        if (recognitionRef.current) {
+          try {
+            recognitionRef.current.stop();
+          } catch (e) {
+            console.log('Error stopping recognition on silence:', e);
+          }
+        }
+      }, silenceTimeout);
+    };
+    
     // Track if we've received a final result
     let finalResultReceived = false;
     let processingTimeout = null;
-  
+    
+    // Set up speech event handlers
+    recognition.onspeechstart = () => {
+      console.log('Speech started, resetting silence timer');
+      resetSilenceTimer();
+    };
+    
+    recognition.onspeechend = () => {
+      console.log('Speech ended, waiting for silence timeout');
+      // The silence timer will auto-stop if no new speech is detected
+    };
+    
     recognition.onresult = (event) => {
+      // Reset silence timer when we get results
+      resetSilenceTimer();
+      
       // Get the complete transcript
       const transcript = event.results[0][0].transcript;
       console.log('Complete voice transcript:', transcript);
@@ -887,8 +964,29 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     recognition.onend = () => {
       console.log('Voice recognition ended');
+      
+      // Clear silence timer if it exists
+      if (silenceTimer) {
+        clearTimeout(silenceTimer);
+        silenceTimer = null;
+      }
+      
       setIsListening(false);
       setIsButtonActive(false);
+      
+      // If we didn't receive any results, show a "no speech detected" message
+      if (!finalResultReceived) {
+        console.log('No speech detected in onend handler');
+        const emptyResults = {
+          query: "No speech detected",
+          foundMatch: false,
+          noSpeechDetected: true,
+          sessionId: `voice-search-${Date.now()}`,
+          timestamp: Date.now()
+        };
+        setVoiceSearchResults(emptyResults);
+        setShowVoiceSearchResults(true);
+      }
     };
     
     recognition.onerror = (event) => {
@@ -901,6 +999,12 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         console.log('No speech detected');
       }
       
+      // Clear silence timer if it exists
+      if (silenceTimer) {
+        clearTimeout(silenceTimer);
+        silenceTimer = null;
+      }
+      
       setIsListening(false);
       setIsButtonActive(false);
     };
@@ -908,7 +1012,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Start recognition
     try {
       recognition.start();
-      console.log('Voice recognition started');
+      // Start silence detection
+      resetSilenceTimer();
+      console.log('Voice recognition started with auto-stop');
     } catch (error) {
       console.error('Error starting voice recognition:', error);
       setIsButtonActive(false);
@@ -1224,9 +1330,12 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     });
   };
   
-  // Handle voice search button press (original method)
+  // Handle voice search button press (improved with auto-stop)
   const handleVoiceButtonPress = (e) => {
     e.preventDefault(); // Prevent default behavior
+    
+    // If already listening, don't do anything (single tap to start only)
+    if (isListening) return;
     
     // Generate a unique ID for this voice search attempt
     const searchSessionId = `voice-search-${Date.now()}`;
@@ -1272,11 +1381,45 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Create a variable to store the transcript for this specific session
     let sessionTranscript = '';
     
+    // Set up silence detection
+    let silenceTimer = null;
+    const silenceTimeout = 2000; // 2 seconds of silence will auto-stop
+  
+    // Function to reset silence timer
+    const resetSilenceTimer = () => {
+      if (silenceTimer) clearTimeout(silenceTimer);
+      silenceTimer = setTimeout(() => {
+        console.log('Silence detected, auto-stopping recognition');
+        if (recognitionRef.current) {
+          try {
+            recognitionRef.current.stop();
+          } catch (e) {
+            console.log('Error stopping recognition on silence:', e);
+          }
+        }
+      }, silenceTimeout);
+    };
+  
     recognition.onstart = () => {
       console.log(`Recognition started for session ${searchSessionId}`);
+      // Start silence detection
+      resetSilenceTimer();
     };
-    
+  
+    recognition.onspeechstart = () => {
+      console.log('Speech started, resetting silence timer');
+      resetSilenceTimer();
+    };
+  
+    recognition.onspeechend = () => {
+      console.log('Speech ended, waiting for silence timeout');
+      // The silence timer will auto-stop if no new speech is detected
+    };
+  
     recognition.onresult = (event) => {
+      // Reset silence timer when we get results
+      resetSilenceTimer();
+      
       // Reset the transcript for this event
       let currentTranscript = '';
       
@@ -1300,20 +1443,18 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     recognition.onend = () => {
       console.log(`Recognition ended for session ${searchSessionId}`);
       
+      // Clear silence timer
+      if (silenceTimer) {
+        clearTimeout(silenceTimer);
+        silenceTimer = null;
+      }
+      
       // Get the final transcript before cleaning up
       const finalTranscript = sessionTranscript || voiceSearchQuery;
       
       // Clean up the recognition instance
       if (recognitionRef.current) {
         try {
-          // Stop any active recognition
-          try {
-            recognitionRef.current.stop();
-            console.log('Stopped recognition in onend handler');
-          } catch (e) {
-            console.log('Error stopping recognition in onend:', e);
-          }
-          
           // Clear all event handlers
           recognitionRef.current.onresult = null;
           recognitionRef.current.onend = null;
@@ -1336,19 +1477,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       // Update UI state
       setIsListening(false);
       setIsButtonActive(false);
-      
-      // Remove all event listeners
-      const cleanupEventListeners = () => {
-        document.removeEventListener('touchend', handleVoiceButtonRelease);
-        document.removeEventListener('touchcancel', handleVoiceButtonRelease);
-        document.removeEventListener('mouseup', handleVoiceButtonRelease);
-      };
-      
-      try {
-        cleanupEventListeners();
-      } catch (e) {
-        console.error('Error cleaning up event listeners in onend:', e);
-      }
       
       // Process the voice search if we have a transcript
       if (finalTranscript && finalTranscript.trim().length > 0) {
@@ -1374,100 +1502,26 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       console.log(`Recognition successfully started for session ${searchSessionId}`);
     } catch (error) {
       console.error(`Error starting recognition for session ${searchSessionId}:`, error);
-      setIsButtonActive(false);
       setIsListening(false);
+      setIsButtonActive(false);
     }
-    
-    // Add event listeners for button release
-    document.addEventListener('touchend', (event) => handleVoiceButtonRelease(event, searchSessionId, sessionTranscript));
-    document.addEventListener('touchcancel', (event) => handleVoiceButtonRelease(event, searchSessionId, sessionTranscript));
-    document.addEventListener('mouseup', (event) => handleVoiceButtonRelease(event, searchSessionId, sessionTranscript));
   };
   
-  // Function to stop and clean up voice recognition
-  const stopAndCleanupRecognition = (sessionId) => {
-    console.log(`Stopping and cleaning up recognition for session ${sessionId}`);
+  // Manual stop recognition function (for emergency use)
+  const stopRecognition = () => {
+    if (!recognitionRef.current) return;
     
-    // Stop recognition if it's active
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-        console.log(`Recognition stopped for session ${sessionId}`);
-      } catch (error) {
-        console.error(`Error stopping recognition for session ${sessionId}:`, error);
-      }
-      
-      // Clean up the recognition instance
-      try {
-        recognitionRef.current.onresult = null;
-        recognitionRef.current.onend = null;
-        recognitionRef.current.onerror = null;
-        recognitionRef.current = null;
-      } catch (e) {
-        console.log(`Error cleaning up recognition for session ${sessionId}:`, e);
-      }
+    console.log('Manually stopping recognition');
+    
+    try {
+      recognitionRef.current.stop();
+    } catch (e) {
+      console.error('Error manually stopping recognition:', e);
     }
     
-    // Update UI state
+    // Update UI state immediately
     setIsListening(false);
     setIsButtonActive(false);
-    
-    // Remove all event listeners
-    const cleanupEventListeners = () => {
-      document.removeEventListener('touchend', handleVoiceButtonRelease);
-      document.removeEventListener('touchcancel', handleVoiceButtonRelease);
-      document.removeEventListener('mouseup', handleVoiceButtonRelease);
-    };
-    
-    // Ensure we clean up listeners even if something fails
-    try {
-      cleanupEventListeners();
-    } catch (e) {
-      console.error('Error cleaning up event listeners:', e);
-    }
-  };
-  
-  // Handle voice search button release with session ID and transcript
-  const handleVoiceButtonRelease = (e, sessionId, sessionTranscript) => {
-    if (e) e.preventDefault();
-    
-    // Only process if this is the active button press
-    if (!isButtonActive) return;
-    
-    console.log(`Button released for session ${sessionId}`);
-    setIsButtonActive(false);
-    
-    // Capture the current transcript from state as a fallback
-    const stateTranscript = voiceSearchQuery;
-    
-    // Use the session transcript if available, otherwise fall back to state
-    const finalTranscript = sessionTranscript || stateTranscript;
-    console.log(`Final transcript for session ${sessionId}:`, finalTranscript);
-    
-    // Stop and clean up recognition
-    stopAndCleanupRecognition(sessionId);
-    
-    // Remove all event listeners
-    document.removeEventListener('touchend', handleVoiceButtonRelease);
-    document.removeEventListener('touchcancel', handleVoiceButtonRelease);
-    document.removeEventListener('mouseup', handleVoiceButtonRelease);
-    
-    // Process the query
-    if (finalTranscript && finalTranscript.trim().length > 0) {
-      console.log(`Processing query for session ${sessionId}:`, finalTranscript.trim());
-      processVoiceSearch(finalTranscript.trim(), sessionId);
-    } else {
-      console.log(`No speech detected for session ${sessionId}`);
-      const emptyResults = {
-        query: "No speech detected",
-        foundMatch: false,
-        noSpeechDetected: true,
-        sessionId: sessionId,
-        timestamp: Date.now()
-      };
-      setVoiceSearchResults(emptyResults);
-      setShowVoiceSearchResults(true);
-    }
   };
   // Handle mouse events for desktop browsers
   const handleMouseDown = (e) => {
@@ -5430,7 +5484,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        aria-label={isListening ? 'Tap to stop' : 'Tap to start voice search'}
+        
         style={{
           position: 'fixed',
           left: `${buttonPosition.x}px`,
@@ -5441,7 +5495,18 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         }}
       >
         <i className={`fas ${isButtonActive ? 'fa-microphone-alt' : 'fa-microphone'}`}></i>
-        <span className="voice-button-label">{isListening ? 'Tap to stop' : 'Tap to talk'}</span>
+       
+        {isListening && (
+          <div className="voice-wave-container">
+            <div className="voice-wave">
+              <div className="voice-wave-bar"></div>
+              <div className="voice-wave-bar"></div>
+              <div className="voice-wave-bar"></div>
+              <div className="voice-wave-bar"></div>
+              <div className="voice-wave-bar"></div>
+            </div>
+          </div>
+        )}
       </button>
     </div>
   );
