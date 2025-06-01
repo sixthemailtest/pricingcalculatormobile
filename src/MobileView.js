@@ -3066,11 +3066,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     const currentTime = new Date();
     console.log(`Current time: ${currentTime.toLocaleString()}`);
     
-    // Create checkout time based on target hour but preserve the minutes from current time
+    // Create checkout time based on target hour with minutes set to 00
     const checkoutTime = new Date(currentTime);
-    const currentMinutes = currentTime.getMinutes();
-    console.log(`Preserving ${currentMinutes} minutes for checkout time`);
-    checkoutTime.setHours(targetHour, currentMinutes, 0, 0);
+    console.log(`Setting checkout time to exactly ${targetHour}:00`);
+    checkoutTime.setHours(targetHour, 0, 0, 0);
     
     // Special handling for AM hours (3 AM, 4 AM, 5 AM, etc.)
     if (explicitAM) {
@@ -3094,29 +3093,29 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     console.log(`Checkout time: ${checkoutTime.toLocaleString()}`);
     
-    // Calculate duration in hours - always count whole hours only
-    // For short stays, we count from the next whole hour to the checkout time
+    // Calculate duration in hours directly from current time to checkout time
+    // We need to count the full hours, including the partial first hour
     
-    // Calculate the next whole hour from check-in time
-    const nextWholeHour = new Date(currentTime);
-    if (currentTime.getMinutes() > 0) {
-      // If we have minutes, move to the next hour
-      nextWholeHour.setHours(currentTime.getHours() + 1, 0, 0, 0);
-      console.log(`Current time has minutes: ${currentTime.getMinutes()}, next whole hour is ${nextWholeHour.toLocaleTimeString()}`);
-    }
+    // Calculate the raw duration in milliseconds
+    const durationMs = checkoutTime - currentTime;
     
-    // Calculate hours from the next whole hour to checkout time
-    let durationHours;
-    if (currentTime.getMinutes() > 0) {
-      // If we have minutes, calculate from next whole hour
-      const wholeHourDurationMs = checkoutTime - nextWholeHour;
-      durationHours = Math.ceil(wholeHourDurationMs / (1000 * 60 * 60));
-      console.log(`Calculating ${durationHours} hours from next whole hour ${nextWholeHour.toLocaleTimeString()} to checkout ${checkoutTime.toLocaleTimeString()}`);
-    } else {
-      // If exactly on the hour, calculate normally
-      const durationMs = checkoutTime - currentTime;
-      durationHours = Math.ceil(durationMs / (1000 * 60 * 60));
-      console.log(`Calculating ${durationHours} hours from current hour ${currentTime.toLocaleTimeString()} to checkout ${checkoutTime.toLocaleTimeString()}`);
+    // Convert to hours and round up to include partial hours
+    // For short stays, we always count a partial hour as a full hour
+    const rawHours = durationMs / (1000 * 60 * 60);
+    let durationHours = Math.ceil(rawHours);
+    
+    console.log(`Raw hours calculation: ${rawHours} hours`);
+    console.log(`Rounded up to: ${durationHours} hours`);
+    console.log(`From ${currentTime.toLocaleTimeString()} to ${checkoutTime.toLocaleTimeString()}`);
+    
+    // Special case: if we're at exactly X:00 and checking out at Y:00,
+    // the hours should be Y-X (not counting the next day case)
+    if (currentTime.getMinutes() === 0 && checkoutTime.getDate() === currentTime.getDate()) {
+      const hourDiff = checkoutTime.getHours() - currentTime.getHours();
+      if (hourDiff > 0) {
+        console.log(`Exact hour difference: ${hourDiff} hours`);
+        durationHours = hourDiff;
+      }
     }
     console.log(`Duration: ${durationHours} hours`);
     
@@ -4467,30 +4466,30 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                   {/* Show single room price if multiple rooms */}
                   {voiceSearchResults.isShortStay ? (
                     <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85em' }}>
                         <span>Base Rate (4 hours{voiceSearchResults.hasJacuzzi ? ' with Jacuzzi' : ''}):</span>
                         <span>${voiceSearchResults.basePrice.toFixed(2)}</span>
                       </div>
                       {voiceSearchResults.extraHours > 0 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85em' }}>
                           <span>Extra Hours ({voiceSearchResults.extraHours} @ ${(shortStayPrices.extraHourRate.regular).toFixed(2)}/hr):</span>
                           <span>${voiceSearchResults.extraHoursCost.toFixed(2)}</span>
                         </div>
                       )}
                       
                       {/* Cash price */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.1em', marginTop: '12px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.2)', backgroundColor: 'rgba(0,255,0,0.1)', padding: '8px', borderRadius: '4px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '0.9em', marginTop: '10px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.2)', backgroundColor: 'rgba(0,255,0,0.1)', padding: '6px', borderRadius: '4px' }}>
                         <span>Cash Total:</span>
                         <span>${voiceSearchResults.cashTotal.toFixed(2)}</span>
                       </div>
                       
                       {/* Credit card price with tax */}
-                      <div style={{ marginTop: '12px', backgroundColor: 'rgba(0,0,255,0.1)', padding: '8px', borderRadius: '4px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <div style={{ marginTop: '10px', backgroundColor: 'rgba(0,0,255,0.1)', padding: '6px', borderRadius: '4px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85em' }}>
                           <span>Credit Card Tax (15%):</span>
                           <span>${voiceSearchResults.creditTax.toFixed(2)}</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.1em' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '0.9em' }}>
                           <span>Credit Card Total:</span>
                           <span>${voiceSearchResults.creditTotal.toFixed(2)}</span>
                         </div>
