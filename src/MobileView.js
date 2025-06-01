@@ -13,6 +13,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   // State for voice search
   const [isButtonActive, setIsButtonActive] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  
+  // State for draggable voice button position
+  const [buttonPosition, setButtonPosition] = useState({ x: 20, y: window.innerHeight - 100 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
   const [voiceSearchResults, setVoiceSearchResults] = useState(null);
   const [showVoiceSearchResults, setShowVoiceSearchResults] = useState(false);
@@ -300,10 +305,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       if (dayOfWeek === 5) { // Friday
         daysBreakdown.friday++;
         dayPrice = roomPrices.friday;
-      } else if (dayOfWeek === 0 || dayOfWeek === 6) { // Sunday or Saturday
+      } else if (dayOfWeek === 6) { // Saturday only
         daysBreakdown.weekend++;
         dayPrice = roomPrices.weekend;
-      } else { // Weekday
+      } else { // Weekday (including Sunday)
         daysBreakdown.weekday++;
         dayPrice = roomPrices.weekday;
       }
@@ -470,9 +475,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     if (day === 5) { // Friday
       return { regular: prices.friday.withoutJacuzzi, jacuzzi: prices.friday.withJacuzzi };
-    } else if (day === 0 || day === 6) { // Sunday or Saturday
+    } else if (day === 6) { // Saturday only
       return { regular: prices.weekend.withoutJacuzzi, jacuzzi: prices.weekend.withJacuzzi };
-    } else { // Weekday
+    } else { // Weekday (including Sunday)
       return { regular: prices.weekday.withoutJacuzzi, jacuzzi: prices.weekday.withJacuzzi };
     }
   }, [currentDateTime, prices]);
@@ -2830,10 +2835,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           if (dayOfWeek === 5) { // Friday
             dayPrice = roomPrices.friday;
             dayType = 'Friday';
-          } else if (dayOfWeek === 0 || dayOfWeek === 6) { // Sunday or Saturday
+          } else if (dayOfWeek === 6) { // Sunday or Saturday
             dayPrice = roomPrices.weekend;
             dayType = 'Weekend';
-          } else { // Weekday
+          } else { // Weekday (including Sunday)
             dayPrice = roomPrices.weekday;
             dayType = 'Weekday';
           }
@@ -2870,10 +2875,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           if (dayOfWeek === 5) { // Friday
             dayPrice = roomPrices.friday;
             dayType = 'Friday';
-          } else if (dayOfWeek === 0 || dayOfWeek === 6) { // Sunday or Saturday
+          } else if (dayOfWeek === 6) { // Saturday only (Sunday is now a weekday)
             dayPrice = roomPrices.weekend;
             dayType = 'Weekend';
-          } else { // Weekday
+          } else { // Weekday (including Sunday)
             dayPrice = roomPrices.weekday;
             dayType = 'Weekday';
           }
@@ -3311,24 +3316,77 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     }
   };
   
+  // Handle touch start for dragging
+  const handleTouchStart = (e) => {
+    const touch = e.touches[0];
+    const buttonElement = e.currentTarget;
+    const buttonRect = buttonElement.getBoundingClientRect();
+    
+    // Calculate the offset from the touch point to the button's top-left corner
+    const offsetX = touch.clientX - buttonRect.left;
+    const offsetY = touch.clientY - buttonRect.top;
+    
+    setDragOffset({ x: offsetX, y: offsetY });
+    setIsDragging(true);
+    
+    // Prevent default to avoid scrolling while dragging
+    e.preventDefault();
+  };
+  
+  // Handle touch move for dragging
+  const handleTouchMove = (e) => {
+    if (isDragging) {
+      const touch = e.touches[0];
+      
+      // Calculate new position based on touch position and drag offset
+      const newX = touch.clientX - dragOffset.x;
+      const newY = touch.clientY - dragOffset.y;
+      
+      // Apply constraints to keep button within viewport
+      const buttonWidth = 80; // Approximate width of the button
+      const buttonHeight = 80; // Approximate height of the button
+      
+      const maxX = window.innerWidth - buttonWidth;
+      const maxY = window.innerHeight - buttonHeight;
+      
+      const constrainedX = Math.max(0, Math.min(newX, maxX));
+      const constrainedY = Math.max(0, Math.min(newY, maxY));
+      
+      setButtonPosition({ x: constrainedX, y: constrainedY });
+      
+      // Prevent default to avoid scrolling while dragging
+      e.preventDefault();
+    }
+  };
+  
+  // Handle touch end for dragging
+  const handleTouchEnd = () => {
+    if (isDragging) {
+      setIsDragging(false);
+    }
+  };
+  
   // Handle voice button click
   const handleVoiceButtonClick = (e) => {
-    e.preventDefault();
-    console.log('Voice button clicked');
-    
-    // If we're already listening, stop
-    if (isListening) {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
+    // Only handle click if not dragging
+    if (!isDragging) {
+      e.preventDefault();
+      console.log('Voice button clicked');
+      
+      // If we're already listening, stop
+      if (isListening) {
+        if (recognitionRef.current) {
+          recognitionRef.current.stop();
+        }
+        setIsListening(false);
+        setIsButtonActive(false);
+        return;
       }
-      setIsListening(false);
-      setIsButtonActive(false);
-      return;
+      
+      // Start voice recognition
+      setIsButtonActive(true);
+      startImprovedVoiceRecognition();
     }
-    
-    // Start voice recognition
-    setIsButtonActive(true);
-    startImprovedVoiceRecognition();
   };
   
   // Close voice search results
@@ -4544,11 +4602,22 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         </div>
       )}
       
-      {/* Floating Voice Search Button - Changed to tap-to-start/tap-to-stop for iOS compatibility */}
+      {/* Floating Draggable Voice Search Button */}
       <button 
-        className={`voice-search-button ${isButtonActive ? 'active' : 'inactive'}`}
+        className={`voice-search-button ${isButtonActive ? 'active' : 'inactive'} ${isDragging ? 'dragging' : ''}`}
         onClick={handleVoiceButtonClick}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         aria-label={isListening ? 'Tap to stop' : 'Tap to start voice search'}
+        style={{
+          position: 'fixed',
+          left: `${buttonPosition.x}px`,
+          top: `${buttonPosition.y}px`,
+          zIndex: 1000,
+          touchAction: 'none',
+          transition: isDragging ? 'none' : 'opacity 0.3s'
+        }}
       >
         <i className={`fas ${isButtonActive ? 'fa-microphone-alt' : 'fa-microphone'}`}></i>
         <span className="voice-button-label">{isListening ? 'Tap to stop' : 'Tap to talk'}</span>
