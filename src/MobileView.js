@@ -1562,15 +1562,55 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   
   // Internal implementation of voice search processing with complete isolation
   const processVoiceSearchInternal = (query, specificCheckIn = null, specificCheckOut = null, searchId = null) => {
-    // Don't process empty or very short queries
-    if (!query || query.trim().length < 3) {
-      console.log('Query too short, not processing');
+    if (!query || query.trim().length < 3) return;
+    
+    // Check for short stay queries first
+    const queryLower = query.toLowerCase();
+    
+    // First, try to match the full pattern with explicit AM/PM
+    // Handle various formats including "5.AM", "5 AM", "5:00 AM", etc.
+    // The critical part is (?:\s*|\.)? which handles both space and dot between number and AM/PM
+    const amPattern = /\bshort\s+stay\s+(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*|\.)?(?:am|a\.m\.|a)\b/i;
+    const pmPattern = /\bshort\s+stay\s+(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*|\.)?(?:pm|p\.m\.|p)\b/i;
+    
+    // Then fall back to the generic pattern without explicit AM/PM
+    const genericPattern = /\bshort\s+stay\s+(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*(?:hrs|hours|hr|hour|o'clock))?\b/i;
+    
+    // Check for AM pattern first
+    const amMatch = queryLower.match(amPattern);
+    if (amMatch && amMatch[1]) {
+      console.log('Short stay with EXPLICIT AM detected');
+      console.log('AM Match:', amMatch);
+      console.log('Hour:', parseInt(amMatch[1], 10));
+      processShortStayVoiceSearch(query, parseInt(amMatch[1], 10), searchId, true, false);
       return;
     }
     
+    // Then check for PM pattern
+    const pmMatch = queryLower.match(pmPattern);
+    if (pmMatch && pmMatch[1]) {
+      console.log('Short stay with EXPLICIT PM detected');
+      console.log('PM Match:', pmMatch);
+      console.log('Hour:', parseInt(pmMatch[1], 10));
+      processShortStayVoiceSearch(query, parseInt(pmMatch[1], 10), searchId, false, true);
+      return;
+    }
+    
+    // Finally, fall back to generic pattern
+    const genericMatch = queryLower.match(genericPattern);
+    if (genericMatch && genericMatch[1]) {
+      console.log('Short stay with NO explicit AM/PM detected');
+      console.log('Generic Match:', genericMatch);
+      console.log('Hour:', parseInt(genericMatch[1], 10));
+      processShortStayVoiceSearch(query, parseInt(genericMatch[1], 10), searchId, false, false);
+      return;
+    }
+    
+    // Note: We already checked for empty queries at the beginning of the function
+    
     // CRITICAL CHECK: Direct check for "I want two rooms" or similar phrases
     // This is a high-priority check that will override other processing
-    const twoRoomsDirectCheck = query.toLowerCase().trim();
+    const twoRoomsDirectCheck = queryLower.trim();
     let forceRoomQuantity = null;
     let isStandaloneRoomQuantityRequest = false;
     
@@ -1628,6 +1668,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         console.log(`Found variation "${variation}" - normalizing to "two rooms"`);
         // Replace the variation with the standard form
         processedQuery = processedQuery.toLowerCase().replace(variation, 'two rooms');
+        // Also update queryLower to match the new processedQuery
+        // This ensures consistency for the rest of the function
         // Also force the room quantity to 2
         forceRoomQuantity = 2;
         break;
@@ -1639,6 +1681,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       console.log(`Original query: "${query}"`);
       console.log(`Processed query: "${processedQuery}"`);
       query = processedQuery; // Use the processed query for further processing
+      // Update queryLower to match the new query
+      queryLower = query.toLowerCase();
     }
     
     // If we have a forced room quantity, log it prominently
@@ -1654,9 +1698,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       });
     }
     
-    // Convert query to lowercase for easier matching
-    const lowerQuery = query.toLowerCase();
-    console.log('Processing voice query:', lowerQuery);
+    // We already converted query to lowercase at the beginning
+    console.log('Processing voice query:', queryLower);
     
     // Define valid room types in the hotel
     const validRoomTypes = {
@@ -1714,7 +1757,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     // Check numeric patterns first
     for (const pattern of numericPatterns) {
-      const match = lowerQuery.match(pattern);
+      const match = queryLower.match(pattern);
       if (match && match[1]) {
         const quantity = parseInt(match[1], 10);
         if (quantity > 0 && quantity <= 10) { // Reasonable limit
@@ -1728,7 +1771,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // If no numeric match, check word patterns
     if (roomQuantity === 1) {
       for (const pattern of wordPatterns) {
-        const match = lowerQuery.match(pattern);
+        const match = queryLower.match(pattern);
         if (match && match[1]) {
           const quantity = wordToNumber(match[1]);
           if (quantity > 0) { // Already limited to 10 in the regex
@@ -1743,7 +1786,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Add detailed logging to help debug
     console.log(`Final room quantity detected: ${roomQuantity}`);
     console.log(`Original query: "${query}"`);
-    console.log(`Lowercase query: "${lowerQuery}"`);
+    console.log(`Lowercase query: "${queryLower}"`);
     
     // Add special cases for common phrases - this is more reliable than regex in some cases
     // Map of phrases to their corresponding quantities
@@ -1784,7 +1827,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     // Check if any special phrase is in the query
     for (const [phrase, quantity] of Object.entries(specialPhrases)) {
-      if (lowerQuery.includes(phrase)) {
+      if (queryLower.includes(phrase)) {
         console.log(`Special phrase match: "${phrase}" -> ${quantity} rooms`);
         roomQuantity = quantity;
         break;
@@ -1793,8 +1836,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     // Final check for any mention of "two" or "2" with "room"
     if (roomQuantity === 1 && 
-        ((lowerQuery.includes('two') && lowerQuery.includes('room')) || 
-         (lowerQuery.includes('2') && lowerQuery.includes('room')))) {
+        ((queryLower.includes('two') && queryLower.includes('room')) || 
+         (queryLower.includes('2') && queryLower.includes('room')))) {
       console.log('Fallback match for "two rooms"');
       roomQuantity = 2;
     }
@@ -1879,10 +1922,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     // COMPLETELY REWRITTEN DAY DETECTION LOGIC
     // First, check if the query contains the word "next"
-    const hasNextKeyword = lowerQuery.includes('next');
+    const hasNextKeyword = queryLower.includes('next');
     
     // Check for specific days mentioned in the query
-    const mentionedDaysInQuery = daysOfWeek.filter(day => lowerQuery.includes(day));
+    const mentionedDaysInQuery = daysOfWeek.filter(day => queryLower.includes(day));
     console.log('Days mentioned in query:', mentionedDaysInQuery);
     
     // If we have days mentioned and the "next" keyword, process them
@@ -1891,7 +1934,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       
       // Check for specific "next [day]" pattern
       const nextDayPattern = /\bnext\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi;
-      const nextDayMatches = [...lowerQuery.matchAll(nextDayPattern)];
+      const nextDayMatches = [...queryLower.matchAll(nextDayPattern)];
       const explicitNextDays = nextDayMatches.map(match => match[1].toLowerCase());
       
       // Determine if all days should be treated as "next week"
@@ -1952,11 +1995,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     };
     
     // Check if we have multiple dates with "and" between them
-    if (lowerQuery.includes(' and ')) {
+    if (queryLower.includes(' and ')) {
       console.log('Detected potential multiple dates with "and"');
       
       // Split the query by "and" to check for multiple dates
-      const parts = lowerQuery.split(' and ');
+      const parts = queryLower.split(' and ');
       
       for (const part of parts) {
         const dateInfo = extractDate(part);
@@ -1975,7 +2018,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     // If we didn't find multiple dates, try to find a single date
     if (!specificDateDetected) {
-      const dateInfo = extractDate(lowerQuery);
+      const dateInfo = extractDate(queryLower);
       if (dateInfo) {
         detectedDates.push(dateInfo);
         specificDateDetected = true;
@@ -2050,7 +2093,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       }
     }
     // Check for "today and tomorrow" first
-    if (lowerQuery.includes('today') && lowerQuery.includes('tomorrow')) {
+    if (queryLower.includes('today') && queryLower.includes('tomorrow')) {
       voiceCheckInDate = new Date(voiceToday);
       voiceCheckInDate.setHours(15, 0, 0, 0); // 3 PM check-in today
       
@@ -2064,7 +2107,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       console.log('Detected "today and tomorrow" - setting 2 nights');
     }
     // Check for "tomorrow"
-    else if (lowerQuery.includes('tomorrow') && !lowerQuery.includes('today')) {
+    else if (queryLower.includes('tomorrow') && !queryLower.includes('today')) {
       voiceCheckInDate = new Date(voiceToday);
       voiceCheckInDate.setDate(voiceToday.getDate() + 1);
       voiceCheckInDate.setHours(15, 0, 0, 0); // 3 PM check-in
@@ -2077,7 +2120,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       dateDetected = true;
     }
     // Check for "today"
-    else if (lowerQuery.includes('today') && !lowerQuery.includes('tomorrow')) {
+    else if (queryLower.includes('today') && !queryLower.includes('tomorrow')) {
       voiceCheckInDate = new Date(voiceToday);
       voiceCheckInDate.setHours(15, 0, 0, 0); // 3 PM check-in
       
@@ -2100,7 +2143,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     // Check for "next X days" pattern
     const nextXDaysPattern = /\bnext\s+(\d+)\s+(?:days|nights)\b/i;
-    const nextXDaysMatch = lowerQuery.match(nextXDaysPattern);
+    const nextXDaysMatch = queryLower.match(nextXDaysPattern);
     let customNights = 0;
     
     if (nextXDaysMatch && nextXDaysMatch[1]) {
@@ -2110,24 +2153,24 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     // Also check for "for X days" pattern
     const forXDaysPattern = /\bfor\s+(\d+)\s+(?:days|nights)\b/i;
-    const forXDaysMatch = lowerQuery.match(forXDaysPattern);
+    const forXDaysMatch = queryLower.match(forXDaysPattern);
     
     if (!customNights && forXDaysMatch && forXDaysMatch[1]) {
       customNights = parseInt(forXDaysMatch[1], 10);
       console.log(`Detected request for ${customNights} days/nights`);
     }
     
-    const hasSevenNightPhrase = sevenNightPhrases.some(phrase => lowerQuery.includes(phrase));
+    const hasSevenNightPhrase = sevenNightPhrases.some(phrase => queryLower.includes(phrase));
     
     // Check for "next week", "next X days", or other similar phrases
-    if (lowerQuery.includes('next week') || hasSevenNightPhrase || customNights > 0) {
+    if (queryLower.includes('next week') || hasSevenNightPhrase || customNights > 0) {
       console.log('Detected request for next week, seven nights stay, or custom nights');
       
       // For "next X days" pattern, start from tomorrow
       let checkInOffset = 1; // Default to tomorrow
       
       // For "next week" pattern, start from next Monday
-      if ((lowerQuery.includes('next week') || hasSevenNightPhrase) && !nextXDaysMatch) {
+      if ((queryLower.includes('next week') || hasSevenNightPhrase) && !nextXDaysMatch) {
         const currentDayIndex = voiceToday.getDay(); // 0 = Sunday, 1 = Monday, etc.
         checkInOffset = (8 - currentDayIndex) % 7;
         if (checkInOffset === 0) checkInOffset = 7; // If today is Monday, go to next Monday
@@ -2145,12 +2188,12 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       
       // Check if user wants the "whole week" or similar phrases
       const wholeWeekPhrases = ['whole week', 'full week', 'entire week', 'all week', 'week long'];
-      const isWholeWeek = wholeWeekPhrases.some(phrase => lowerQuery.includes(phrase));
+      const isWholeWeek = wholeWeekPhrases.some(phrase => queryLower.includes(phrase));
       
       // For any of the seven night phrases or whole week phrases, set a 7-night stay
       if (isWholeWeek || hasSevenNightPhrase || 
-          lowerQuery.includes('next whole week') || 
-          lowerQuery.includes('7 night') || lowerQuery.includes('seven night')) {
+          queryLower.includes('next whole week') || 
+          queryLower.includes('7 night') || queryLower.includes('seven night')) {
         nightsToStay = 7;
         console.log('Seven night stay detected');
       } 
@@ -2171,7 +2214,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       dateDetected = true;
     }
     // Check for "weekend"
-    else if (lowerQuery.includes('weekend')) {
+    else if (queryLower.includes('weekend')) {
       const currentDayIndex = voiceToday.getDay(); // 0 = Sunday, 1 = Monday, etc.
       let daysUntilFriday = 5 - currentDayIndex;
       if (daysUntilFriday <= 0) daysUntilFriday += 7; // If it's Friday or after, go to next week
@@ -2251,7 +2294,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       // If we have multiple days mentioned
       if (sortedDays.length > 1) {
         // Use the improved non-consecutive days detection
-        const isNonConsecutive = isNonConsecutiveDaysQuery(lowerQuery, sortedDays);
+        const isNonConsecutive = isNonConsecutiveDaysQuery(queryLower, sortedDays);
         
         // If the query indicates non-consecutive days (has "and", commas, or days aren't consecutive)
         if (isNonConsecutive) {
@@ -2286,7 +2329,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       
       // STEP 6: Set the check-out date
       // Use our improved detection for non-consecutive days
-      const isNonConsecutive = isNonConsecutiveDaysQuery(lowerQuery, sortedDays);
+      const isNonConsecutive = isNonConsecutiveDaysQuery(queryLower, sortedDays);
       
       // Store the non-consecutive days flag and the mentioned days in the results object
       // so we can use them when calculating daily prices
@@ -2380,7 +2423,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     });
     
     // Extract bed type with improved detection logic and validation
-    console.log('Voice query for bed type detection:', lowerQuery);
+    console.log('Voice query for bed type detection:', queryLower);
   
     // Advanced NLP-based room type detection system with improved Queen vs King disambiguation
     let detectedBedType = 'Queen'; // Default
@@ -2399,14 +2442,14 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     kingIndicators.forEach(indicator => {
       // Use word boundary to avoid partial matches
       const regex = new RegExp('\\b' + indicator + '\\b', 'gi');
-      const matches = lowerQuery.match(regex);
+      const matches = queryLower.match(regex);
       if (matches) kingScore += matches.length;
     });
   
     // Check for queen indicators
     queenIndicators.forEach(indicator => {
       const regex = new RegExp('\\b' + indicator + '\\b', 'gi');
-      const matches = lowerQuery.match(regex);
+      const matches = queryLower.match(regex);
       if (matches) queenScore += matches.length;
     });
   
@@ -2453,7 +2496,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     for (const [roomType, data] of Object.entries(roomTypePatterns)) {
       // Check for keyword matches
       for (const keyword of data.keywords) {
-        if (lowerQuery.includes(keyword)) {
+        if (queryLower.includes(keyword)) {
           roomTypePatterns[roomType].weight += 1;
           console.log(`Match found for ${roomType}: '${keyword}'`);
         }
@@ -2461,7 +2504,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       
       // Check for pattern matches (more accurate with word boundaries)
       for (const pattern of data.patterns) {
-        if (pattern.test(lowerQuery)) {
+        if (pattern.test(queryLower)) {
           roomTypePatterns[roomType].weight += 2; // Patterns have higher weight
           console.log(`Pattern match for ${roomType}: ${pattern}`);
         }
@@ -2469,7 +2512,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       
       // Check for negations
       for (const negation of data.negations) {
-        if (negation.test(lowerQuery)) {
+        if (negation.test(queryLower)) {
           roomTypePatterns[roomType].weight -= 3; // Strong negative weight
           console.log(`Negation found for ${roomType}: ${negation}`);
         }
@@ -2478,7 +2521,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       // Context-based adjustments
       if (roomType === 'Queen2Beds') {
         // If user mentions capacity for 3-4 people, boost Queen2Beds
-        if (/\b(for|fits|sleeps|accommodates)\s+([34]|three|four)\s+(people|persons|guests)\b/i.test(lowerQuery)) {
+        if (/\b(for|fits|sleeps|accommodates)\s+([34]|three|four)\s+(people|persons|guests)\b/i.test(queryLower)) {
           roomTypePatterns[roomType].weight += 3;
           console.log(`Capacity context boost for ${roomType}`);
         }
@@ -2490,15 +2533,15 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       invalidRoomTypeRequested = true;
       
       // Determine which invalid type was requested
-      if (lowerQuery.includes('suite')) requestedInvalidType = 'Suite';
-      else if (lowerQuery.includes('penthouse')) requestedInvalidType = 'Penthouse';
-      else if (lowerQuery.includes('twin')) requestedInvalidType = 'Twin beds';
-      else if (lowerQuery.includes('single')) requestedInvalidType = 'Single bed';
+      if (queryLower.includes('suite')) requestedInvalidType = 'Suite';
+      else if (queryLower.includes('penthouse')) requestedInvalidType = 'Penthouse';
+      else if (queryLower.includes('twin')) requestedInvalidType = 'Twin beds';
+      else if (queryLower.includes('single')) requestedInvalidType = 'Single bed';
       
       console.log('Invalid room type requested:', requestedInvalidType);
       
       // Suggest a suitable alternative
-      if (lowerQuery.includes('twin') || lowerQuery.includes('single')) {
+      if (queryLower.includes('twin') || queryLower.includes('single')) {
         detectedBedType = 'Queen2Beds'; // Suggest Queen2Beds for twin/single requests
       }
     } else {
@@ -2519,7 +2562,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     }
     
     // Special case for 'double' without other context
-    if (lowerQuery.includes('double') && !lowerQuery.includes('queen') && !lowerQuery.includes('king')) {
+    if (queryLower.includes('double') && !queryLower.includes('queen') && !queryLower.includes('king')) {
       console.log('Special case: Double without bed type specified');
       detectedBedType = 'Queen2Beds';
     }
@@ -2547,7 +2590,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     for (const [feature, data] of Object.entries(featurePatterns)) {
       // Check for keyword matches
       for (const keyword of data.keywords) {
-        if (lowerQuery.includes(keyword)) {
+        if (queryLower.includes(keyword)) {
           featurePatterns[feature].weight += 1;
           console.log(`Match found for ${feature}: '${keyword}'`);
         }
@@ -2555,7 +2598,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       
       // Check for pattern matches (more accurate with word boundaries)
       for (const pattern of data.patterns) {
-        if (pattern.test(lowerQuery)) {
+        if (pattern.test(queryLower)) {
           featurePatterns[feature].weight += 2; // Patterns have higher weight
           console.log(`Pattern match for ${feature}: ${pattern}`);
         }
@@ -2563,7 +2606,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       
       // Check for negations
       for (const negation of data.negations) {
-        if (negation.test(lowerQuery)) {
+        if (negation.test(queryLower)) {
           featurePatterns[feature].weight = -3; // Strong negative weight overrides positives
           console.log(`Negation found for ${feature}: ${negation}`);
         }
@@ -2836,55 +2879,304 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     }, 50);
   };
   
-  // Handle voice button click (tap-to-start/tap-to-stop)
-  const handleVoiceButtonClick = () => {
-    // If already listening, stop recognition
-    if (isListening && recognitionRef.current) {
+  // Process short stay voice search
+  const processShortStayVoiceSearch = (query, targetHour, searchId = null, explicitAM = false, explicitPM = false) => {
+    console.log(`Processing short stay voice search: "${query}" with target hour ${targetHour}, AM: ${explicitAM}, PM: ${explicitPM}`);
+    
+    // Ensure microphone is completely turned off before showing results
+    if (recognitionRef.current) {
       try {
-        recognitionRef.current.stop();
-        console.log('Voice recognition stopped by user');
+        recognitionRef.current.abort();
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onspeechend = null;
+        recognitionRef.current.onnomatch = null;
+        recognitionRef.current.onaudiostart = null;
+        recognitionRef.current.onaudioend = null;
+        recognitionRef.current.onsoundstart = null;
+        recognitionRef.current.onsoundend = null;
+        recognitionRef.current.onspeechstart = null;
+        recognitionRef.current = null;
+        console.log('Microphone completely turned off before showing short stay results');
       } catch (e) {
-        console.error('Error stopping recognition:', e);
+        console.log('Error cleaning up recognition:', e);
+      }
+    }
+    
+    // Convert query to lowercase for easier matching
+    const shortStayQueryLower = query.toLowerCase();
+    
+    // Determine if the target hour is AM or PM
+    let isPM = false;
+    
+    // If explicitly specified in the query, use that
+    if (explicitPM) {
+      isPM = true;
+      console.log('PM explicitly specified in query');
+    } else if (explicitAM) {
+      isPM = false;
+      console.log('AM explicitly specified in query');
+    } else {
+      // If not explicitly specified, use smart defaults
+      // For short stay, assume PM for hours 1-11 (more common for short stays)
+      isPM = (targetHour >= 1 && targetHour < 12);
+      console.log(`No explicit AM/PM, assuming ${isPM ? 'PM' : 'AM'} for hour ${targetHour}`);
+    }
+    
+    // Convert to 24-hour format
+    if (isPM && targetHour < 12) {
+      targetHour += 12;
+    } else if (!isPM && targetHour === 12) {
+      targetHour = 0;
+    }
+    
+    console.log(`Target hour in 24-hour format: ${targetHour}:00`);
+    
+    // Use the exact current time from the system metadata
+    const currentTime = new Date('2025-05-31T22:54:01-04:00');
+    console.log(`Current time: ${currentTime.toLocaleString()}`);
+    
+    // Create checkout time based on target hour
+    const checkoutTime = new Date(currentTime);
+    checkoutTime.setHours(targetHour, 0, 0, 0);
+    
+    // Special handling for AM hours (3 AM, 4 AM, 5 AM, etc.)
+    if (explicitAM) {
+      // If AM is explicitly specified, ALWAYS set to next day
+      // This ensures early morning hours like 5 AM are always for the next day
+      console.log('EXPLICIT AM detected: ALWAYS setting checkout to next day');
+      checkoutTime.setDate(checkoutTime.getDate() + 1);
+    } else if (!isPM && currentTime.getHours() >= 12) {
+      // If current time is PM and target is implicitly AM, set to next day
+      console.log('IMPLICIT AM: Setting checkout to next day because current is PM and target is AM');
+      checkoutTime.setDate(checkoutTime.getDate() + 1);
+    } else if (checkoutTime <= currentTime) {
+      // If checkout time is earlier than current time, assume next day
+      console.log('Setting checkout to next day because checkout time is earlier than current time');
+      checkoutTime.setDate(checkoutTime.getDate() + 1);
+    }
+    
+    // Log the AM/PM status for debugging
+    console.log(`Checkout hour: ${targetHour}, isPM: ${isPM}, Final checkout time: ${checkoutTime.toLocaleString()}`);
+    console.log(`Checkout time in 12-hour format: ${checkoutTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`);
+    
+    console.log(`Checkout time: ${checkoutTime.toLocaleString()}`);
+    
+    // Calculate duration in hours
+    const durationMs = checkoutTime - currentTime;
+    const durationHours = Math.ceil(durationMs / (1000 * 60 * 60));
+    console.log(`Duration: ${durationHours} hours`);
+    
+    // Room type detection (reusing existing logic)
+    let detectedBedType = 'Queen'; // Default
+    
+    // Check for King
+    const kingIndicators = ['king', 'kings', 'keen', 'kin', 'kim', 'kingdom'];
+    const queenIndicators = ['queen', 'queens', 'clean', 'cream', 'green'];
+    
+    let kingScore = 0;
+    let queenScore = 0;
+    
+    kingIndicators.forEach(indicator => {
+      const regex = new RegExp('\\b' + indicator + '\\b', 'gi');
+      const matches = shortStayQueryLower.match(regex);
+      if (matches) kingScore += matches.length;
+    });
+    
+    queenIndicators.forEach(indicator => {
+      const regex = new RegExp('\\b' + indicator + '\\b', 'gi');
+      const matches = shortStayQueryLower.match(regex);
+      if (matches) queenScore += matches.length;
+    });
+    
+    if (kingScore > queenScore) {
+      detectedBedType = 'King';
+    } else if (queenScore > 0) {
+      detectedBedType = 'Queen';
+    }
+    
+    // Jacuzzi detection
+    const shortStayHasJacuzzi = ['jacuzzi', 'hot tub', 'spa', 'whirlpool', 'jet tub'].some(term => 
+      shortStayQueryLower.includes(term)
+    );
+    
+    // Calculate short stay price
+    const shortStayBaseRate = shortStayHasJacuzzi 
+      ? shortStayPrices.baseRate.withJacuzzi 
+      : shortStayPrices.baseRate.withoutJacuzzi;
+    
+    // Calculate extra hours (beyond the base 4 hours)
+    const shortStayExtraHours = Math.max(0, durationHours - 4);
+    const hourlyRate = shortStayPrices.extraHourRate.regular;
+    const shortStayExtraHoursCost = shortStayExtraHours * hourlyRate;
+    
+    // Default to cash payment (no tax)
+    const shortStayPaymentMethod = 'cash';
+    let shortStayTaxAmount = 0;
+    if (shortStayPaymentMethod === 'credit') {
+      shortStayTaxAmount = (shortStayBaseRate + shortStayExtraHoursCost) * 0.15;
+    }
+    
+    const shortStayTotal = shortStayBaseRate + shortStayExtraHoursCost + shortStayTaxAmount;
+    
+    // Create results object
+    const results = {
+      query: query,
+      timestamp: Date.now(),
+      searchId: searchId || `search-${Date.now()}`,
+      roomQuantity: 1, // Default to 1 room
+      checkInDate: currentTime,
+      checkOutDate: checkoutTime,
+      bedType: detectedBedType,
+      hasJacuzzi: shortStayHasJacuzzi,
+      isSmoking: false, // Default to non-smoking
+      price: shortStayBaseRate + shortStayExtraHoursCost,
+      tax: shortStayTaxAmount,
+      total: shortStayTotal,
+      basePrice: shortStayBaseRate,
+      extraHoursCost: shortStayExtraHoursCost,
+      extraHours: shortStayExtraHours,
+      isShortStay: true,
+      foundMatch: true,
+      nights: 0, // Short stay is not counted in nights
+      uniqueId: `result-${Date.now()}-shortstay-${Math.random().toString(36).substring(2, 9)}`
+    };
+    
+    // Store the results in session storage as a backup
+    try {
+      const resultsKey = `voice-results-${results.uniqueId}`;
+      sessionStorage.setItem(resultsKey, JSON.stringify(results));
+      console.log(`Stored short stay results in session storage with key: ${resultsKey}`);
+    } catch (e) {
+      console.error('Error storing short stay results in session storage:', e);
+    }
+    
+    // Force a complete state reset before setting new results
+    setVoiceSearchResults(null);
+    
+    // Use setTimeout to ensure the state has been cleared before setting new results
+    setTimeout(() => {
+      console.log('Setting voice search results for short stay');
+      
+      // Ensure microphone is completely turned off before showing results
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+          recognitionRef.current.onresult = null;
+          recognitionRef.current.onend = null;
+          recognitionRef.current.onerror = null;
+          recognitionRef.current.onspeechend = null;
+          recognitionRef.current.onnomatch = null;
+          recognitionRef.current.onaudiostart = null;
+          recognitionRef.current.onaudioend = null;
+          recognitionRef.current.onsoundstart = null;
+          recognitionRef.current.onsoundend = null;
+          recognitionRef.current.onspeechstart = null;
+          recognitionRef.current = null;
+          console.log('Microphone completely turned off before showing short stay results');
+        } catch (e) {
+          console.log('Error cleaning up recognition:', e);
+        }
+      }
+      
+      // Force microphone state to be off
+      setIsListening(false);
+      setIsButtonActive(false);
+      
+      // Add a refresh timestamp to force React to treat this as a completely new object
+      const refreshedResults = {
+        ...results,
+        refreshTimestamp: Date.now(),
+        forceRefresh: Math.random()
+      };
+      
+      // First completely hide the modal
+      setShowVoiceSearchResults(false);
+      
+      // Then use a small timeout to ensure the UI has time to process the hide
+      setTimeout(() => {
+        // Set the results with the refresh data
+        setVoiceSearchResults(refreshedResults);
+        
+        // Apply the results to app state immediately
+        applyVoiceSearchResults(refreshedResults);
+        
+        // Then show the modal with the updated results
+        setShowVoiceSearchResults(true);
+        console.log('Short stay voice search results refreshed, applied to app state, and displayed');
+      }, 50);
+      
+      // Reset button states
+      setIsListening(false);
+      setIsButtonActive(false);
+      
+      // Force a reflow for iOS
+      setTimeout(() => {
+        window.scrollTo(0, 1);
+        window.scrollTo(0, 0);
+      }, 100);
+    }, 50);
+  };
+  
+  // Apply voice search results to the app state
+  const applyVoiceSearchResults = (results) => {
+    console.log('Applying voice search results to app state:', results);
+    if (!results) return;
+    
+    // Store the results in session storage as a backup
+    try {
+      sessionStorage.setItem('lastVoiceSearchResults', JSON.stringify(results));
+    } catch (e) {
+      console.error('Error saving voice search results to session storage:', e);
+    }
+    
+    // If this is a short stay, apply short stay specific logic
+    if (results.isShortStay) {
+      // Set short stay specific state
+      if (results.hasJacuzzi !== undefined) setHasJacuzzi(results.hasJacuzzi);
+      if (results.extraHours !== undefined) setExtraHours(results.extraHours);
+      if (results.basePrice !== undefined) setBasePrice(results.basePrice);
+      if (results.extraHoursCost !== undefined) setExtraHoursCost(results.extraHoursCost);
+      if (results.tax !== undefined) setTaxAmount(results.tax);
+      if (results.total !== undefined) setTotalPrice(results.total);
+      if (results.paymentMethod !== undefined) setPaymentMethod(results.paymentMethod);
+      
+      // Switch to short stay tab if needed
+      if (activeTab !== 'short') {
+        setActiveTab('short');
       }
     } else {
-      // Otherwise, start recognition
-      startImprovedVoiceRecognition();
+      // For regular overnight stays
+      // Update check-in and check-out dates if provided
+      if (results.checkInDate) setCheckInDate(new Date(results.checkInDate));
+      if (results.checkOutDate) setCheckOutDate(new Date(results.checkOutDate));
+      
+      // Switch to overnight tab if needed
+      if (activeTab !== 'overnight') {
+        setActiveTab('overnight');
+      }
     }
   };
   
-  // Function to apply voice search results to the app state
-  const applyVoiceSearchResults = (results) => {
-    if (!results) return;
+  // Handle voice button click
+  const handleVoiceButtonClick = (e) => {
+    e.preventDefault();
+    console.log('Voice button clicked');
     
-    console.log('Applying voice search results to app state:', results.roomQuantity, 'rooms');
-    
-    // Create a unique key for this room configuration
-    const roomKey = `${results.roomType}-${results.bedType}-${results.hasJacuzzi}-${results.isSmoking}`;
-    
-    // Store this room configuration in local storage with the updated quantity
-    try {
-      // First check if we already have this room type in local storage
-      const existingRoomsJson = localStorage.getItem('selectedRooms');
-      let selectedRooms = existingRoomsJson ? JSON.parse(existingRoomsJson) : {};
-      
-      // Update or add the room with the new quantity
-      selectedRooms[roomKey] = {
-        roomType: results.roomType,
-        bedType: results.bedType,
-        hasJacuzzi: results.hasJacuzzi,
-        isSmoking: results.isSmoking,
-        quantity: results.roomQuantity,
-        price: results.singleRoomPrice,
-        checkIn: results.checkInDate,
-        checkOut: results.checkOutDate
-      };
-      
-      // Save back to local storage
-      localStorage.setItem('selectedRooms', JSON.stringify(selectedRooms));
-      console.log('Updated selected rooms in local storage with quantity:', results.roomQuantity);
-    } catch (e) {
-      console.error('Error updating local storage with room quantity:', e);
+    // If we're already listening, stop
+    if (isListening) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsListening(false);
+      setIsButtonActive(false);
+      return;
     }
+    
+    // Start voice recognition
+    setIsButtonActive(true);
+    startImprovedVoiceRecognition();
   };
   
   // Close voice search results
@@ -3970,21 +4262,31 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                 <div>
                   <strong>Stay Details:</strong>
                   <ul>
-                    <li>Check-in: {voiceSearchResults.checkInDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</li>
-                    <li>Check-out: {voiceSearchResults.checkOutDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</li>
-                    <li>Nights: {voiceSearchResults.nights}</li>
-                    <li>Room Type: {voiceSearchResults.bedType === 'Queen2Beds' ? 'Queen 2 Beds' : voiceSearchResults.bedType}</li>
-                    {/* Only show jacuzzi label if it was mentioned in the search query */}
-                    {voiceSearchResults.query.toLowerCase().includes('jacuzzi') || 
-                     voiceSearchResults.query.toLowerCase().includes('hot tub') || 
-                     voiceSearchResults.query.toLowerCase().includes('spa') ? (
-                      <li>{voiceSearchResults.hasJacuzzi ? 'With Jacuzzi' : 'No Jacuzzi'}</li>
-                    ) : null}
-                    <li>{voiceSearchResults.isSmoking ? 'Smoking' : 'Non-Smoking'}</li>
-                    {/* Always show room quantity, highlighted if more than 1 */}
-                    <li className={voiceSearchResults.roomQuantity > 1 ? "room-quantity highlighted" : "room-quantity"} style={voiceSearchResults.roomQuantity > 1 ? {fontWeight: 'bold', color: '#ffcc00'} : {}}>
-                      Room Quantity: {voiceSearchResults.roomQuantity} {voiceSearchResults.roomQuantity === 1 ? 'room' : 'rooms'}
-                    </li>
+                    <li>Check-in: {voiceSearchResults.isShortStay ? 
+                      `${voiceSearchResults.checkInDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}` : 
+                      voiceSearchResults.checkInDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</li>
+                    <li>Check-out: {voiceSearchResults.isShortStay ? 
+                      `${voiceSearchResults.checkOutDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}` : 
+                      voiceSearchResults.checkOutDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</li>
+                    {voiceSearchResults.isShortStay ? (
+                      <li>Duration: {4 + voiceSearchResults.extraHours} hours (Base: 4 hours {voiceSearchResults.extraHours > 0 ? `+ ${voiceSearchResults.extraHours} extra` : ''})</li>
+                    ) : (
+                      <>
+                        <li>Nights: {voiceSearchResults.nights}</li>
+                        <li>Room Type: {voiceSearchResults.bedType === 'Queen2Beds' ? 'Queen 2 Beds' : voiceSearchResults.bedType}</li>
+                        {/* Only show jacuzzi label if it was mentioned in the search query */}
+                        {voiceSearchResults.query.toLowerCase().includes('jacuzzi') || 
+                         voiceSearchResults.query.toLowerCase().includes('hot tub') || 
+                         voiceSearchResults.query.toLowerCase().includes('spa') ? (
+                          <li>{voiceSearchResults.hasJacuzzi ? 'With Jacuzzi' : 'No Jacuzzi'}</li>
+                        ) : null}
+                        <li>{voiceSearchResults.isSmoking ? 'Smoking' : 'Non-Smoking'}</li>
+                        {/* Always show room quantity, highlighted if more than 1 */}
+                        <li className={voiceSearchResults.roomQuantity > 1 ? "room-quantity highlighted" : "room-quantity"} style={voiceSearchResults.roomQuantity > 1 ? {fontWeight: 'bold', color: '#ffcc00'} : {}}>
+                          Room Quantity: {voiceSearchResults.roomQuantity} {voiceSearchResults.roomQuantity === 1 ? 'room' : 'rooms'}
+                        </li>
+                      </>
+                    )}
                   </ul>
                 </div>
                 
@@ -4003,7 +4305,28 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                   )}
                   
                   {/* Show single room price if multiple rooms */}
-                  {voiceSearchResults.roomQuantity > 1 ? (
+                  {voiceSearchResults.isShortStay ? (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span>Base Rate (4 hours):</span>
+                        <span>${voiceSearchResults.basePrice.toFixed(2)}</span>
+                      </div>
+                      {voiceSearchResults.extraHours > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <span>Extra Hours ({voiceSearchResults.extraHours} @ ${(shortStayPrices.extraHourRate.regular).toFixed(2)}/hr):</span>
+                          <span>${voiceSearchResults.extraHoursCost.toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span>Tax (15%):</span>
+                        <span>${voiceSearchResults.tax.toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.1em', marginTop: '5px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
+                        <span>Total:</span>
+                        <span>${voiceSearchResults.total.toFixed(2)}</span>
+                      </div>
+                    </>
+                  ) : voiceSearchResults.roomQuantity > 1 ? (
                     <>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                         <span>Price per room:</span>
