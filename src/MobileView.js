@@ -874,7 +874,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     // Set up silence detection
     let silenceTimer = null;
-    const silenceTimeout = 2000; // 2 seconds of silence will auto-stop
+    const silenceTimeout = 3500; // 3.5 seconds of silence will auto-stop
     
     // Function to reset silence timer
     const resetSilenceTimer = () => {
@@ -1383,7 +1383,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     // Set up silence detection
     let silenceTimer = null;
-    const silenceTimeout = 2000; // 2 seconds of silence will auto-stop
+    const silenceTimeout = 3500; // 3.5 seconds of silence will auto-stop
   
     // Function to reset silence timer
     const resetSilenceTimer = () => {
