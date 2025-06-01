@@ -2933,8 +2933,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     console.log(`Target hour in 24-hour format: ${targetHour}:00`);
     
-    // Use the exact current time from the system metadata
-    const currentTime = new Date('2025-05-31T23:14:59-04:00');
+    // Always use the actual current time when the function is called
+    const currentTime = new Date();
     console.log(`Current time: ${currentTime.toLocaleString()}`);
     
     // Create checkout time based on target hour
