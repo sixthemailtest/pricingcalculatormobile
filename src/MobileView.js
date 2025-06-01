@@ -2934,7 +2934,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     console.log(`Target hour in 24-hour format: ${targetHour}:00`);
     
     // Use the exact current time from the system metadata
-    const currentTime = new Date('2025-05-31T22:54:01-04:00');
+    const currentTime = new Date('2025-05-31T23:14:59-04:00');
     console.log(`Current time: ${currentTime.toLocaleString()}`);
     
     // Create checkout time based on target hour
@@ -3011,14 +3011,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     const hourlyRate = shortStayPrices.extraHourRate.regular;
     const shortStayExtraHoursCost = shortStayExtraHours * hourlyRate;
     
-    // Default to cash payment (no tax)
-    const shortStayPaymentMethod = 'cash';
-    let shortStayTaxAmount = 0;
-    if (shortStayPaymentMethod === 'credit') {
-      shortStayTaxAmount = (shortStayBaseRate + shortStayExtraHoursCost) * 0.15;
-    }
+    // Calculate both cash and credit card prices
+    // For cash - no tax
+    const shortStayCashTotal = shortStayBaseRate + shortStayExtraHoursCost;
     
-    const shortStayTotal = shortStayBaseRate + shortStayExtraHoursCost + shortStayTaxAmount;
+    // For credit card - 15% tax
+    const shortStayCreditTaxAmount = (shortStayBaseRate + shortStayExtraHoursCost) * 0.15;
+    const shortStayCreditTotal = shortStayBaseRate + shortStayExtraHoursCost + shortStayCreditTaxAmount;
     
     // Create results object
     const results = {
@@ -3031,11 +3030,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       bedType: detectedBedType,
       hasJacuzzi: shortStayHasJacuzzi,
       isSmoking: false, // Default to non-smoking
-      price: shortStayBaseRate + shortStayExtraHoursCost,
-      tax: shortStayTaxAmount,
-      total: shortStayTotal,
       basePrice: shortStayBaseRate,
       extraHoursCost: shortStayExtraHoursCost,
+      cashTotal: shortStayCashTotal,
+      creditTax: shortStayCreditTaxAmount,
+      creditTotal: shortStayCreditTotal,
       extraHours: shortStayExtraHours,
       isShortStay: true,
       foundMatch: true,
@@ -4317,13 +4316,23 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                           <span>${voiceSearchResults.extraHoursCost.toFixed(2)}</span>
                         </div>
                       )}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <span>Tax (15%):</span>
-                        <span>${voiceSearchResults.tax.toFixed(2)}</span>
+                      
+                      {/* Cash price */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.1em', marginTop: '12px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.2)', backgroundColor: 'rgba(0,255,0,0.1)', padding: '8px', borderRadius: '4px' }}>
+                        <span>Cash Total:</span>
+                        <span>${voiceSearchResults.cashTotal.toFixed(2)}</span>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.1em', marginTop: '5px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
-                        <span>Total:</span>
-                        <span>${voiceSearchResults.total.toFixed(2)}</span>
+                      
+                      {/* Credit card price with tax */}
+                      <div style={{ marginTop: '12px', backgroundColor: 'rgba(0,0,255,0.1)', padding: '8px', borderRadius: '4px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <span>Credit Card Tax (15%):</span>
+                          <span>${voiceSearchResults.creditTax.toFixed(2)}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '1.1em' }}>
+                          <span>Credit Card Total:</span>
+                          <span>${voiceSearchResults.creditTotal.toFixed(2)}</span>
+                        </div>
                       </div>
                     </>
                   ) : voiceSearchResults.roomQuantity > 1 ? (
