@@ -825,7 +825,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     }
   };
   
-  // Improved voice recognition with auto-stop and wave animation
+  // Smart voice recognition with auto-stop and better silence detection
   const startImprovedVoiceRecognition = () => {
     // Check if speech recognition is supported
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -845,12 +845,14 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     setIsListening(true);
     setVoiceSearchQuery('');
     
-    // Check if we need to use iOS special handling
+    // Use device-specific settings
     const useIOSMode = isIOSSafari;
     
-    // Track if we've received a final result
+    // Track state and results
     let finalResultReceived = false;
     let processingTimeout = null;
+    let speechDetected = false;
+    let lastActivity = Date.now();
     
     // Clean up any existing recognition instance
     if (recognitionRef.current) {
@@ -874,147 +876,141 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     // Configure recognition settings
     recognition.lang = 'en-US';
-    recognition.continuous = false;
+    recognition.continuous = true; // Keep listening until extended silence
     
-    // Different settings for iOS Safari vs other browsers
+    // Configure device-specific settings
     if (useIOSMode) {
-      // iOS Safari works better with interim results
-      recognition.interimResults = true;
-      recognition.maxAlternatives = 5; // Get more alternatives for better accuracy
-      console.log('Using iOS-optimized recognition settings');
+      // iOS Safari settings
+      recognition.interimResults = true; // Get interim results
+      recognition.maxAlternatives = 3;  // Get multiple alternatives for better accuracy
     } else {
-      recognition.interimResults = false;
+      recognition.interimResults = true; // Also use interim results for other browsers for smoother experience
       recognition.maxAlternatives = 1;
     }
     
-    console.log('Starting improved voice recognition...', useIOSMode ? 'with iOS optimizations' : 'standard mode');
+    console.log('Starting smarter voice recognition...');
     
-    // Save last interim result for iOS
+    // Store transcript information
+    let allTranscripts = [];
     let lastInterimResult = '';
+    let lastFinalResult = '';
+    let significantPauseDetected = false;
     
-    // Set up silence detection - less aggressive for iOS
+    // Set up silence detection with longer timeouts for better user experience
     let silenceTimer = null;
-    const silenceTimeout = useIOSMode ? 7000 : 5000; // longer timeout for iOS
+    const initialSilenceTimeout = useIOSMode ? 10000 : 8000; // Longer timeout initially
+    const activeSilenceTimeout = 3000; // Shorter timeout once speech has been detected
     
-    // Function to reset silence timer
+    // Function to reset silence timer with dynamic timeouts
     const resetSilenceTimer = () => {
       if (silenceTimer) clearTimeout(silenceTimer);
+      
+      // Use a longer timeout before any speech is detected,
+      // and a shorter one once the user has started speaking
+      const timeoutDuration = speechDetected ? activeSilenceTimeout : initialSilenceTimeout;
+      
       silenceTimer = setTimeout(() => {
-        console.log('Silence detected, auto-stopping recognition');
-        if (recognitionRef.current) {
-          try {
-            recognitionRef.current.stop();
-          } catch (e) {
-            console.log('Error stopping recognition on silence:', e);
+        // Check how long it's been since last activity
+        const timeSinceActivity = Date.now() - lastActivity;
+        
+        if (timeSinceActivity > activeSilenceTimeout) {
+          console.log(`Silence detected for ${timeSinceActivity}ms, stopping recognition`);
+          significantPauseDetected = true;
+          
+          // Only stop if we have some content
+          if (lastInterimResult.trim().length > 0 || lastFinalResult.trim().length > 0) {
+            if (recognitionRef.current) {
+              try {
+                recognitionRef.current.stop();
+                console.log('Recognition stopped after significant pause');
+              } catch (e) {
+                console.log('Error stopping recognition on silence:', e);
+              }
+            }
+          } else {
+            // Reset timer to give more time if nothing has been said yet
+            lastActivity = Date.now();
+            resetSilenceTimer();
           }
         }
-      }, silenceTimeout);
+      }, timeoutDuration);
     };
     
     // Set up speech event handlers
     recognition.onspeechstart = () => {
-      console.log('Speech started, resetting silence timer');
+      console.log('Speech detected, tracking activity');
+      speechDetected = true;
+      lastActivity = Date.now();
       resetSilenceTimer();
     };
     
     recognition.onspeechend = () => {
-      console.log('Speech ended, waiting for silence timeout');
-      // Don't immediately stop - give time for final results
+      console.log('Speech ended');
+      // Don't immediately stop, wait for silence timeout
+    };
+    
+    recognition.onaudiostart = () => {
+      console.log('Audio capturing started');
+    };
+    
+    recognition.onaudioend = () => {
+      console.log('Audio capturing ended');
+    };
+    
+    recognition.onsoundstart = () => {
+      console.log('Sound detected');
+      lastActivity = Date.now();
+    };
+    
+    recognition.onsoundend = () => {
+      console.log('Sound ended');
     };
     
     recognition.onresult = (event) => {
-      // Reset silence timer when we get results
+      // Update last activity timestamp and reset silence detection
+      lastActivity = Date.now();
       resetSilenceTimer();
       
+      // Extract transcript
       let transcript = '';
       let isFinal = false;
       
-      // Handle interim and final results differently
-      if (useIOSMode) {
-        // For iOS Safari, we need to handle interim results
-        const results = event.results;
-        for (let i = event.resultIndex; i < results.length; i++) {
-          transcript = results[i][0].transcript;
-          isFinal = results[i].isFinal;
-          
-          if (isFinal) {
-            console.log('Final iOS result:', transcript);
-            finalResultReceived = true;
-            break;
-          } else {
-            // Keep track of the latest interim result
-            lastInterimResult = transcript;
-            console.log('Interim iOS result:', transcript);
-          }
-        }
+      // Process results
+      const results = event.results;
+      for (let i = event.resultIndex; i < results.length; i++) {
+        transcript = results[i][0].transcript;
+        isFinal = results[i].isFinal;
         
-        // If we didn't get a final result but have an interim one, use that
-        if (!isFinal && lastInterimResult) {
-          transcript = lastInterimResult;
-          console.log('Using last interim result:', transcript);
+        if (isFinal) {
+          console.log('Final result:', transcript);
+          finalResultReceived = true;
+          lastFinalResult = transcript;
+          allTranscripts.push({ text: transcript, isFinal: true });
+          break;
+        } else {
+          lastInterimResult = transcript;
+          console.log('Interim result:', transcript);
         }
-      } else {
-        // Standard handling for other browsers
-        transcript = event.results[0][0].transcript;
-        isFinal = true;
-        finalResultReceived = true;
-        console.log('Complete voice transcript:', transcript);
       }
       
-      // Update the transcript in state
-      setVoiceSearchQuery(transcript);
+      // Decide which transcript to use
+      let bestTranscript = lastFinalResult || lastInterimResult;
       
-      // Only process if we have a meaningful transcript
-      if (transcript.trim().length > 0) {
-        // Clear any existing timeout to prevent multiple processing
+      // Update the UI
+      if (bestTranscript.trim().length > 0) {
+        setVoiceSearchQuery(bestTranscript);
+        
+        // Clear any existing timeout
         if (processingTimeout) {
           clearTimeout(processingTimeout);
         }
-        
-        // Pre-process the transcript to fix common misrecognitions
-        let processedTranscript = transcript;
-        
-        // Fix "Queen" vs "King" confusion
-        const lowerTranscript = transcript.toLowerCase();
-        
-        // Look for clear indicators of "King" bed
-        if (lowerTranscript.includes('king') || 
-            lowerTranscript.includes('keen') || 
-            lowerTranscript.includes('kin')) {
-          // Check if there are strong indicators this is actually a King bed
-          if (!lowerTranscript.includes('queen') || 
-              lowerTranscript.indexOf('king') < lowerTranscript.indexOf('queen')) {
-            // Replace with clear "King" for processing
-            processedTranscript = transcript.replace(/\b(king|keen|kin)\b/gi, 'King');
-            console.log('Detected King bed, processed transcript:', processedTranscript);
-          }
-        }
-        
-        // For iOS, process immediately if it's a final result
-        // For other browsers or interim results, add a small delay
-        const processingDelay = (useIOSMode && isFinal) ? 100 : 600;
-        
-        processingTimeout = setTimeout(() => {
-          // Process the enhanced transcript
-          processVoiceSearch(processedTranscript);
-          
-          // Automatically stop the recognition after processing
-          try {
-            if (recognitionRef.current) {
-              recognitionRef.current.stop();
-              console.log('Voice recognition automatically stopped after processing');
-            }
-          } catch (e) {
-            console.error('Error stopping recognition after processing:', e);
-          }
-        }, processingDelay);
       }
     };
     
     recognition.onend = () => {
       console.log('Voice recognition ended');
       
-      // Clear silence timer if it exists
+      // Clear silence timer
       if (silenceTimer) {
         clearTimeout(silenceTimer);
         silenceTimer = null;
@@ -1024,21 +1020,36 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       setIsListening(false);
       setIsButtonActive(false);
       
-      // For iOS Safari, we might have an interim result that was never finalized
-      if (useIOSMode && !finalResultReceived && lastInterimResult && lastInterimResult.trim().length > 0) {
-        console.log('Using last interim result as final:', lastInterimResult);
-        processVoiceSearch(lastInterimResult);
+      // Get best available transcript
+      const bestTranscript = lastFinalResult || lastInterimResult;
+      
+      // Process results if we have a meaningful transcript
+      if (bestTranscript.trim().length > 0) {
+        // Pre-process the transcript
+        let processedTranscript = bestTranscript;
+        
+        // Fix "Queen" vs "King" confusion
+        const lowerTranscript = bestTranscript.toLowerCase();
+        if (lowerTranscript.includes('king') || 
+            lowerTranscript.includes('keen') || 
+            lowerTranscript.includes('kin')) {
+          if (!lowerTranscript.includes('queen') || 
+              lowerTranscript.indexOf('king') < lowerTranscript.indexOf('queen')) {
+            processedTranscript = bestTranscript.replace(/\b(king|keen|kin)\b/gi, 'King');
+          }
+        }
+        
+        console.log('Processing final transcript:', processedTranscript);
+        processVoiceSearch(processedTranscript);
         finalResultReceived = true;
       }
-      
-      // If we still didn't receive any usable results, show a helpful message
-      if (!finalResultReceived) {
-        console.log('No speech detected in onend handler');
+      // If we didn't get any usable results
+      else if (!finalResultReceived) {
+        console.log('No speech detected');
         const emptyResults = {
           query: "No speech detected",
           foundMatch: false,
           noSpeechDetected: true,
-          isIOSSafari: useIOSMode,
           sessionId: `voice-search-${Date.now()}`,
           timestamp: Date.now()
         };
@@ -1046,7 +1057,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         setShowVoiceSearchResults(true);
       }
       
-      // Make sure we fully clean up the recognition instance
+      // Clean up recognition instance
       if (recognitionRef.current) {
         try {
           recognitionRef.current.onresult = null;
@@ -1054,6 +1065,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           recognitionRef.current.onerror = null;
           recognitionRef.current.onspeechstart = null;
           recognitionRef.current.onspeechend = null;
+          recognitionRef.current.onaudiostart = null;
+          recognitionRef.current.onaudioend = null;
+          recognitionRef.current.onsoundstart = null;
+          recognitionRef.current.onsoundend = null;
           recognitionRef.current = null;
         } catch (e) {
           console.log('Error in final cleanup:', e);
@@ -1068,7 +1083,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       if (event.error === 'not-allowed') {
         console.log('Microphone permission not granted');
       } else if (event.error === 'no-speech') {
-        console.log('No speech detected error');
+        // This error often happens too quickly, so ignore it if we haven't had a chance
+        if (Date.now() - lastActivity > 2000) {
+          console.log('No speech detected error');
+        } else {
+          console.log('Ignoring premature no-speech error');
+          return; // Don't stop recognition yet
+        }
       } else if (event.error === 'aborted') {
         console.log('Recognition aborted');
       }
@@ -1088,7 +1109,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     try {
       recognition.start();
       resetSilenceTimer();
-      console.log('Voice recognition started with auto-stop and iOS optimizations');
+      console.log('Voice recognition started with smart silence detection');
     } catch (error) {
       console.error('Error starting voice recognition:', error);
       setIsButtonActive(false);
@@ -3664,20 +3685,12 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     }
   };
   
-  // Track if button is being pressed for iOS Safari
-  const [isButtonPressed, setIsButtonPressed] = useState(false);
-
-  // Handle voice button click/press
+  // Handle voice button click
   const handleVoiceButtonClick = (e) => {
     // Only handle click if not dragging
     if (!isDragging) {
       e.preventDefault();
       console.log('Voice button clicked');
-      
-      // Check if this is an iOS Safari device
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-      const isIOSSafari = isIOS && isSafari;
       
       // If we're already listening, stop
       if (isListening) {
@@ -3692,49 +3705,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       // Start voice recognition
       setIsButtonActive(true);
       startImprovedVoiceRecognition();
-    }
-  };
-  
-  // Handle button press down
-  const handleButtonPressStart = (e) => {
-    if (!isDragging) {
-      e.preventDefault();
-      console.log('Button press started');
-      setIsButtonPressed(true);
-      
-      // Check if this is an iOS Safari device
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-      const isIOSSafari = isIOS && isSafari;
-      
-      // If we're on iOS Safari, start voice recognition on press down
-      if (isIOSSafari && !isListening) {
-        console.log('Starting voice recognition on press down (iOS Safari)');
-        setIsButtonActive(true);
-        startImprovedVoiceRecognition();
-      }
-    }
-  };
-  
-  // Handle button press release
-  const handleButtonPressEnd = (e) => {
-    if (!isDragging) {
-      e.preventDefault();
-      console.log('Button press ended');
-      setIsButtonPressed(false);
-      
-      // Check if this is an iOS Safari device
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-      const isIOSSafari = isIOS && isSafari;
-      
-      // If we're on iOS Safari, stop voice recognition on release
-      if (isIOSSafari && isListening) {
-        console.log('Stopping voice recognition on press release (iOS Safari)');
-        if (recognitionRef.current) {
-          recognitionRef.current.stop();
-        }
-      }
     }
   };
   
@@ -4977,61 +4947,28 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               </div>
             ) : voiceSearchResults.noSpeechDetected ? (
               <div className="no-speech-error">
-                <p><i className="fas fa-microphone-slash" style={{fontSize: '36px', color: '#ff6b6b', margin: '15px 0'}}></i></p>
-                <p style={{fontSize: '18px', fontWeight: 'bold', marginBottom: '10px'}}>No speech detected</p>
-                {voiceSearchResults.isIOSSafari ? (
-                  <div style={{fontSize: '14px', lineHeight: '1.4', marginTop: '10px'}}>
-                    <p>For best results on iPhone/iPad:</p>
-                    <ul style={{textAlign: 'left', paddingLeft: '20px', marginTop: '5px'}}>
-                      <li>Press and <strong>hold</strong> the microphone button while speaking</li>
-                      <li>Release when you're done speaking</li>
-                      <li>Speak clearly at a normal volume</li>
-                      <li>Try again in a quieter environment</li>
-                    </ul>
-                    <button 
-                      onClick={() => {
-                        closeVoiceSearchResults();
-                        setTimeout(() => {
-                          startImprovedVoiceRecognition();
-                        }, 300);
-                      }}
-                      style={{
-                        marginTop: '15px',
-                        padding: '8px 16px',
-                        backgroundColor: '#4285f4',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Try Again
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{fontSize: '14px', marginTop: '10px'}}>
-                    <p>Please try again. Speak clearly and ensure your microphone is working properly.</p>
-                    <button 
-                      onClick={() => {
-                        closeVoiceSearchResults();
-                        setTimeout(() => {
-                          startImprovedVoiceRecognition();
-                        }, 300);
-                      }}
-                      style={{
-                        marginTop: '15px',
-                        padding: '8px 16px',
-                        backgroundColor: '#4285f4',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Try Again
-                    </button>
-                  </div>
-                )}
+                <p><i className="fas fa-microphone-slash" style={{fontSize: '32px', color: '#ff6b6b'}}></i></p>
+                <p style={{fontSize: '16px', fontWeight: 'bold', margin: '10px 0'}}>No speech detected</p>
+                <button 
+                  onClick={() => {
+                    closeVoiceSearchResults();
+                    setTimeout(() => {
+                      startImprovedVoiceRecognition();
+                    }, 300);
+                  }}
+                  style={{
+                    marginTop: '10px',
+                    padding: '6px 14px',
+                    backgroundColor: '#4285f4',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '14px'
+                  }}
+                >
+                  Try Again
+                </button>
               </div>
             ) : voiceSearchResults.foundMatch ? (
               <div>
@@ -5706,20 +5643,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       
       {/* Floating Draggable Voice Search Button */}
       <button 
-        className={`voice-search-button ${isButtonActive ? 'active' : 'inactive'} ${isDragging ? 'dragging' : ''} ${isButtonPressed ? 'pressed' : ''}`}
+        className={`voice-search-button ${isButtonActive ? 'active' : 'inactive'} ${isDragging ? 'dragging' : ''}`}
         onClick={handleVoiceButtonClick}
-        onTouchStart={(e) => {
-          handleTouchStart(e);
-          handleButtonPressStart(e);
-        }}
+        onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
-        onTouchEnd={(e) => {
-          handleTouchEnd(e);
-          handleButtonPressEnd(e);
-        }}
-        onMouseDown={handleButtonPressStart}
-        onMouseUp={handleButtonPressEnd}
-        onMouseLeave={handleButtonPressEnd}
+        onTouchEnd={handleTouchEnd}
         style={{
           position: 'fixed',
           left: `${buttonPosition.x}px`,
@@ -5742,14 +5670,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             </div>
           </div>
         )}
-        
-        {isButtonActive && (
-          <div className="voice-instructions">
-            {/iPad|iPhone|iPod/.test(navigator.userAgent) ? 
-              'Keep holding while speaking...' : 
-              'Speak now...'}
-          </div>
-        )}
+
       </button>
     </div>
   );
