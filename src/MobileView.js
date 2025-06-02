@@ -70,30 +70,44 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   
   // Effect to clean up speech recognition on unmount
   useEffect(() => {
-    // Cleanup function to run when component unmounts
-    return () => {
-      console.log('Component unmounting - cleaning up voice recognition');
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-          recognitionRef.current.onresult = null;
-          recognitionRef.current.onend = null;
-          recognitionRef.current.onerror = null;
-          recognitionRef.current.onspeechend = null;
-          recognitionRef.current.onnomatch = null;
-          recognitionRef.current.onaudiostart = null;
-          recognitionRef.current.onaudioend = null;
-          recognitionRef.current.onsoundstart = null;
-          recognitionRef.current.onsoundend = null;
-          recognitionRef.current.onspeechstart = null;
-          recognitionRef.current = null;
-        } catch (e) {
-          console.error('Error during cleanup:', e);
+    // This effect ensures we handle app state changes appropriately
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        // App moving to background, stop any active recognition
+        if (isListening) {
+          console.log('App going to background, stopping recognition');
+          stopVoiceRecognition();
         }
       }
     };
-  }, []); // Empty dependency array means this runs on mount and unmount
-  
+
+    // Listen for visibility changes (app going to background)
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Set up a safety timer to check and force-stop if button stays active too long
+    let safetyTimer = null;
+    
+    if (isListening) {
+      console.log('Setting up safety timer for voice recognition');
+      safetyTimer = setTimeout(() => {
+        // If we're still listening after the safety timeout, force stop
+        if (isListening) {
+          console.log('Safety timeout: forcing voice recognition to stop');
+          stopVoiceRecognition();
+        }
+      }, 30000); // 30 seconds safety timeout
+    }
+
+    // Cleanup when component unmounts or state changes
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (safetyTimer) clearTimeout(safetyTimer);
+      if (isListening) {
+        stopVoiceRecognition();
+      }
+    };
+  }, [isListening]);
+
   // Load selected rooms from local storage on component mount
   useEffect(() => {
     try {
@@ -861,9 +875,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         recognitionRef.current.onresult = null;
         recognitionRef.current.onend = null;
         recognitionRef.current.onerror = null;
-        recognitionRef.current.onspeechstart = null;
-        recognitionRef.current.onspeechend = null;
-        recognitionRef.current = null;
       } catch (e) {
         console.log('Error cleaning up previous recognition:', e);
       }
@@ -1016,9 +1027,16 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         silenceTimer = null;
       }
       
-      // Reset UI state
+      // Reset UI state immediately
       setIsListening(false);
       setIsButtonActive(false);
+      
+      // Additional safety: ensure we're not still recording
+      try {
+        recognition.abort();
+      } catch (e) {
+        // Ignore errors here
+      }
       
       // Get best available transcript
       const bestTranscript = lastFinalResult || lastInterimResult;
@@ -1057,9 +1075,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         setShowVoiceSearchResults(true);
       }
       
-      // Clean up recognition instance
-      if (recognitionRef.current) {
-        try {
+      // Clean up recognition instance properly
+      try {
+        // First nullify all the handlers to prevent any callbacks
+        if (recognitionRef.current) {
           recognitionRef.current.onresult = null;
           recognitionRef.current.onend = null;
           recognitionRef.current.onerror = null;
@@ -1069,10 +1088,18 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           recognitionRef.current.onaudioend = null;
           recognitionRef.current.onsoundstart = null;
           recognitionRef.current.onsoundend = null;
+          recognitionRef.current.onspeechstart = null;
+          
+          // Then try to forcefully abort to make sure it's stopped
+          recognitionRef.current.abort();
           recognitionRef.current = null;
-        } catch (e) {
-          console.log('Error in final cleanup:', e);
         }
+      } catch (e) {
+        console.log('Error in final cleanup:', e);
+      } finally {
+        // Always ensure the button state is reset
+        setIsButtonActive(false);
+        setIsListening(false);
       }
     };
     
@@ -1103,6 +1130,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       // Reset UI state
       setIsListening(false);
       setIsButtonActive(false);
+      
+      // Log error silently without showing alerts
+      console.log('Speech recognition failed to start - will try again automatically');
     };
     
     // Start recognition
@@ -1112,8 +1142,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       console.log('Voice recognition started with smart silence detection');
     } catch (error) {
       console.error('Error starting voice recognition:', error);
-      setIsButtonActive(false);
-      setIsListening(false);
+      stopVoiceRecognition(); // Use our unified stop method
       
       // Log error silently without showing alerts
       console.log('Speech recognition failed to start - will try again automatically');
@@ -1481,18 +1510,44 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     const silenceTimeout = 5000; // 5 seconds of silence will auto-stop
   
     // Function to reset silence timer
+    // Initialize variables for voice recognition state tracking
+    let lastActivity = Date.now();
+    let lastInterimResult = '';
+    let lastFinalResult = '';
+    let significantPauseDetected = false;
+    
     const resetSilenceTimer = () => {
       if (silenceTimer) clearTimeout(silenceTimer);
+      
+      // Use a longer timeout before any speech is detected,
+      // and a shorter one once the user has started speaking
+      const timeoutDuration = 5000; // Always use 5 seconds for auto-stop
+      
       silenceTimer = setTimeout(() => {
-        console.log('Silence detected, auto-stopping recognition');
-        if (recognitionRef.current) {
-          try {
-            recognitionRef.current.stop();
-          } catch (e) {
-            console.log('Error stopping recognition on silence:', e);
+        // Check how long it's been since last activity
+        const timeSinceActivity = Date.now() - lastActivity;
+        
+        if (timeSinceActivity > timeoutDuration) {
+          console.log(`Silence detected for ${timeSinceActivity}ms, stopping recognition`);
+          significantPauseDetected = true;
+          
+          // Only stop if we have some content
+          if (lastInterimResult.trim().length > 0 || lastFinalResult.trim().length > 0) {
+            if (recognitionRef.current) {
+              try {
+                recognitionRef.current.stop();
+                console.log('Recognition stopped after significant pause');
+              } catch (e) {
+                console.log('Error stopping recognition on silence:', e);
+              }
+            }
+          } else {
+            // Reset timer to give more time if nothing has been said yet
+            lastActivity = Date.now();
+            resetSilenceTimer();
           }
         }
-      }, silenceTimeout);
+      }, timeoutDuration);
     };
   
     recognition.onstart = () => {
@@ -3694,11 +3749,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       
       // If we're already listening, stop
       if (isListening) {
-        if (recognitionRef.current) {
-          recognitionRef.current.stop();
-        }
-        setIsListening(false);
-        setIsButtonActive(false);
+        console.log('Stopping active recognition');
+        stopVoiceRecognition();
         return;
       }
       
@@ -3706,6 +3758,36 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       setIsButtonActive(true);
       startImprovedVoiceRecognition();
     }
+  };
+  
+  // Helper to reliably stop voice recognition
+  const stopVoiceRecognition = () => {
+    console.log('Force stopping voice recognition');
+    if (recognitionRef.current) {
+      try {
+        // Remove all event handlers first
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onspeechstart = null;
+        recognitionRef.current.onspeechend = null;
+        recognitionRef.current.onaudiostart = null;
+        recognitionRef.current.onaudioend = null;
+        recognitionRef.current.onsoundstart = null;
+        recognitionRef.current.onsoundend = null;
+        
+        // Then stop the recognition
+        recognitionRef.current.stop();
+        recognitionRef.current.abort();
+        recognitionRef.current = null;
+      } catch (e) {
+        console.log('Error stopping recognition:', e);
+      }
+    }
+    
+    // Reset UI state regardless of errors
+    setIsListening(false);
+    setIsButtonActive(false);
   };
   
   // Update room quantity in voice search results and recalculate prices
