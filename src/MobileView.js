@@ -2027,26 +2027,30 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Check the ultra-simple jacuzzi pattern first (e.g., "8 hrs jacuzzi")
     if (ultraSimpleJacuzziMatchResult && ultraSimpleJacuzziMatchResult[1]) {
       console.log('iOS Safari - Ultra simple HOURS WITH JACUZZI detected');
-      const requestedHours = parseInt(ultraSimpleJacuzziMatchResult[1], 10);
-      console.log('Hours:', requestedHours);
+      console.log('Hours:', parseInt(ultraSimpleJacuzziMatchResult[1], 10));
       
-      // IMPORTANT: For iOS Safari, pass the raw hours value directly and flag isDuration as true
-      // This will ensure we use the exact hours requested by the user
-      console.log('iOS Safari - Using exact requested hours for jacuzzi short stay:', requestedHours);
-      processShortStayVoiceSearch(query, requestedHours, searchId, false, false, true, 0, true);
+      // Calculate target hour based on current time + requested hours
+      const currentTime = new Date();
+      const targetHour = (currentTime.getHours() + parseInt(ultraSimpleJacuzziMatchResult[1], 10)) % 24;
+      const currentMinutes = currentTime.getMinutes();
+      
+      // Process as a short stay with jacuzzi
+      processShortStayVoiceSearch(query, targetHour, searchId, false, false, true, currentMinutes, true);
       return;
     }
     
     // Check the ultra-simple hours pattern (e.g., "8 hrs")
     if (ultraSimpleHoursMatchResult && ultraSimpleHoursMatchResult[1]) {
       console.log('iOS Safari - Ultra simple HOURS detected');
-      const requestedHours = parseInt(ultraSimpleHoursMatchResult[1], 10);
-      console.log('Hours:', requestedHours);
+      console.log('Hours:', parseInt(ultraSimpleHoursMatchResult[1], 10));
       
-      // IMPORTANT: For iOS Safari, pass the raw hours value directly and flag isDuration as true
-      // This will ensure we use the exact hours requested by the user
-      console.log('iOS Safari - Using exact requested hours for short stay:', requestedHours);
-      processShortStayVoiceSearch(query, requestedHours, searchId, false, false, false, 0, true);
+      // Calculate target hour based on current time + requested hours
+      const currentTime = new Date();
+      const targetHour = (currentTime.getHours() + parseInt(ultraSimpleHoursMatchResult[1], 10)) % 24;
+      const currentMinutes = currentTime.getMinutes();
+      
+      // Process as a regular short stay
+      processShortStayVoiceSearch(query, targetHour, searchId, false, false, false, currentMinutes, true);
       return;
     }
     
@@ -2065,13 +2069,15 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       const fallbackHoursWithJacuzziMatchResult = queryLower.match(fallbackHoursWithJacuzziPattern);
       if (fallbackHoursWithJacuzziMatchResult && fallbackHoursWithJacuzziMatchResult[1]) {
         console.log('iOS Safari - Extreme fallback HOURS WITH JACUZZI detected');
-        const requestedHours = parseInt(fallbackHoursWithJacuzziMatchResult[1], 10);
-        console.log('Hours:', requestedHours);
+        console.log('Hours:', parseInt(fallbackHoursWithJacuzziMatchResult[1], 10));
         
-        // IMPORTANT: For iOS Safari, pass the raw hours value directly and flag isDuration as true
-        // This will ensure we use the exact hours requested by the user
-        console.log('iOS Safari - Using exact requested hours for extreme fallback with jacuzzi:', requestedHours);
-        processShortStayVoiceSearch(query, requestedHours, searchId, false, false, true, 0, true);
+        // Calculate target hour based on current time + requested hours
+        const currentTime = new Date();
+        const targetHour = (currentTime.getHours() + parseInt(fallbackHoursWithJacuzziMatchResult[1], 10)) % 24;
+        const currentMinutes = currentTime.getMinutes();
+        
+        // Process as a short stay with jacuzzi
+        processShortStayVoiceSearch(query, targetHour, searchId, false, false, true, currentMinutes, true);
         return;
       }
       
@@ -2079,13 +2085,15 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       const fallbackJacuzziWithHoursMatchResult = queryLower.match(fallbackJacuzziWithHoursPattern);
       if (fallbackJacuzziWithHoursMatchResult && fallbackJacuzziWithHoursMatchResult[1]) {
         console.log('iOS Safari - Extreme fallback JACUZZI WITH HOURS detected');
-        const requestedHours = parseInt(fallbackJacuzziWithHoursMatchResult[1], 10);
-        console.log('Hours:', requestedHours);
+        console.log('Hours:', parseInt(fallbackJacuzziWithHoursMatchResult[1], 10));
         
-        // IMPORTANT: For iOS Safari, pass the raw hours value directly and flag isDuration as true
-        // This will ensure we use the exact hours requested by the user
-        console.log('iOS Safari - Using exact requested hours for extreme fallback jacuzzi with hours:', requestedHours);
-        processShortStayVoiceSearch(query, requestedHours, searchId, false, false, true, 0, true);
+        // Calculate target hour based on current time + requested hours
+        const currentTime = new Date();
+        const targetHour = (currentTime.getHours() + parseInt(fallbackJacuzziWithHoursMatchResult[1], 10)) % 24;
+        const currentMinutes = currentTime.getMinutes();
+        
+        // Process as a short stay with jacuzzi
+        processShortStayVoiceSearch(query, targetHour, searchId, false, false, true, currentMinutes, true);
         return;
       }
       
@@ -2093,13 +2101,15 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       const extremeFallbackHoursMatchResult = queryLower.match(extremeFallbackHoursPattern);
       if (extremeFallbackHoursMatchResult && extremeFallbackHoursMatchResult[1]) {
         console.log('iOS Safari - Extreme fallback JUST HOURS detected');
-        const requestedHours = parseInt(extremeFallbackHoursMatchResult[1], 10);
-        console.log('Hours:', requestedHours);
+        console.log('Hours:', parseInt(extremeFallbackHoursMatchResult[1], 10));
         
-        // IMPORTANT: For iOS Safari, pass the raw hours value directly and flag isDuration as true
-        // This will ensure we use the exact hours requested by the user
-        console.log('iOS Safari - Using exact requested hours for extreme fallback just hours:', requestedHours);
-        processShortStayVoiceSearch(query, requestedHours, searchId, false, false, false, 0, true);
+        // Calculate target hour based on current time + requested hours
+        const currentTime = new Date();
+        const targetHour = (currentTime.getHours() + parseInt(extremeFallbackHoursMatchResult[1], 10)) % 24;
+        const currentMinutes = currentTime.getMinutes();
+        
+        // Process as a regular short stay
+        processShortStayVoiceSearch(query, targetHour, searchId, false, false, false, currentMinutes, true);
         return;
       }
     }
@@ -3627,7 +3637,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   
   // Process short stay voice search
   const processShortStayVoiceSearch = (query, targetHour, searchId = null, explicitAM = false, explicitPM = false, forceJacuzzi = false, targetMinutes = null, isDuration = false) => {
-    console.log(`Processing short stay voice search: "${query}" with target hour ${targetHour}, AM: ${explicitAM}, PM: ${explicitPM}, isDuration: ${isDuration}`);
+    console.log(`Processing short stay voice search: "${query}" with target hour ${targetHour}, AM: ${explicitAM}, PM: ${explicitPM}`);
     
     // Ensure microphone is completely turned off before showing results
     if (recognitionRef.current) {
@@ -3653,118 +3663,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Convert query to lowercase for easier matching
     const shortStayQueryLower = query.toLowerCase();
     
-    // Always use the actual current time when the function is called
-    const currentTime = new Date();
-    console.log(`Current time: ${currentTime.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`);
-    
-    // Create checkout time based on current time
-    const checkoutTime = new Date(currentTime);
-    
-    // SPECIAL HANDLING FOR DURATION-BASED QUERIES (e.g., "10 hrs")
-    // For duration-based queries, targetHour actually represents the number of hours to add
-    if (isDuration) {
-      console.log(`DURATION-BASED QUERY: Adding ${targetHour} hours to current time`);
-      // For duration-based queries, the targetHour is actually the number of hours to add to current time
-      const requestedHours = targetHour;
-      
-      // For iOS Safari, ensure we use the exact hours requested by the user
-      let durationHours = requestedHours;
-      
-      // Calculate the checkout time by adding the requested hours to current time
-      checkoutTime.setTime(currentTime.getTime() + (requestedHours * 60 * 60 * 1000));
-      
-      console.log(`Current time: ${currentTime.toLocaleString()}`);
-      console.log(`Adding ${requestedHours} hours`);
-      console.log(`Checkout time: ${checkoutTime.toLocaleString()}`);
-      
-      // Calculate the bed rate (with or without jacuzzi)
-      const currentHour = currentTime.getHours();
-      const isWeekend = [0, 6].includes(currentTime.getDay());
-      const isFriday = currentTime.getDay() === 5;
-      
-      // Use daily rate based on day of week
-      let baseRate;
-      if (isFriday) {
-        baseRate = forceJacuzzi ? shortStayPrices.friday.withJacuzzi : shortStayPrices.friday.withoutJacuzzi;
-      } else if (isWeekend) {
-        baseRate = forceJacuzzi ? shortStayPrices.weekend.withJacuzzi : shortStayPrices.weekend.withoutJacuzzi;
-      } else {
-        baseRate = forceJacuzzi ? shortStayPrices.weekday.withJacuzzi : shortStayPrices.weekday.withoutJacuzzi;
-      }
-      
-      // Determine hourly rate
-      const hourlyRate = shortStayPrices.hourlyRates.regular;
-      
-      // Calculate the base price for requested duration
-      const basePrice = hourlyRate * durationHours;
-      const tax = basePrice * 0.15;
-      const total = basePrice + tax;
-      
-      // Room type detection (reusing existing logic)
-      let detectedBedType = 'Queen'; // Default
-      
-      // Check for King
-      const kingIndicators = ['king', 'kings', 'keen', 'kin', 'kim', 'kingdom'];
-      const queenIndicators = ['queen', 'queens', 'clean', 'cream', 'green'];
-      
-      let kingScore = 0;
-      let queenScore = 0;
-      
-      kingIndicators.forEach(indicator => {
-        const regex = new RegExp('\\b' + indicator + '\\b', 'gi');
-        const matches = shortStayQueryLower.match(regex);
-        if (matches) kingScore += matches.length;
-      });
-      
-      queenIndicators.forEach(indicator => {
-        const regex = new RegExp('\\b' + indicator + '\\b', 'gi');
-        const matches = shortStayQueryLower.match(regex);
-        if (matches) queenScore += matches.length;
-      });
-      
-      if (kingScore > queenScore) {
-        detectedBedType = 'King';
-      } else if (queenScore > 0) {
-        detectedBedType = 'Queen';
-      }
-      
-      // Set the checkout time 12-hour format for display
-      const formattedCheckoutTime = checkoutTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      
-      // Format check-in time (current time)
-      const formattedCheckinTime = currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-      
-      console.log(`Duration hours: ${durationHours}, Base price: $${basePrice.toFixed(2)}, Tax: $${tax.toFixed(2)}, Total: $${total.toFixed(2)}`);
-      
-      // Create the voice search results object
-      const results = {
-        query: query,
-        foundMatch: true,
-        isShortStay: true,
-        bedType: detectedBedType,
-        hasJacuzzi: forceJacuzzi,
-        checkinTime: formattedCheckinTime,
-        checkoutTime: formattedCheckoutTime,
-        shortStayHours: durationHours,
-        price: basePrice.toFixed(2),
-        tax: tax.toFixed(2),
-        total: total.toFixed(2),
-        sessionId: searchId,
-        timestamp: Date.now()
-      };
-      
-      console.log('Short stay voice search results:', results);
-      
-      // Update UI
-      setVoiceSearchResults(results);
-      setShowVoiceSearchResults(true);
-      setIsListening(false);
-      setIsButtonActive(false);
-      
-      return; // Exit early for duration-based queries
-    }
-    
-    // REGULAR TIME-BASED QUERIES (not duration-based)
     // Determine if the target hour is AM or PM
     let isPM = false;
     
@@ -3791,6 +3689,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     console.log(`Target hour in 24-hour format: ${targetHour}:00`);
     
+    // Always use the actual current time when the function is called
+    const currentTime = new Date();
+    console.log(`Current time: ${currentTime.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`);    
+    
+    // Create checkout time based on target hour and minutes
+    const checkoutTime = new Date(currentTime);
+    
     // Use current time minutes if no specific minutes were provided in the query
     const minutesToUse = targetMinutes !== null ? targetMinutes : currentTime.getMinutes();
     
@@ -3798,27 +3703,32 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Set the hours and minutes, with seconds and milliseconds set to 0
     checkoutTime.setHours(targetHour, minutesToUse, 0, 0);
     
-    // Special handling for AM hours (3 AM, 4 AM, 5 AM, etc.)
-    if (explicitAM) {
-      // If AM is explicitly specified, ALWAYS set to next day
-      // This ensures early morning hours like 5 AM are always for the next day
-      console.log('EXPLICIT AM detected: ALWAYS setting checkout to next day');
-      checkoutTime.setDate(checkoutTime.getDate() + 1);
-    } else if (!isPM && currentTime.getHours() >= 12) {
-      // If current time is PM and target is implicitly AM, set to next day
-      console.log('IMPLICIT AM: Setting checkout to next day because current is PM and target is AM');
-      checkoutTime.setDate(checkoutTime.getDate() + 1);
-    } else if (checkoutTime <= currentTime) {
-      // If checkout time is earlier than current time, assume next day
-      console.log('Setting checkout to next day because checkout time is earlier than current time');
-      checkoutTime.setDate(checkoutTime.getDate() + 1);
+    // Skip date adjustments if this is a duration-based request (e.g., "7 hrs")
+    if (!isDuration) {
+      // Special handling for AM hours (3 AM, 4 AM, 5 AM, etc.)
+      if (explicitAM) {
+        // If AM is explicitly specified, ALWAYS set to next day
+        // This ensures early morning hours like 5 AM are always for the next day
+        console.log('EXPLICIT AM detected: ALWAYS setting checkout to next day');
+        checkoutTime.setDate(checkoutTime.getDate() + 1);
+      } else if (!isPM && currentTime.getHours() >= 12) {
+        // If current time is PM and target is implicitly AM, set to next day
+        console.log('IMPLICIT AM: Setting checkout to next day because current is PM and target is AM');
+        checkoutTime.setDate(checkoutTime.getDate() + 1);
+      } else if (checkoutTime <= currentTime) {
+        // If checkout time is earlier than current time, assume next day
+        console.log('Setting checkout to next day because checkout time is earlier than current time');
+        checkoutTime.setDate(checkoutTime.getDate() + 1);
+      }
+    } else {
+      console.log('Duration-based request: Skip adding extra days to checkout time');
     }
     
     // Log the AM/PM status for debugging
-    console.log(`Checkout hour: ${targetHour}, isPM: ${isPM}, Final checkout time: ${checkoutTime.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`);
+    console.log(`Checkout hour: ${targetHour}, isPM: ${isPM}, Final checkout time: ${checkoutTime.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`);    
     console.log(`Checkout time in 12-hour format: ${checkoutTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`);
     
-    console.log(`Checkout time: ${checkoutTime.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`);
+    console.log(`Checkout time: ${checkoutTime.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`);    
     
     // Calculate duration in hours directly from current time to checkout time
     // We need to count the full hours, including the partial first hour
