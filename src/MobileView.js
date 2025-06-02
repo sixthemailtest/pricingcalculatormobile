@@ -755,9 +755,15 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Pre-initialize speech recognition to avoid first-time delay
     if (('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window)) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      // Just create the instance to warm up the API
+      // Just create the instance to warm up the API without starting it
       const warmupRecognition = new SpeechRecognition();
-      console.log('Speech recognition pre-initialized');
+      
+      // Configure it to do nothing on events to prevent accidental starting
+      warmupRecognition.onstart = () => {};
+      warmupRecognition.onend = () => {};
+      warmupRecognition.onerror = () => {};
+      
+      console.log('Speech recognition pre-initialized without starting');
     }
   }, []);
   
@@ -907,10 +913,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     let lastFinalResult = '';
     let significantPauseDetected = false;
     
-    // Set up silence detection with longer timeouts for better user experience
+    // Set up silence detection with much shorter timeouts for immediate response
     let silenceTimer = null;
-    const initialSilenceTimeout = useIOSMode ? 10000 : 8000; // Longer timeout initially
-    const activeSilenceTimeout = 3000; // Shorter timeout once speech has been detected
+    const initialSilenceTimeout = useIOSMode ? 3000 : 2000; // Very short initial timeout
+    const activeSilenceTimeout = 800; // Very short timeout after speech detected
     
     // Function to reset silence timer with dynamic timeouts
     const resetSilenceTimer = () => {
@@ -924,12 +930,18 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         // Check how long it's been since last activity
         const timeSinceActivity = Date.now() - lastActivity;
         
+        // Respond immediately once we detect a pause
         if (timeSinceActivity > activeSilenceTimeout) {
           console.log(`Silence detected for ${timeSinceActivity}ms, stopping recognition`);
           significantPauseDetected = true;
           
-          // Only stop if we have some content
+          // Process results as soon as we have any content
           if (lastInterimResult.trim().length > 0 || lastFinalResult.trim().length > 0) {
+            // Process the transcript immediately instead of waiting
+            let bestTranscript = lastFinalResult || lastInterimResult;
+            console.log('Processing transcript immediately:', bestTranscript);
+            
+            // Stop the recognition first
             if (recognitionRef.current) {
               try {
                 recognitionRef.current.stop();
@@ -939,7 +951,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               }
             }
           } else {
-            // Reset timer to give more time if nothing has been said yet
+            // Reset timer but with shorter duration if nothing has been said
             lastActivity = Date.now();
             resetSilenceTimer();
           }
@@ -997,6 +1009,17 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           finalResultReceived = true;
           lastFinalResult = transcript;
           allTranscripts.push({ text: transcript, isFinal: true });
+          
+          // Immediately process final results
+          if (transcript.trim().length > 0) {
+            console.log('Processing final result immediately');
+            // Stop the recognition immediately
+            try {
+              recognition.stop();
+            } catch (e) {
+              console.log('Error stopping recognition on final result:', e);
+            }
+          }
           break;
         } else {
           lastInterimResult = transcript;
@@ -1038,10 +1061,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         // Ignore errors here
       }
       
-      // Get best available transcript
+      // Get best available transcript and process immediately
       const bestTranscript = lastFinalResult || lastInterimResult;
       
-      // Process results if we have a meaningful transcript
+      // Process results if we have a meaningful transcript - IMMEDIATELY
       if (bestTranscript.trim().length > 0) {
         // Pre-process the transcript
         let processedTranscript = bestTranscript;
@@ -1111,7 +1134,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         console.log('Microphone permission not granted');
       } else if (event.error === 'no-speech') {
         // This error often happens too quickly, so ignore it if we haven't had a chance
-        if (Date.now() - lastActivity > 2000) {
+        if (Date.now() - lastActivity > 1000) { // Reduced from 2000ms to 1000ms
           console.log('No speech detected error');
         } else {
           console.log('Ignoring premature no-speech error');
@@ -5349,9 +5372,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                         ) : null}
                         <li>{voiceSearchResults.isSmoking ? 'Smoking' : 'Non-Smoking'}</li>
                         {/* Room Quantity - Only show for overnight stays */}
-                        <li className={voiceSearchResults.roomQuantity > 1 ? "room-quantity highlighted" : "room-quantity"} style={voiceSearchResults.roomQuantity > 1 ? {fontWeight: 'bold', color: '#ffcc00'} : {}}>
+                        <li className="room-quantity">
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                            <span style={{ fontSize: '12px' }}>Room Quantity:</span>
+                            <span>Room Quantity:</span>
                             <div style={{ display: 'flex', alignItems: 'center' }}>
                               <button 
                                 onClick={(e) => {
@@ -5407,8 +5430,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                                 }}
                                 disabled={voiceSearchResults.roomQuantity <= 1}
                                 style={{
-                                  width: '22px',
-                                  height: '22px',
+                                  width: '28px',
+                                  height: '28px',
                                   padding: '0',
                                   display: 'flex',
                                   alignItems: 'center',
@@ -5419,13 +5442,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                                   borderRadius: '4px',
                                   marginRight: '6px',
                                   cursor: voiceSearchResults.roomQuantity <= 1 ? 'not-allowed' : 'pointer',
-                                  fontSize: '12px',
+                                  fontSize: '14px',
                                   fontWeight: 'bold'
                                 }}
                               >
                                 -
                               </button>
-                              <span style={{ margin: '0 6px', fontSize: '12px'}}>{voiceSearchResults.roomQuantity} {voiceSearchResults.roomQuantity === 1 ? 'room' : 'rooms'}</span>
+                              <span style={{ margin: '0 8px'}}>{voiceSearchResults.roomQuantity} {voiceSearchResults.roomQuantity === 1 ? 'room' : 'rooms'}</span>
                               <button 
                                 onClick={(e) => {
                                   e.preventDefault();
@@ -5480,8 +5503,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                                 }}
                                 disabled={voiceSearchResults.roomQuantity >= 5}
                                 style={{
-                                  width: '22px',
-                                  height: '22px',
+                                  width: '28px',
+                                  height: '28px',
                                   padding: '0',
                                   display: 'flex',
                                   alignItems: 'center',
@@ -5492,7 +5515,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                                   borderRadius: '4px',
                                   marginLeft: '6px',
                                   cursor: voiceSearchResults.roomQuantity >= 5 ? 'not-allowed' : 'pointer',
-                                  fontSize: '12px',
+                                  fontSize: '14px',
                                   fontWeight: 'bold'
                                 }}
                               >
@@ -5503,9 +5526,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
 
                         </li>
                         {/* Early Check-in - Only show for overnight stays */}
-                        <li className={voiceSearchResults.earlyCheckInHours !== 0 ? "early-checkin highlighted" : "early-checkin"} style={voiceSearchResults.earlyCheckInHours !== 0 ? {fontWeight: 'bold', color: '#ffcc00'} : {}}>
+                        <li className="early-checkin">
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                            <span style={{ fontSize: '12px' }}>Early Check-in:</span>
+                            <span>Early Check-in:</span>
                             <div style={{ display: 'flex', alignItems: 'center' }}>
                               <button 
                                 onClick={(e) => {
@@ -5542,8 +5565,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                                   setVoiceSearchResults(updatedResults);
                                 }}
                                 style={{
-                                  width: '22px',
-                                  height: '22px',
+                                  width: '28px',
+                                  height: '28px',
                                   padding: '0',
                                   display: 'flex',
                                   alignItems: 'center',
@@ -5554,18 +5577,18 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                                   borderRadius: '4px',
                                   marginRight: '6px',
                                   cursor: 'pointer',
-                                  fontSize: '12px',
+                                  fontSize: '14px',
                                   fontWeight: 'bold'
                                 }}
                               >
                                 -
                               </button>
-                              <span style={{ margin: '0 6px', fontSize: '12px'}}>{voiceSearchResults.earlyCheckInHours} {voiceSearchResults.earlyCheckInHours === 1 ? 'hour' : 'hours'}</span>
+                              <span style={{ margin: '0 8px'}}>{voiceSearchResults.earlyCheckInHours} {voiceSearchResults.earlyCheckInHours === 1 ? 'hour' : 'hours'}</span>
                               <button 
                                 disabled={true}
                                 style={{
-                                  width: '22px',
-                                  height: '22px',
+                                  width: '28px',
+                                  height: '28px',
                                   padding: '0',
                                   display: 'flex',
                                   alignItems: 'center',
@@ -5576,7 +5599,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                                   borderRadius: '4px',
                                   marginLeft: '6px',
                                   cursor: 'not-allowed',
-                                  fontSize: '12px',
+                                  fontSize: '14px',
                                   fontWeight: 'bold',
                                   opacity: 0.6
                                 }}
@@ -5589,9 +5612,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                         </li>
                         
                         {/* Late Check-out - Only show for overnight stays */}
-                        <li className={voiceSearchResults.lateCheckOutHours > 0 ? "late-checkout highlighted" : "late-checkout"} style={voiceSearchResults.lateCheckOutHours > 0 ? {fontWeight: 'bold', color: '#ffcc00'} : {}}>
+                        <li className="late-checkout">
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                            <span style={{ fontSize: '12px' }}>Late Check-out:</span>
+                            <span>Late Check-out:</span>
                             <div style={{ display: 'flex', alignItems: 'center' }}>
                               <button 
                                 onClick={(e) => {
@@ -5630,8 +5653,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                                 }}
                                 disabled={voiceSearchResults.lateCheckOutHours <= 0}
                                 style={{
-                                  width: '22px',
-                                  height: '22px',
+                                  width: '28px',
+                                  height: '28px',
                                   padding: '0',
                                   display: 'flex',
                                   alignItems: 'center',
@@ -5642,13 +5665,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                                   borderRadius: '4px',
                                   marginRight: '6px',
                                   cursor: voiceSearchResults.lateCheckOutHours <= 0 ? 'not-allowed' : 'pointer',
-                                  fontSize: '12px',
+                                  fontSize: '14px',
                                   fontWeight: 'bold'
                                 }}
                               >
                                 -
                               </button>
-                              <span style={{ margin: '0 6px', fontSize: '12px'}}>{voiceSearchResults.lateCheckOutHours} {voiceSearchResults.lateCheckOutHours === 1 ? 'hour' : 'hours'}</span>
+                              <span style={{ margin: '0 8px'}}>{voiceSearchResults.lateCheckOutHours} {voiceSearchResults.lateCheckOutHours === 1 ? 'hour' : 'hours'}</span>
                               <button 
                                 onClick={(e) => {
                                   e.preventDefault();
@@ -5686,8 +5709,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                                 }}
                                 disabled={voiceSearchResults.lateCheckOutHours >= 12}
                                 style={{
-                                  width: '22px',
-                                  height: '22px',
+                                  width: '28px',
+                                  height: '28px',
                                   padding: '0',
                                   display: 'flex',
                                   alignItems: 'center',
@@ -5698,7 +5721,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                                   borderRadius: '4px',
                                   marginLeft: '6px',
                                   cursor: voiceSearchResults.lateCheckOutHours >= 12 ? 'not-allowed' : 'pointer',
-                                  fontSize: '12px',
+                                  fontSize: '14px',
                                   fontWeight: 'bold'
                                 }}
                               >
@@ -5722,7 +5745,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                   color: 'white', 
                   borderRadius: '8px', 
                   marginTop: '12px',
-                  fontSize: '11px'
+                  fontSize: '14px'
                 }}>
                   {/* Daily price breakdown - only show if more than 1 night */}
                   {voiceSearchResults.dailyPrices && voiceSearchResults.dailyPrices.length > 1 && (
@@ -5780,36 +5803,36 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                     </>
                   ) : voiceSearchResults.roomQuantity > 1 ? (
                     <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span>Price per room:</span>
+                        <span>${(Number(voiceSearchResults.singleRoomPrice) || 0).toFixed(2)}</span>
+                      </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '11px' }}>Price per room:</span>
-                        <span style={{ fontSize: '11px' }}>${(Number(voiceSearchResults.singleRoomPrice) || 0).toFixed(2)}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontWeight: 'bold', backgroundColor: 'rgba(255, 255, 255, 0.15)', padding: '5px', borderRadius: '4px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '11px' }}>Number of rooms:</span>
-                        <span style={{ fontSize: '11px' }}>{voiceSearchResults.roomQuantity}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontWeight: 'bold' }}>
-                        <span style={{ fontSize: '11px' }}>Total base price:</span>
-                        <span style={{ fontSize: '11px' }}>${(Number(voiceSearchResults.price) || 0).toFixed(2)}</span>
+                        <span>Number of rooms:</span>
+                        <span>{voiceSearchResults.roomQuantity}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '11px' }}>Tax (15%):</span>
-                        <span style={{ fontSize: '11px' }}>${(Number(voiceSearchResults.tax) || 0).toFixed(2)}</span>
+                        <span>Total base price:</span>
+                        <span>${(Number(voiceSearchResults.price) || 0).toFixed(2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span>Tax (15%):</span>
+                        <span>${(Number(voiceSearchResults.tax) || 0).toFixed(2)}</span>
                       </div>
                       
                       {/* Show early check-in cost if applicable */}
                       {voiceSearchResults.earlyCheckInHours !== 0 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', backgroundColor: 'rgba(255, 204, 0, 0.2)', padding: '5px', borderRadius: '4px' }}>
-                          <span style={{ fontSize: '11px' }}>Early Check-in ({voiceSearchResults.earlyCheckInHours} {voiceSearchResults.earlyCheckInHours === 1 ? 'hour' : 'hours'} @ $15/hr):</span>
-                          <span style={{ fontSize: '11px' }}>${voiceSearchResults.earlyCheckInCost.toFixed(2)}</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <span>Early Check-in ({voiceSearchResults.earlyCheckInHours} {voiceSearchResults.earlyCheckInHours === 1 ? 'hour' : 'hours'} @ $15/hr):</span>
+                          <span>${voiceSearchResults.earlyCheckInCost.toFixed(2)}</span>
                         </div>
                       )}
                       
                       {/* Show late check-out cost if applicable */}
                       {voiceSearchResults.lateCheckOutHours > 0 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', backgroundColor: 'rgba(255, 204, 0, 0.2)', padding: '5px', borderRadius: '4px' }}>
-                          <span style={{ fontSize: '11px' }}>Late Check-out ({voiceSearchResults.lateCheckOutHours} {voiceSearchResults.lateCheckOutHours === 1 ? 'hour' : 'hours'} @ $15/hr):</span>
-                          <span style={{ fontSize: '11px' }}>${voiceSearchResults.lateCheckOutCost.toFixed(2)}</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <span>Late Check-out ({voiceSearchResults.lateCheckOutHours} {voiceSearchResults.lateCheckOutHours === 1 ? 'hour' : 'hours'} @ $15/hr):</span>
+                          <span>${voiceSearchResults.lateCheckOutCost.toFixed(2)}</span>
                         </div>
                       )}
                       
@@ -5819,38 +5842,37 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                         marginTop: '12px',
                         paddingTop: '8px',
                         borderTop: '1px solid rgba(255, 255, 255, 0.3)',
-                        fontWeight: 'bold',
-                        fontSize: '13px',
+                        fontSize: '16px',
                         alignItems: 'center'
                       }}>
-                        <span style={{ fontSize: '11px' }}>Total:</span>
-                        <span style={{ fontSize: '11px' }}>${(Number(voiceSearchResults.total) || 0).toFixed(2)}</span>
+                        <span>Total:</span>
+                        <span>${(Number(voiceSearchResults.total) || 0).toFixed(2)}</span>
                       </div>
                     </>
                   ) : (
                     <>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '11px' }}>Base Price:</span>
-                        <span style={{ fontSize: '11px' }}>${(Number(voiceSearchResults.price) || 0).toFixed(2)}</span>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
+                        <span>Base Price:</span>
+                        <span>${(Number(voiceSearchResults.price) || 0).toFixed(2)}</span>
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                        <span style={{ fontSize: '11px' }}>Tax (15%):</span>
-                        <span style={{ fontSize: '11px' }}>${(Number(voiceSearchResults.tax) || 0).toFixed(2)}</span>
+                        <span>Tax (15%):</span>
+                        <span>${(Number(voiceSearchResults.tax) || 0).toFixed(2)}</span>
                       </div>
                       
                       {/* Show early check-in cost if applicable */}
                       {voiceSearchResults.earlyCheckInHours !== 0 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', backgroundColor: 'rgba(255, 204, 0, 0.2)', padding: '5px', borderRadius: '4px' }}>
-                          <span style={{ fontSize: '11px' }}>Early Check-in ({voiceSearchResults.earlyCheckInHours} {voiceSearchResults.earlyCheckInHours === 1 ? 'hour' : 'hours'} @ $15/hr):</span>
-                          <span style={{ fontSize: '11px' }}>${voiceSearchResults.earlyCheckInCost.toFixed(2)}</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <span>Early Check-in ({voiceSearchResults.earlyCheckInHours} {voiceSearchResults.earlyCheckInHours === 1 ? 'hour' : 'hours'} @ $15/hr):</span>
+                          <span>${voiceSearchResults.earlyCheckInCost.toFixed(2)}</span>
                         </div>
                       )}
                       
                       {/* Show late check-out cost if applicable */}
                       {voiceSearchResults.lateCheckOutHours > 0 && (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', backgroundColor: 'rgba(255, 204, 0, 0.2)', padding: '5px', borderRadius: '4px' }}>
-                          <span style={{ fontSize: '11px' }}>Late Check-out ({voiceSearchResults.lateCheckOutHours} {voiceSearchResults.lateCheckOutHours === 1 ? 'hour' : 'hours'} @ $15/hr):</span>
-                          <span style={{ fontSize: '11px' }}>${voiceSearchResults.lateCheckOutCost.toFixed(2)}</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                          <span>Late Check-out ({voiceSearchResults.lateCheckOutHours} {voiceSearchResults.lateCheckOutHours === 1 ? 'hour' : 'hours'} @ $15/hr):</span>
+                          <span>${voiceSearchResults.lateCheckOutCost.toFixed(2)}</span>
                         </div>
                       )}
                       
