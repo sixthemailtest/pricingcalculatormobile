@@ -1514,32 +1514,39 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Function to reset silence timer
     const resetSilenceTimer = () => {
       if (silenceTimer) clearTimeout(silenceTimer);
-      const timeoutDuration = speechDetected ? 3000 : 5000;
+      const timeoutDuration = speechDetected ? 800 : 1500;
       
       silenceTimer = setTimeout(() => {
         const timeSinceActivity = Date.now() - lastActivity;
         if (timeSinceActivity > timeoutDuration) {
-          console.log(`Silence detected for ${timeSinceActivity}ms, stopping recognition`);
-          significantPauseDetected = true;
-          
-          // Only stop if we have some content
-          if ((lastInterimResult && lastInterimResult.trim().length > 0) || 
-              (lastFinalResult && lastFinalResult.trim().length > 0)) {
-            if (recognitionRef.current) {
-              try {
-                recognitionRef.current.stop();
-                console.log('Recognition stopped after significant pause');
-              } catch (e) {
-                console.log('Error stopping recognition on silence:', e);
+          console.log(`Silence timeout reached after ${timeSinceActivity}ms`);
+          if (recognitionRef.current) {
+            try {
+              recognitionRef.current.stop();
+              console.log('Recognition stopped due to silence timeout');
+            } catch (e) {
+              console.error('Error stopping recognition on silence timeout:', e);
+            }
+          }
+        } else {
+          // Still check frequently if we've had enough silence
+          const checkInterval = 300; // Check every 300ms
+          silenceTimer = setTimeout(() => {
+            const newTimeSinceActivity = Date.now() - lastActivity;
+            if (newTimeSinceActivity > timeoutDuration) {
+              console.log(`Silence detected in interval check after ${newTimeSinceActivity}ms`);
+              if (recognitionRef.current) {
+                try {
+                  recognitionRef.current.stop();
+                  console.log('Recognition stopped after significant pause');
+                } catch (e) {
+                  console.error('Error stopping recognition in interval check:', e);
+                }
               }
             }
-          } else {
-            // Reset timer to give more time if nothing has been said yet
-            lastActivity = Date.now();
-            resetSilenceTimer();
-          }
+          }, checkInterval);
         }
-      }, timeoutDuration);
+      }, Math.min(timeoutDuration/2, 750)); // Check halfway through or after 750ms max
     };
     
     recognition.onstart = () => {
@@ -1554,8 +1561,29 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     };
   
     recognition.onspeechend = () => {
-      console.log('Speech ended, waiting for silence timeout');
-      // The silence timer will auto-stop if no new speech is detected
+      console.log('Speech ended, processing results soon');
+      
+      // Process results almost immediately after speech ends
+      // Only wait a very short time for final results to come in
+      setTimeout(() => {
+        // Only process if recognition is still active (wasn't already processed by silence timer)
+        if (recognitionRef.current) {
+          console.log('Processing results immediately after speech end');
+          try {
+            recognitionRef.current.stop(); // This will trigger onend and process results
+          } catch (e) {
+            console.error('Error stopping recognition after speech end:', e);
+            // Force process results anyway
+            const finalTranscript = sessionTranscript || voiceSearchQuery;
+            if (finalTranscript && finalTranscript.trim().length > 0) {
+              processVoiceSearch(finalTranscript.trim(), searchSessionId);
+            }
+            // Force UI update
+            setIsListening(false);
+            setIsButtonActive(false);
+          }
+        }
+      }, 500); // Shorter delay to ensure faster response
     };
   
     recognition.onresult = (event) => {
@@ -1638,15 +1666,56 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       }
     };
     
+    // Add absolute maximum timeout to guarantee voice recognition always stops
+    const maxRecognitionTimeout = setTimeout(() => {
+      console.log('Maximum recognition time reached, forcing stop');
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          console.error('Error stopping recognition at max timeout:', e);
+          // Force process any results we have
+          const finalTranscript = sessionTranscript || voiceSearchQuery;
+          if (finalTranscript && finalTranscript.trim().length > 0) {
+            processVoiceSearch(finalTranscript.trim(), searchSessionId);
+          } else {
+            // No speech detected, show error
+            const emptyResults = {
+              query: "No speech detected",
+              foundMatch: false,
+              noSpeechDetected: true,
+              sessionId: searchSessionId,
+              timestamp: Date.now()
+            };
+            setVoiceSearchResults(emptyResults);
+            setShowVoiceSearchResults(true);
+          }
+          // Force UI update
+          setIsListening(false);
+          setIsButtonActive(false);
+        }
+      }
+    }, 4000); // Hard limit of 4 seconds max for voice recognition
+    
     // Start recognition
     try {
       recognition.start();
       console.log(`Recognition successfully started for session ${searchSessionId}`);
     } catch (error) {
       console.error(`Error starting recognition for session ${searchSessionId}:`, error);
+      clearTimeout(maxRecognitionTimeout);
       setIsListening(false);
       setIsButtonActive(false);
     }
+    
+    // Add cleanup for the max timeout when recognition ends
+    const originalOnEnd = recognition.onend;
+    recognition.onend = (event) => {
+      // Clear the max timeout
+      clearTimeout(maxRecognitionTimeout);
+      // Call the original handler
+      if (originalOnEnd) originalOnEnd(event);
+    };
   };
   
   // Manual stop recognition function (for emergency use)
@@ -3347,7 +3416,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   };
   
   // Process short stay voice search
-  const processShortStayVoiceSearch = (query, targetHour, searchId = null, explicitAM = false, explicitPM = false, forceJacuzzi = false, targetMinutes = 37) => {
+  const processShortStayVoiceSearch = (query, targetHour, searchId = null, explicitAM = false, explicitPM = false, forceJacuzzi = false, targetMinutes = null) => {
     console.log(`Processing short stay voice search: "${query}" with target hour ${targetHour}, AM: ${explicitAM}, PM: ${explicitPM}`);
     
     // Ensure microphone is completely turned off before showing results
@@ -3404,11 +3473,15 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     const currentTime = new Date();
     console.log(`Current time: ${currentTime.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`);    
     
-    // Create checkout time based on target hour with minutes set to 00
+    // Create checkout time based on target hour and minutes
     const checkoutTime = new Date(currentTime);
-    console.log(`Setting checkout time to exactly ${targetHour}:${String(targetMinutes).padStart(2, '0')}`);
-    // Set the hours and minutes from the voice query, with seconds and milliseconds set to 0
-    checkoutTime.setHours(targetHour, targetMinutes, 0, 0);
+    
+    // Use current time minutes if no specific minutes were provided in the query
+    const minutesToUse = targetMinutes !== null ? targetMinutes : currentTime.getMinutes();
+    
+    console.log(`Setting checkout time to exactly ${targetHour}:${String(minutesToUse).padStart(2, '0')}`);
+    // Set the hours and minutes, with seconds and milliseconds set to 0
+    checkoutTime.setHours(targetHour, minutesToUse, 0, 0);
     
     // Special handling for AM hours (3 AM, 4 AM, 5 AM, etc.)
     if (explicitAM) {
