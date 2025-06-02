@@ -860,6 +860,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     console.log('Device detection:', { isIOS, isSafari, isIOSSafari });
     
+    // For .app domains, assume it's iOS Safari for more aggressive pattern matching
+    const isAppDomain = window.location.hostname.endsWith('.app');
+    const forceIOSSafariHandling = isIOSSafari || isAppDomain;
+    console.log('Enhanced detection:', { isAppDomain, forceIOSSafariHandling });
+    
     // Set UI state
     setIsButtonActive(true);
     setIsListening(true);
@@ -1477,7 +1482,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     });
   };
   
-  // Handle voice search button press (improved with auto-stop)
+  // Handle voice button press (improved with auto-stop)
   const handleVoiceButtonPress = (e) => {
     e.preventDefault(); // Prevent default behavior
     
@@ -1913,11 +1918,20 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Pattern for just 'short stay' with no specific time (default to 4 hours)
     const justShortStayPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay)\b/i;
     
-    // Patterns for specific hour durations - two patterns to catch both standalone and embedded mentions
-    const standaloneHoursPattern = /\b(?:for\s+)?(\d{1,2})\s*(?:hrs|hours|hr|hour)\b/i;
-    const specificHoursPattern = /\b(\d{1,2})\s*(?:hrs|hours|hr|hour)\b/i;
-    const specificHoursJacuzziPattern = /\b(\d{1,2})\s*(?:hrs|hours|hr|hour)\s+(?:with\s+jacuzzi|jacuzzi)\b/i;
-    const jacuzziSpecificHoursPattern = /\b(?:with\s+jacuzzi|jacuzzi)\s+(\d{1,2})\s*(?:hrs|hours|hr|hour)\b/i;
+    // Patterns for specific hour durations - more flexible patterns for iOS Safari compatibility
+    const standaloneHoursPattern = /(\d{1,2})\s*(?:hrs|hours|hr|hour)/i; // Removed word boundary for iOS Safari
+    const specificHoursPattern = /(\d{1,2})\s*(?:hrs|hours|hr|hour)/i; // Removed word boundary for iOS Safari
+    const specificHoursJacuzziPattern = /(\d{1,2})\s*(?:hrs|hours|hr|hour)(?:\s+|\s*)(?:with\s+jacuzzi|jacuzzi|with\s+jets|jets)/i; // More flexible spacing
+    const jacuzziSpecificHoursPattern = /(?:with\s+jacuzzi|jacuzzi|with\s+jets|jets)(?:\s+|\s*)(\d{1,2})\s*(?:hrs|hours|hr|hour)/i; // More flexible spacing
+    
+    // Ultra simple patterns for iOS Safari - these will catch the most basic queries
+    const ultraSimpleHoursPattern = /^\s*(\d{1,2})\s*(?:hr|hrs|hour|hours|h)\s*$/i; // Just "8 hrs" or "8 h"
+    const ultraSimpleHoursJacuzziPattern = /^\s*(\d{1,2})\s*(?:hr|hrs|hour|hours|h)\s*(?:jacuzzi|jets|spa|hot\s*tub)\s*$/i; // Just "8 hrs jacuzzi"
+    
+    // Extreme fallback patterns for Safari on .app domains
+    const extremeFallbackHoursPattern = /^\s*(\d{1,2})\s*$/i; // Just the number itself, like "8"
+    const fallbackHoursWithJacuzziPattern = /^\s*(\d{1,2})\s+(?:jacuzzi|jets|spa|hot\s*tub)\s*$/i; // "8 jacuzzi"
+    const fallbackJacuzziWithHoursPattern = /^\s*(?:jacuzzi|jets|spa|hot\s*tub)\s+(\d{1,2})\s*$/i; // "jacuzzi 8"
     
     // Additional patterns for just time mentions that imply short stay
     const justTimeAmPattern = /\b(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*|\.)?(?:am|a\.m\.|a)\b/i;
@@ -2003,14 +2017,111 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     console.log('iOS Safari debug - Raw query for hours detection:', queryLower);
     console.log('iOS Safari debug - Looking for pattern:', standaloneHoursPattern);
     
-    // Check if this is a very simple query that might be just hours
+    // Special check for ultra-simple patterns for iOS Safari
+    const ultraSimpleHoursMatchResult = queryLower.match(ultraSimpleHoursPattern);
+    const ultraSimpleJacuzziMatchResult = queryLower.match(ultraSimpleHoursJacuzziPattern);
+    
+    console.log('iOS Safari debug - Ultra simple hours match:', ultraSimpleHoursMatchResult);
+    console.log('iOS Safari debug - Ultra simple hours with jacuzzi match:', ultraSimpleJacuzziMatchResult);
+    
+    // Check the ultra-simple jacuzzi pattern first (e.g., "8 hrs jacuzzi")
+    if (ultraSimpleJacuzziMatchResult && ultraSimpleJacuzziMatchResult[1]) {
+      console.log('iOS Safari - Ultra simple HOURS WITH JACUZZI detected');
+      console.log('Hours:', parseInt(ultraSimpleJacuzziMatchResult[1], 10));
+      
+      // Calculate target hour based on current time + requested hours
+      const currentTime = new Date();
+      const targetHour = (currentTime.getHours() + parseInt(ultraSimpleJacuzziMatchResult[1], 10)) % 24;
+      const currentMinutes = currentTime.getMinutes();
+      
+      // Process as a short stay with jacuzzi
+      processShortStayVoiceSearch(query, targetHour, searchId, false, false, true, currentMinutes, true);
+      return;
+    }
+    
+    // Check the ultra-simple hours pattern (e.g., "8 hrs")
+    if (ultraSimpleHoursMatchResult && ultraSimpleHoursMatchResult[1]) {
+      console.log('iOS Safari - Ultra simple HOURS detected');
+      console.log('Hours:', parseInt(ultraSimpleHoursMatchResult[1], 10));
+      
+      // Calculate target hour based on current time + requested hours
+      const currentTime = new Date();
+      const targetHour = (currentTime.getHours() + parseInt(ultraSimpleHoursMatchResult[1], 10)) % 24;
+      const currentMinutes = currentTime.getMinutes();
+      
+      // Process as a regular short stay
+      processShortStayVoiceSearch(query, targetHour, searchId, false, false, false, currentMinutes, true);
+      return;
+    }
+    
+    // Check for extreme fallback patterns specifically for iOS Safari and .app domains
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    const isIOSSafari = isIOS && isSafari;
+    const isAppDomain = window.location.hostname.endsWith('.app');
+    const forceIOSSafariHandling = isIOSSafari || isAppDomain;
+    
+    console.log('Device and domain detection:', { isIOS, isSafari, isIOSSafari, isAppDomain, forceIOSSafariHandling });
+    
+    // Apply extreme fallback patterns for iOS Safari and .app domains
+    if (forceIOSSafariHandling) {
+      // Check for "8 jacuzzi" pattern
+      const fallbackHoursWithJacuzziMatchResult = queryLower.match(fallbackHoursWithJacuzziPattern);
+      if (fallbackHoursWithJacuzziMatchResult && fallbackHoursWithJacuzziMatchResult[1]) {
+        console.log('iOS Safari - Extreme fallback HOURS WITH JACUZZI detected');
+        console.log('Hours:', parseInt(fallbackHoursWithJacuzziMatchResult[1], 10));
+        
+        // Calculate target hour based on current time + requested hours
+        const currentTime = new Date();
+        const targetHour = (currentTime.getHours() + parseInt(fallbackHoursWithJacuzziMatchResult[1], 10)) % 24;
+        const currentMinutes = currentTime.getMinutes();
+        
+        // Process as a short stay with jacuzzi
+        processShortStayVoiceSearch(query, targetHour, searchId, false, false, true, currentMinutes, true);
+        return;
+      }
+      
+      // Check for "jacuzzi 8" pattern
+      const fallbackJacuzziWithHoursMatchResult = queryLower.match(fallbackJacuzziWithHoursPattern);
+      if (fallbackJacuzziWithHoursMatchResult && fallbackJacuzziWithHoursMatchResult[1]) {
+        console.log('iOS Safari - Extreme fallback JACUZZI WITH HOURS detected');
+        console.log('Hours:', parseInt(fallbackJacuzziWithHoursMatchResult[1], 10));
+        
+        // Calculate target hour based on current time + requested hours
+        const currentTime = new Date();
+        const targetHour = (currentTime.getHours() + parseInt(fallbackJacuzziWithHoursMatchResult[1], 10)) % 24;
+        const currentMinutes = currentTime.getMinutes();
+        
+        // Process as a short stay with jacuzzi
+        processShortStayVoiceSearch(query, targetHour, searchId, false, false, true, currentMinutes, true);
+        return;
+      }
+      
+      // Check for just the number ("8")
+      const extremeFallbackHoursMatchResult = queryLower.match(extremeFallbackHoursPattern);
+      if (extremeFallbackHoursMatchResult && extremeFallbackHoursMatchResult[1]) {
+        console.log('iOS Safari - Extreme fallback JUST HOURS detected');
+        console.log('Hours:', parseInt(extremeFallbackHoursMatchResult[1], 10));
+        
+        // Calculate target hour based on current time + requested hours
+        const currentTime = new Date();
+        const targetHour = (currentTime.getHours() + parseInt(extremeFallbackHoursMatchResult[1], 10)) % 24;
+        const currentMinutes = currentTime.getMinutes();
+        
+        // Process as a regular short stay
+        processShortStayVoiceSearch(query, targetHour, searchId, false, false, false, currentMinutes, true);
+        return;
+      }
+    }
+    
+    // Check if this is a very simple query that might be just hours (standard fallback)
     const simpleHourCheck = /^\s*(\d{1,2})\s*(?:hr|hrs|hour|hours)\s*$/i.test(queryLower);
     const extractedHours = queryLower.match(/(\d{1,2})\s*(?:hr|hrs|hour|hours)/i);
     
     console.log('iOS Safari debug - Simple hour check:', simpleHourCheck);
     console.log('iOS Safari debug - Extracted hours:', extractedHours);
     
-    // Use the standard pattern first
+    // Use the standard pattern 
     const standaloneHoursMatch = queryLower.match(standaloneHoursPattern);
     
     // For iOS Safari, also do a manual check if the pattern doesn't match
