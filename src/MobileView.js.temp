@@ -5094,8 +5094,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                               {(() => {
                                 // Standard check-in is 3:00 PM (15:00 in 24-hour format)
                                 // Allow early check-in as early as 6:00 AM (9 hours before 3:00 PM)
-                                // When earlyCheckInHours is 1, time should be 2:00 PM
-                                // When earlyCheckInHours is 9, time should be 6:00 AM
+                                // Changed from 9 hours (15 - 6) to 6 hours (15 - 9) limit for early check-in
                                 const hour = 15 - voiceSearchResults.earlyCheckInHours;
                                 if (hour <= 0) {
                                   // Handle hours before noon
@@ -5329,16 +5328,17 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                                   
                                   // Direct state update with simple calculation
                                   const currentHours = parseInt(voiceSearchResults.earlyCheckInHours) || 0;
-                                  // Always allow increasing hours with maximum of 9 (to get to 6:00 AM)
-                                  // Standard check-in is 3:00 PM (15:00), so 9 hours earlier is 6:00 AM
-                                  const newHours = Math.min(currentHours + 1, 9); // Increase hours to make check-in earlier
+                                  // Always allow decreasing hours with no minimum limit
+                                  // But maximum of 6 hours early (6:00 AM) instead of 9 hours (3:00 AM)
+                                  const newHours = Math.min(currentHours - 1, 6);
                                   
                                   // Create a simple copy with only the necessary updates
                                   const updatedResults = { ...voiceSearchResults };
                                   updatedResults.earlyCheckInHours = newHours;
                                   
-                                  // Calculate cost based on actual hours
-                                  updatedResults.earlyCheckInCost = Number(newHours * 15);
+                                  // Simple cost calculation - always calculate cost based on absolute hours
+                                  const absHours = Math.abs(newHours);
+                                  updatedResults.earlyCheckInCost = Number(absHours * 15);
                                   
                                   // Make sure all values are numbers
                                   const price = Number(updatedResults.price || 0);
@@ -5374,7 +5374,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                               >
                                 -
                               </button>
-                              <span style={{ margin: '0 6px', fontSize: '12px'}}>{voiceSearchResults.earlyCheckInHours} {voiceSearchResults.earlyCheckInHours === 1 ? 'hour' : 'hours'}</span>
+                              <span style={{ margin: '0 6px', fontSize: '12px'}}>{Math.abs(voiceSearchResults.earlyCheckInHours)} {Math.abs(voiceSearchResults.earlyCheckInHours) === 1 ? 'hour' : 'hours'}</span>
                               <button 
                                 disabled={true}
                                 style={{
@@ -5612,7 +5612,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                       </div>
                       
                       {/* Show early check-in cost if applicable */}
-                      {voiceSearchResults.earlyCheckInHours !== 0 && (
+                      {voiceSearchResults.earlyCheckInHours > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', backgroundColor: 'rgba(255, 204, 0, 0.2)', padding: '5px', borderRadius: '4px' }}>
                           <span style={{ fontSize: '11px' }}>Early Check-in ({voiceSearchResults.earlyCheckInHours} {voiceSearchResults.earlyCheckInHours === 1 ? 'hour' : 'hours'} @ $15/hr):</span>
                           <span style={{ fontSize: '11px' }}>${voiceSearchResults.earlyCheckInCost.toFixed(2)}</span>
@@ -5653,7 +5653,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                       </div>
                       
                       {/* Show early check-in cost if applicable */}
-                      {voiceSearchResults.earlyCheckInHours !== 0 && (
+                      {voiceSearchResults.earlyCheckInHours > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', backgroundColor: 'rgba(255, 204, 0, 0.2)', padding: '5px', borderRadius: '4px' }}>
                           <span style={{ fontSize: '11px' }}>Early Check-in ({voiceSearchResults.earlyCheckInHours} {voiceSearchResults.earlyCheckInHours === 1 ? 'hour' : 'hours'} @ $15/hr):</span>
                           <span style={{ fontSize: '11px' }}>${voiceSearchResults.earlyCheckInCost.toFixed(2)}</span>
