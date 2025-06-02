@@ -1939,6 +1939,74 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     }
     
     // Then check for standard AM pattern
+    // Check for specific hours with jacuzzi patterns first (e.g., "8 hrs with jacuzzi", "jacuzzi 6 hours")
+    const hoursWithJacuzziMatch = queryLower.match(specificHoursJacuzziPattern);
+    if (hoursWithJacuzziMatch && hoursWithJacuzziMatch[1]) {
+      console.log('Short stay with SPECIFIC HOURS and JACUZZI detected');
+      console.log('Hours Jacuzzi Match:', hoursWithJacuzziMatch);
+      console.log('Hours:', parseInt(hoursWithJacuzziMatch[1], 10));
+      
+      // Calculate target hour based on current time + requested hours
+      const currentTime = new Date();
+      const targetHour = (currentTime.getHours() + parseInt(hoursWithJacuzziMatch[1], 10)) % 24;
+      const currentMinutes = currentTime.getMinutes();
+      
+      // Process as a short stay with the calculated end time and jacuzzi
+      processShortStayVoiceSearch(query, targetHour, searchId, false, false, true, currentMinutes, true);
+      return;
+    }
+    
+    // Check alternative pattern "jacuzzi 6 hours"
+    const jacuzziWithHoursMatch = queryLower.match(jacuzziSpecificHoursPattern);
+    if (jacuzziWithHoursMatch && jacuzziWithHoursMatch[1]) {
+      console.log('Short stay with JACUZZI and SPECIFIC HOURS detected');
+      console.log('Jacuzzi Hours Match:', jacuzziWithHoursMatch);
+      console.log('Hours:', parseInt(jacuzziWithHoursMatch[1], 10));
+      
+      // Calculate target hour based on current time + requested hours
+      const currentTime = new Date();
+      const targetHour = (currentTime.getHours() + parseInt(jacuzziWithHoursMatch[1], 10)) % 24;
+      const currentMinutes = currentTime.getMinutes();
+      
+      // Process as a short stay with the calculated end time and jacuzzi
+      processShortStayVoiceSearch(query, targetHour, searchId, false, false, true, currentMinutes, true);
+      return;
+    }
+    
+    // Check for standalone hours pattern (e.g., "6 hours", "for 8 hrs")
+    const standaloneHoursMatch = queryLower.match(standaloneHoursPattern);
+    if (standaloneHoursMatch && standaloneHoursMatch[1]) {
+      console.log('Short stay with STANDALONE HOURS detected');
+      console.log('Standalone Hours Match:', standaloneHoursMatch);
+      console.log('Hours:', parseInt(standaloneHoursMatch[1], 10));
+      
+      // Calculate target hour based on current time + requested hours
+      const currentTime = new Date();
+      const targetHour = (currentTime.getHours() + parseInt(standaloneHoursMatch[1], 10)) % 24;
+      const currentMinutes = currentTime.getMinutes();
+      
+      // Process as a regular short stay with the calculated end time
+      processShortStayVoiceSearch(query, targetHour, searchId, false, false, false, currentMinutes, true);
+      return;
+    }
+    
+    // Check for general hours pattern within context (e.g., "king room 6 hrs")
+    const generalHoursMatch = queryLower.match(specificHoursPattern);
+    if (generalHoursMatch && generalHoursMatch[1]) {
+      console.log('Short stay with SPECIFIC HOURS detected');
+      console.log('Hours Match:', generalHoursMatch);
+      console.log('Hours:', parseInt(generalHoursMatch[1], 10));
+      
+      // Calculate target hour based on current time + requested hours
+      const currentTime = new Date();
+      const targetHour = (currentTime.getHours() + parseInt(generalHoursMatch[1], 10)) % 24;
+      const currentMinutes = currentTime.getMinutes();
+      
+      // Process as a regular short stay with the calculated end time
+      processShortStayVoiceSearch(query, targetHour, searchId, false, false, false, currentMinutes, true);
+      return;
+    }
+    
     const amMatch = queryLower.match(amPattern);
     if (amMatch && amMatch[1]) {
       console.log('Short stay with EXPLICIT AM detected');
@@ -2039,9 +2107,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     }
     
     // First check for standalone hour mentions (e.g., just "9 hrs")
-    const standaloneHoursMatch = queryLower.match(standaloneHoursPattern);
-    if (standaloneHoursMatch && standaloneHoursMatch[1]) {
-      const hours = parseInt(standaloneHoursMatch[1], 10);
+    const simpleHoursMatch = queryLower.match(standaloneHoursPattern);
+    if (simpleHoursMatch && simpleHoursMatch[1]) {
+      const hours = parseInt(simpleHoursMatch[1], 10);
       console.log(`Standalone hours detected: ${hours} hours`);
       
       // Get current time
@@ -3416,7 +3484,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   };
   
   // Process short stay voice search
-  const processShortStayVoiceSearch = (query, targetHour, searchId = null, explicitAM = false, explicitPM = false, forceJacuzzi = false, targetMinutes = null) => {
+  const processShortStayVoiceSearch = (query, targetHour, searchId = null, explicitAM = false, explicitPM = false, forceJacuzzi = false, targetMinutes = null, isDuration = false) => {
     console.log(`Processing short stay voice search: "${query}" with target hour ${targetHour}, AM: ${explicitAM}, PM: ${explicitPM}`);
     
     // Ensure microphone is completely turned off before showing results
@@ -3483,20 +3551,25 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Set the hours and minutes, with seconds and milliseconds set to 0
     checkoutTime.setHours(targetHour, minutesToUse, 0, 0);
     
-    // Special handling for AM hours (3 AM, 4 AM, 5 AM, etc.)
-    if (explicitAM) {
-      // If AM is explicitly specified, ALWAYS set to next day
-      // This ensures early morning hours like 5 AM are always for the next day
-      console.log('EXPLICIT AM detected: ALWAYS setting checkout to next day');
-      checkoutTime.setDate(checkoutTime.getDate() + 1);
-    } else if (!isPM && currentTime.getHours() >= 12) {
-      // If current time is PM and target is implicitly AM, set to next day
-      console.log('IMPLICIT AM: Setting checkout to next day because current is PM and target is AM');
-      checkoutTime.setDate(checkoutTime.getDate() + 1);
-    } else if (checkoutTime <= currentTime) {
-      // If checkout time is earlier than current time, assume next day
-      console.log('Setting checkout to next day because checkout time is earlier than current time');
-      checkoutTime.setDate(checkoutTime.getDate() + 1);
+    // Skip date adjustments if this is a duration-based request (e.g., "7 hrs")
+    if (!isDuration) {
+      // Special handling for AM hours (3 AM, 4 AM, 5 AM, etc.)
+      if (explicitAM) {
+        // If AM is explicitly specified, ALWAYS set to next day
+        // This ensures early morning hours like 5 AM are always for the next day
+        console.log('EXPLICIT AM detected: ALWAYS setting checkout to next day');
+        checkoutTime.setDate(checkoutTime.getDate() + 1);
+      } else if (!isPM && currentTime.getHours() >= 12) {
+        // If current time is PM and target is implicitly AM, set to next day
+        console.log('IMPLICIT AM: Setting checkout to next day because current is PM and target is AM');
+        checkoutTime.setDate(checkoutTime.getDate() + 1);
+      } else if (checkoutTime <= currentTime) {
+        // If checkout time is earlier than current time, assume next day
+        console.log('Setting checkout to next day because checkout time is earlier than current time');
+        checkoutTime.setDate(checkoutTime.getDate() + 1);
+      }
+    } else {
+      console.log('Duration-based request: Skip adding extra days to checkout time');
     }
     
     // Log the AM/PM status for debugging
