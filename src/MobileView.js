@@ -1804,16 +1804,16 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Handle various formats including "5.AM", "5 AM", "5:00 AM", etc.
     // Also handle "I want" and "I need" phrases
     // Include patterns for just "room till X" without explicit "short stay"
-    const amPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay|(?:room|king|queen|bed)(?:\s+\w+){0,3})\s+(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*|\.)?(?:am|a\.m\.|a)\b/i;
-    const pmPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay|(?:room|king|queen|bed)(?:\s+\w+){0,3})\s+(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*|\.)?(?:pm|p\.m\.|p)\b/i;
+    const amPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay|(?:room|king|queen|bed)(?:\s+\w+){0,3})\s+(?:till|until|to)\s+(\d{1,2})(?:[:.](\d{2}))?(?:\s*|\.)(?:am|a\.m\.|a)\b/i;
+    const pmPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay|(?:room|king|queen|bed)(?:\s+\w+){0,3})\s+(?:till|until|to)\s+(\d{1,2})(?:[:.](\d{2}))?(?:\s*|\.)?(?:pm|p\.m\.|p)\b/i;
     
     // Then fall back to the generic pattern without explicit AM/PM
-    const genericPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay|(?:room|king|queen|bed)(?:\s+\w+){0,3})\s+(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*(?:hrs|hours|hr|hour|o'clock))?\b/i;
+    const genericPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay|(?:room|king|queen|bed)(?:\s+\w+){0,3})\s+(?:till|until|to)\s+(\d{1,2})(?:[:.](\d{2}))?(?:\s*(?:hrs|hours|hr|hour|o'clock))?\b/i;
     
     // Additional patterns for jacuzzi short stays
-    const amJacuzziPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay|(?:room|king|queen|bed)(?:\s+\w+){0,3})\s+(?:with\s+jacuzzi|jacuzzi)\s+(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*|\.)?(?:am|a\.m\.|a)\b/i;
-    const pmJacuzziPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay|(?:room|king|queen|bed)(?:\s+\w+){0,3})\s+(?:with\s+jacuzzi|jacuzzi)\s+(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*|\.)?(?:pm|p\.m\.|p)\b/i;
-    const genericJacuzziPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay|(?:room|king|queen|bed)(?:\s+\w+){0,3})\s+(?:with\s+jacuzzi|jacuzzi)\s+(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*(?:hrs|hours|hr|hour|o'clock))?\b/i;
+    const amJacuzziPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay|(?:room|king|queen|bed)(?:\s+\w+){0,3})\s+(?:with\s+jacuzzi|jacuzzi)\s+(?:till|until|to)\s+(\d{1,2})(?:[:.](\d{2}))?(?:\s*|\.)?(?:am|a\.m\.|a)\b/i;
+    const pmJacuzziPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay|(?:room|king|queen|bed)(?:\s+\w+){0,3})\s+(?:with\s+jacuzzi|jacuzzi)\s+(?:till|until|to)\s+(\d{1,2})(?:[:.](\d{2}))?(?:\s*|\.)?(?:pm|p\.m\.|p)\b/i;
+    const genericJacuzziPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay|(?:room|king|queen|bed)(?:\s+\w+){0,3})\s+(?:with\s+jacuzzi|jacuzzi)\s+(?:till|until|to)\s+(\d{1,2})(?:[:.](\d{2}))?(?:\s*(?:hrs|hours|hr|hour|o'clock))?\b/i;
     
     // Pattern for short stay with jacuzzi but no specific time (default to 3 PM)
     const jacuzziNoTimePattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay|(?:room|king|queen|bed)(?:\s+\w+){0,3})\s+(?:with\s+jacuzzi|jacuzzi)\b/i;
@@ -1838,7 +1838,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       console.log('Short stay with Jacuzzi and EXPLICIT AM detected');
       console.log('AM Jacuzzi Match:', amJacuzziMatch);
       console.log('Hour:', parseInt(amJacuzziMatch[1], 10));
-      processShortStayVoiceSearch(query, parseInt(amJacuzziMatch[1], 10), searchId, true, false, true);
+      // Extract minutes if available (amJacuzziMatch[2])
+      const minutes = amJacuzziMatch[2] ? parseInt(amJacuzziMatch[2], 10) : 0;
+      console.log('Minutes:', minutes);
+      processShortStayVoiceSearch(query, parseInt(amJacuzziMatch[1], 10), searchId, true, false, true, minutes);
       return;
     }
     
@@ -1847,7 +1850,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       console.log('Short stay with Jacuzzi and EXPLICIT PM detected');
       console.log('PM Jacuzzi Match:', pmJacuzziMatch);
       console.log('Hour:', parseInt(pmJacuzziMatch[1], 10));
-      processShortStayVoiceSearch(query, parseInt(pmJacuzziMatch[1], 10), searchId, false, true, true);
+      // Extract minutes if available (pmJacuzziMatch[2])
+      const minutes = pmJacuzziMatch[2] ? parseInt(pmJacuzziMatch[2], 10) : 0;
+      console.log('Minutes:', minutes);
+      processShortStayVoiceSearch(query, parseInt(pmJacuzziMatch[1], 10), searchId, false, true, true, minutes);
       return;
     }
     
@@ -1856,7 +1862,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       console.log('Short stay with Jacuzzi and NO explicit AM/PM detected');
       console.log('Generic Jacuzzi Match:', genericJacuzziMatch);
       console.log('Hour:', parseInt(genericJacuzziMatch[1], 10));
-      processShortStayVoiceSearch(query, parseInt(genericJacuzziMatch[1], 10), searchId, false, false, true);
+      // Extract minutes if available (genericJacuzziMatch[2])
+      const minutes = genericJacuzziMatch[2] ? parseInt(genericJacuzziMatch[2], 10) : 0;
+      console.log('Minutes:', minutes);
+      processShortStayVoiceSearch(query, parseInt(genericJacuzziMatch[1], 10), searchId, false, false, true, minutes);
       return;
     }
     
@@ -1866,7 +1875,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       console.log('Short stay with EXPLICIT AM detected');
       console.log('AM Match:', amMatch);
       console.log('Hour:', parseInt(amMatch[1], 10));
-      processShortStayVoiceSearch(query, parseInt(amMatch[1], 10), searchId, true, false, false);
+      // Extract minutes if available (amMatch[2])
+      const minutes = amMatch[2] ? parseInt(amMatch[2], 10) : 0;
+      console.log('Minutes:', minutes);
+      processShortStayVoiceSearch(query, parseInt(amMatch[1], 10), searchId, true, false, false, minutes);
       return;
     }
     
@@ -1876,7 +1888,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       console.log('Short stay with EXPLICIT PM detected');
       console.log('PM Match:', pmMatch);
       console.log('Hour:', parseInt(pmMatch[1], 10));
-      processShortStayVoiceSearch(query, parseInt(pmMatch[1], 10), searchId, false, true, false);
+      // Extract minutes if available (pmMatch[2])
+      const minutes = pmMatch[2] ? parseInt(pmMatch[2], 10) : 0;
+      console.log('Minutes:', minutes);
+      processShortStayVoiceSearch(query, parseInt(pmMatch[1], 10), searchId, false, true, false, minutes);
       return;
     }
     
@@ -1886,7 +1901,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       console.log('Short stay with NO explicit AM/PM detected');
       console.log('Generic Match:', genericMatch);
       console.log('Hour:', parseInt(genericMatch[1], 10));
-      processShortStayVoiceSearch(query, parseInt(genericMatch[1], 10), searchId, false, false, false);
+      // Extract minutes if available (genericMatch[2])
+      const minutes = genericMatch[2] ? parseInt(genericMatch[2], 10) : 0;
+      console.log('Minutes:', minutes);
+      processShortStayVoiceSearch(query, parseInt(genericMatch[1], 10), searchId, false, false, false, minutes);
       return;
     }
     
@@ -3329,7 +3347,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   };
   
   // Process short stay voice search
-  const processShortStayVoiceSearch = (query, targetHour, searchId = null, explicitAM = false, explicitPM = false, forceJacuzzi = false) => {
+  const processShortStayVoiceSearch = (query, targetHour, searchId = null, explicitAM = false, explicitPM = false, forceJacuzzi = false, targetMinutes = 37) => {
     console.log(`Processing short stay voice search: "${query}" with target hour ${targetHour}, AM: ${explicitAM}, PM: ${explicitPM}`);
     
     // Ensure microphone is completely turned off before showing results
@@ -3388,9 +3406,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     // Create checkout time based on target hour with minutes set to 00
     const checkoutTime = new Date(currentTime);
-    console.log(`Setting checkout time to exactly ${targetHour}:00`);
-    // Explicitly set seconds and milliseconds to 0 to ensure no seconds are displayed
-    checkoutTime.setHours(targetHour, 0, 0, 0);
+    console.log(`Setting checkout time to exactly ${targetHour}:${String(targetMinutes).padStart(2, '0')}`);
+    // Set the hours and minutes from the voice query, with seconds and milliseconds set to 0
+    checkoutTime.setHours(targetHour, targetMinutes, 0, 0);
     
     // Special handling for AM hours (3 AM, 4 AM, 5 AM, etc.)
     if (explicitAM) {
@@ -5125,16 +5143,20 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                           {voiceSearchResults.lateCheckOutHours > 0 ? (
                             <span style={{ fontSize: '10px', marginLeft: '4px', color: '#dc3545', fontWeight: 'bold' }}>
                               {(() => {
+                                // Get exact minutes from the checkOutDate if available
+                                const minutes = voiceSearchResults.checkOutDate ? 
+                                  String(voiceSearchResults.checkOutDate.getMinutes()).padStart(2, '0') : '00';
+                                
                                 const hour = 11 + voiceSearchResults.lateCheckOutHours;
                                 if (hour < 12) {
                                   // Morning hours
-                                  return `(${hour}:00 AM)`;
+                                  return `(${hour}:${minutes} AM)`;
                                 } else if (hour === 12) {
                                   // Noon
-                                  return `(12:00 PM)`;
+                                  return `(12:${minutes} PM)`;
                                 } else {
                                   // Afternoon hours
-                                  return `(${hour - 12}:00 PM)`;
+                                  return `(${hour - 12}:${minutes} PM)`;
                                 }
                               })()}
                             </span>
