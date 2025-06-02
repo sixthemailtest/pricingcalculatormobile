@@ -1493,46 +1493,38 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     }
     
     // Create a fresh recognition instance
-    const recognition = createNewRecognitionInstance();
-    if (!recognition) {
-      console.error('Failed to create speech recognition instance');
-      return;
-    }
-    
-    // Store in ref for later access
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
     recognitionRef.current = recognition;
-    
-    // Create a variable to store the transcript for this specific session
-    let sessionTranscript = '';
+
+    // Configure recognition settings
+    recognition.lang = 'en-US';
+    recognition.continuous = true;
+    recognition.interimResults = true;
     
     // Set up silence detection
     let silenceTimer = null;
-    const silenceTimeout = 5000; // 5 seconds of silence will auto-stop
-  
-    // Function to reset silence timer
-    // Initialize variables for voice recognition state tracking
     let lastActivity = Date.now();
     let lastInterimResult = '';
     let lastFinalResult = '';
     let significantPauseDetected = false;
+    let speechDetected = false;
+    let sessionTranscript = '';
     
+    // Function to reset silence timer
     const resetSilenceTimer = () => {
       if (silenceTimer) clearTimeout(silenceTimer);
-      
-      // Use a longer timeout before any speech is detected,
-      // and a shorter one once the user has started speaking
-      const timeoutDuration = 5000; // Always use 5 seconds for auto-stop
+      const timeoutDuration = speechDetected ? 3000 : 5000;
       
       silenceTimer = setTimeout(() => {
-        // Check how long it's been since last activity
         const timeSinceActivity = Date.now() - lastActivity;
-        
         if (timeSinceActivity > timeoutDuration) {
           console.log(`Silence detected for ${timeSinceActivity}ms, stopping recognition`);
           significantPauseDetected = true;
           
           // Only stop if we have some content
-          if (lastInterimResult.trim().length > 0 || lastFinalResult.trim().length > 0) {
+          if ((lastInterimResult && lastInterimResult.trim().length > 0) || 
+              (lastFinalResult && lastFinalResult.trim().length > 0)) {
             if (recognitionRef.current) {
               try {
                 recognitionRef.current.stop();
@@ -1549,7 +1541,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         }
       }, timeoutDuration);
     };
-  
+    
     recognition.onstart = () => {
       console.log(`Recognition started for session ${searchSessionId}`);
       // Start silence detection
@@ -5739,7 +5731,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           transition: isDragging ? 'none' : 'opacity 0.3s'
         }}
       >
-        <i className={`fas ${isButtonActive ? 'fa-microphone-alt' : 'fa-microphone'}`}></i>
+        {!isButtonActive && (
+          <i className="fas fa-microphone"></i>
+        )}
         
         {isListening && (
           <div className="voice-wave-container">
