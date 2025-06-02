@@ -1891,7 +1891,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     const justShortStayPattern = /\b(?:short\s+stay|i\s+(?:want|need)\s+(?:a\s+)?short\s+stay)\b/i;
     
     // Patterns for specific hour durations - two patterns to catch both standalone and embedded mentions
-    const standaloneHoursPattern = /^\s*(?:for\s+)?(\d{1,2})\s*(?:hrs|hours|hr|hour)\s*(?:stay)?\s*$/i;
+    const standaloneHoursPattern = /\b(?:for\s+)?(\d{1,2})\s*(?:hrs|hours|hr|hour)\b/i;
     const specificHoursPattern = /\b(\d{1,2})\s*(?:hrs|hours|hr|hour)\b/i;
     const specificHoursJacuzziPattern = /\b(\d{1,2})\s*(?:hrs|hours|hr|hour)\s+(?:with\s+jacuzzi|jacuzzi)\b/i;
     const jacuzziSpecificHoursPattern = /\b(?:with\s+jacuzzi|jacuzzi)\s+(\d{1,2})\s*(?:hrs|hours|hr|hour)\b/i;
@@ -1940,6 +1940,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     // Then check for standard AM pattern
     // Check for specific hours with jacuzzi patterns first (e.g., "8 hrs with jacuzzi", "jacuzzi 6 hours")
+    // Also add a special debug log for iOS Safari
+    console.log('Raw iOS Safari query:', queryLower);
     const hoursWithJacuzziMatch = queryLower.match(specificHoursJacuzziPattern);
     if (hoursWithJacuzziMatch && hoursWithJacuzziMatch[1]) {
       console.log('Short stay with SPECIFIC HOURS and JACUZZI detected');
@@ -1974,15 +1976,31 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     }
     
     // Check for standalone hours pattern (e.g., "6 hours", "for 8 hrs")
+    // Add iOS Safari specific debug logging
+    console.log('iOS Safari debug - Raw query for hours detection:', queryLower);
+    console.log('iOS Safari debug - Looking for pattern:', standaloneHoursPattern);
+    
+    // Check if this is a very simple query that might be just hours
+    const simpleHourCheck = /^\s*(\d{1,2})\s*(?:hr|hrs|hour|hours)\s*$/i.test(queryLower);
+    const extractedHours = queryLower.match(/(\d{1,2})\s*(?:hr|hrs|hour|hours)/i);
+    
+    console.log('iOS Safari debug - Simple hour check:', simpleHourCheck);
+    console.log('iOS Safari debug - Extracted hours:', extractedHours);
+    
+    // Use the standard pattern first
     const standaloneHoursMatch = queryLower.match(standaloneHoursPattern);
-    if (standaloneHoursMatch && standaloneHoursMatch[1]) {
+    
+    // For iOS Safari, also do a manual check if the pattern doesn't match
+    if ((standaloneHoursMatch && standaloneHoursMatch[1]) || (simpleHourCheck && extractedHours && extractedHours[1])) {
+      // Use either the pattern match or the extracted hours
+      const hours = standaloneHoursMatch && standaloneHoursMatch[1] ? standaloneHoursMatch[1] : extractedHours[1];
       console.log('Short stay with STANDALONE HOURS detected');
-      console.log('Standalone Hours Match:', standaloneHoursMatch);
-      console.log('Hours:', parseInt(standaloneHoursMatch[1], 10));
+      console.log('Standalone Hours Match:', standaloneHoursMatch || extractedHours);
+      console.log('Hours:', parseInt(hours, 10));
       
       // Calculate target hour based on current time + requested hours
       const currentTime = new Date();
-      const targetHour = (currentTime.getHours() + parseInt(standaloneHoursMatch[1], 10)) % 24;
+      const targetHour = (currentTime.getHours() + parseInt(hours, 10)) % 24;
       const currentMinutes = currentTime.getMinutes();
       
       // Process as a regular short stay with the calculated end time
