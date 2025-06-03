@@ -1927,6 +1927,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     const specificHoursJacuzziPattern = /(\d{1,2})\s*(?:hrs|hours|hr|hour)(?:\s+|\s*)(?:with\s+jacuzzi|jacuzzi|with\s+jets|jets)/i; // More flexible spacing
     const jacuzziSpecificHoursPattern = /(?:with\s+jacuzzi|jacuzzi|with\s+jets|jets)(?:\s+|\s*)(\d{1,2})\s*(?:hrs|hours|hr|hour)/i; // More flexible spacing
     
+    // New patterns for "room for X hours" format
+    const roomForHoursPattern = /(?:room|king|queen|bed)\s+(?:for|of)\s+(\d{1,2})\s*(?:hrs|hours|hr|hour)/i; // "room for 9 hours"
+    const roomForHoursJacuzziPattern = /(?:room|king|queen|bed)\s+(?:with\s+jacuzzi|jacuzzi)\s+(?:for|of)\s+(\d{1,2})\s*(?:hrs|hours|hr|hour)/i; // "room with jacuzzi for 9 hours"
+    const roomForHoursJacuzziPattern2 = /(?:room|king|queen|bed)\s+(?:for|of)\s+(\d{1,2})\s*(?:hrs|hours|hr|hour)\s+(?:with\s+jacuzzi|jacuzzi)/i; // "room for 9 hours with jacuzzi"
+    
     // Ultra simple patterns for iOS Safari - these will catch the most basic queries
     const ultraSimpleHoursPattern = /^\s*(\d{1,2})\s*(?:hr|hrs|hour|hours|h)\s*$/i; // Just "8 hrs" or "8 h"
     const ultraSimpleHoursJacuzziPattern = /^\s*(\d{1,2})\s*(?:hr|hrs|hour|hours|h)\s*(?:jacuzzi|jets|spa|hot\s*tub)\s*$/i; // Just "8 hrs jacuzzi"
@@ -1986,15 +1991,16 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     if (hoursWithJacuzziMatch && hoursWithJacuzziMatch[1]) {
       console.log('Short stay with SPECIFIC HOURS and JACUZZI detected');
       console.log('Hours Jacuzzi Match:', hoursWithJacuzziMatch);
-      console.log('Hours:', parseInt(hoursWithJacuzziMatch[1], 10));
+      const hours = parseInt(hoursWithJacuzziMatch[1], 10);
+      console.log('Hours:', hours);
       
       // Calculate target hour based on current time + requested hours
       const currentTime = new Date();
-      const targetHour = (currentTime.getHours() + parseInt(hoursWithJacuzziMatch[1], 10)) % 24;
+      const targetHour = (currentTime.getHours() + hours) % 24;
       const currentMinutes = currentTime.getMinutes();
       
       // Process as a short stay with the calculated end time and jacuzzi
-      processShortStayVoiceSearch(query, targetHour, searchId, false, false, true, currentMinutes, true);
+      processShortStayVoiceSearch(query, targetHour, searchId, false, false, true, currentMinutes, true, hours);
       return;
     }
     
@@ -2003,15 +2009,16 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     if (jacuzziWithHoursMatch && jacuzziWithHoursMatch[1]) {
       console.log('Short stay with JACUZZI and SPECIFIC HOURS detected');
       console.log('Jacuzzi Hours Match:', jacuzziWithHoursMatch);
-      console.log('Hours:', parseInt(jacuzziWithHoursMatch[1], 10));
+      const hours = parseInt(jacuzziWithHoursMatch[1], 10);
+      console.log('Hours:', hours);
       
       // Calculate target hour based on current time + requested hours
       const currentTime = new Date();
-      const targetHour = (currentTime.getHours() + parseInt(jacuzziWithHoursMatch[1], 10)) % 24;
+      const targetHour = (currentTime.getHours() + hours) % 24;
       const currentMinutes = currentTime.getMinutes();
       
       // Process as a short stay with the calculated end time and jacuzzi
-      processShortStayVoiceSearch(query, targetHour, searchId, false, false, true, currentMinutes, true);
+      processShortStayVoiceSearch(query, targetHour, searchId, false, false, true, currentMinutes, true, hours);
       return;
     }
     
@@ -2030,30 +2037,83 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Check the ultra-simple jacuzzi pattern first (e.g., "8 hrs jacuzzi")
     if (ultraSimpleJacuzziMatchResult && ultraSimpleJacuzziMatchResult[1]) {
       console.log('iOS Safari - Ultra simple HOURS WITH JACUZZI detected');
-      console.log('Hours:', parseInt(ultraSimpleJacuzziMatchResult[1], 10));
+      const hours = parseInt(ultraSimpleJacuzziMatchResult[1], 10);
+      console.log('Hours:', hours);
       
       // Calculate target hour based on current time + requested hours
       const currentTime = new Date();
-      const targetHour = (currentTime.getHours() + parseInt(ultraSimpleJacuzziMatchResult[1], 10)) % 24;
+      const targetHour = (currentTime.getHours() + hours) % 24;
       const currentMinutes = currentTime.getMinutes();
       
       // Process as a short stay with jacuzzi
-      processShortStayVoiceSearch(query, targetHour, searchId, false, false, true, currentMinutes, true);
+      processShortStayVoiceSearch(query, targetHour, searchId, false, false, true, currentMinutes, true, hours);
       return;
     }
     
     // Check the ultra-simple hours pattern (e.g., "8 hrs")
     if (ultraSimpleHoursMatchResult && ultraSimpleHoursMatchResult[1]) {
       console.log('iOS Safari - Ultra simple HOURS detected');
-      console.log('Hours:', parseInt(ultraSimpleHoursMatchResult[1], 10));
+      const hours = parseInt(ultraSimpleHoursMatchResult[1], 10);
+      console.log('Hours:', hours);
       
       // Calculate target hour based on current time + requested hours
       const currentTime = new Date();
-      const targetHour = (currentTime.getHours() + parseInt(ultraSimpleHoursMatchResult[1], 10)) % 24;
+      const targetHour = (currentTime.getHours() + hours) % 24;
       const currentMinutes = currentTime.getMinutes();
       
       // Process as a regular short stay
-      processShortStayVoiceSearch(query, targetHour, searchId, false, false, false, currentMinutes, true);
+      processShortStayVoiceSearch(query, targetHour, searchId, false, false, false, currentMinutes, true, hours);
+      return;
+    }
+    
+    // Check for "room for X hours" patterns
+    const roomForHoursMatchResult = queryLower.match(roomForHoursPattern);
+    if (roomForHoursMatchResult && roomForHoursMatchResult[1]) {
+      console.log('Room for specific hours detected');
+      const hours = parseInt(roomForHoursMatchResult[1], 10);
+      console.log('Hours:', hours);
+      
+      // Calculate target hour based on current time + requested hours
+      const currentTime = new Date();
+      const targetHour = (currentTime.getHours() + hours) % 24;
+      const currentMinutes = currentTime.getMinutes();
+      
+      // Process as a regular short stay with the specified duration
+      processShortStayVoiceSearch(query, targetHour, searchId, false, false, false, currentMinutes, true, hours);
+      return;
+    }
+    
+    // Check for "room with jacuzzi for X hours" pattern
+    const roomForHoursJacuzziMatchResult = queryLower.match(roomForHoursJacuzziPattern);
+    if (roomForHoursJacuzziMatchResult && roomForHoursJacuzziMatchResult[1]) {
+      console.log('Room with jacuzzi for specific hours detected');
+      const hours = parseInt(roomForHoursJacuzziMatchResult[1], 10);
+      console.log('Hours:', hours);
+      
+      // Calculate target hour based on current time + requested hours
+      const currentTime = new Date();
+      const targetHour = (currentTime.getHours() + hours) % 24;
+      const currentMinutes = currentTime.getMinutes();
+      
+      // Process as a short stay with jacuzzi with the specified duration
+      processShortStayVoiceSearch(query, targetHour, searchId, false, false, true, currentMinutes, true, hours);
+      return;
+    }
+    
+    // Check for "room for X hours with jacuzzi" pattern
+    const roomForHoursJacuzziMatchResult2 = queryLower.match(roomForHoursJacuzziPattern2);
+    if (roomForHoursJacuzziMatchResult2 && roomForHoursJacuzziMatchResult2[1]) {
+      console.log('Room for specific hours with jacuzzi detected');
+      const hours = parseInt(roomForHoursJacuzziMatchResult2[1], 10);
+      console.log('Hours:', hours);
+      
+      // Calculate target hour based on current time + requested hours
+      const currentTime = new Date();
+      const targetHour = (currentTime.getHours() + hours) % 24;
+      const currentMinutes = currentTime.getMinutes();
+      
+      // Process as a short stay with jacuzzi with the specified duration
+      processShortStayVoiceSearch(query, targetHour, searchId, false, false, true, currentMinutes, true, hours);
       return;
     }
     
@@ -2072,15 +2132,16 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       const fallbackHoursWithJacuzziMatchResult = queryLower.match(fallbackHoursWithJacuzziPattern);
       if (fallbackHoursWithJacuzziMatchResult && fallbackHoursWithJacuzziMatchResult[1]) {
         console.log('iOS Safari - Extreme fallback HOURS WITH JACUZZI detected');
-        console.log('Hours:', parseInt(fallbackHoursWithJacuzziMatchResult[1], 10));
+        const hours = parseInt(fallbackHoursWithJacuzziMatchResult[1], 10);
+        console.log('Hours:', hours);
         
         // Calculate target hour based on current time + requested hours
         const currentTime = new Date();
-        const targetHour = (currentTime.getHours() + parseInt(fallbackHoursWithJacuzziMatchResult[1], 10)) % 24;
+        const targetHour = (currentTime.getHours() + hours) % 24;
         const currentMinutes = currentTime.getMinutes();
         
         // Process as a short stay with jacuzzi
-        processShortStayVoiceSearch(query, targetHour, searchId, false, false, true, currentMinutes, true);
+        processShortStayVoiceSearch(query, targetHour, searchId, false, false, true, currentMinutes, true, hours);
         return;
       }
       
@@ -2088,15 +2149,16 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       const fallbackJacuzziWithHoursMatchResult = queryLower.match(fallbackJacuzziWithHoursPattern);
       if (fallbackJacuzziWithHoursMatchResult && fallbackJacuzziWithHoursMatchResult[1]) {
         console.log('iOS Safari - Extreme fallback JACUZZI WITH HOURS detected');
-        console.log('Hours:', parseInt(fallbackJacuzziWithHoursMatchResult[1], 10));
+        const hours = parseInt(fallbackJacuzziWithHoursMatchResult[1], 10);
+        console.log('Hours:', hours);
         
         // Calculate target hour based on current time + requested hours
         const currentTime = new Date();
-        const targetHour = (currentTime.getHours() + parseInt(fallbackJacuzziWithHoursMatchResult[1], 10)) % 24;
+        const targetHour = (currentTime.getHours() + hours) % 24;
         const currentMinutes = currentTime.getMinutes();
         
         // Process as a short stay with jacuzzi
-        processShortStayVoiceSearch(query, targetHour, searchId, false, false, true, currentMinutes, true);
+        processShortStayVoiceSearch(query, targetHour, searchId, false, false, true, currentMinutes, true, hours);
         return;
       }
       
@@ -2104,15 +2166,16 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       const extremeFallbackHoursMatchResult = queryLower.match(extremeFallbackHoursPattern);
       if (extremeFallbackHoursMatchResult && extremeFallbackHoursMatchResult[1]) {
         console.log('iOS Safari - Extreme fallback JUST HOURS detected');
-        console.log('Hours:', parseInt(extremeFallbackHoursMatchResult[1], 10));
+        const hours = parseInt(extremeFallbackHoursMatchResult[1], 10);
+        console.log('Hours:', hours);
         
         // Calculate target hour based on current time + requested hours
         const currentTime = new Date();
-        const targetHour = (currentTime.getHours() + parseInt(extremeFallbackHoursMatchResult[1], 10)) % 24;
+        const targetHour = (currentTime.getHours() + hours) % 24;
         const currentMinutes = currentTime.getMinutes();
         
         // Process as a regular short stay
-        processShortStayVoiceSearch(query, targetHour, searchId, false, false, false, currentMinutes, true);
+        processShortStayVoiceSearch(query, targetHour, searchId, false, false, false, currentMinutes, true, hours);
         return;
       }
     }
@@ -2130,18 +2193,19 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // For iOS Safari, also do a manual check if the pattern doesn't match
     if ((standaloneHoursMatch && standaloneHoursMatch[1]) || (simpleHourCheck && extractedHours && extractedHours[1])) {
       // Use either the pattern match or the extracted hours
-      const hours = standaloneHoursMatch && standaloneHoursMatch[1] ? standaloneHoursMatch[1] : extractedHours[1];
+      const hoursStr = standaloneHoursMatch && standaloneHoursMatch[1] ? standaloneHoursMatch[1] : extractedHours[1];
+      const hours = parseInt(hoursStr, 10);
       console.log('Short stay with STANDALONE HOURS detected');
       console.log('Standalone Hours Match:', standaloneHoursMatch || extractedHours);
-      console.log('Hours:', parseInt(hours, 10));
+      console.log('Hours:', hours);
       
       // Calculate target hour based on current time + requested hours
       const currentTime = new Date();
-      const targetHour = (currentTime.getHours() + parseInt(hours, 10)) % 24;
+      const targetHour = (currentTime.getHours() + hours) % 24;
       const currentMinutes = currentTime.getMinutes();
       
       // Process as a regular short stay with the calculated end time
-      processShortStayVoiceSearch(query, targetHour, searchId, false, false, false, currentMinutes, true);
+      processShortStayVoiceSearch(query, targetHour, searchId, false, false, false, currentMinutes, true, hours);
       return;
     }
     
@@ -2150,15 +2214,16 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     if (generalHoursMatch && generalHoursMatch[1]) {
       console.log('Short stay with SPECIFIC HOURS detected');
       console.log('Hours Match:', generalHoursMatch);
-      console.log('Hours:', parseInt(generalHoursMatch[1], 10));
+      const hours = parseInt(generalHoursMatch[1], 10);
+      console.log('Hours:', hours);
       
       // Calculate target hour based on current time + requested hours
       const currentTime = new Date();
-      const targetHour = (currentTime.getHours() + parseInt(generalHoursMatch[1], 10)) % 24;
+      const targetHour = (currentTime.getHours() + hours) % 24;
       const currentMinutes = currentTime.getMinutes();
       
       // Process as a regular short stay with the calculated end time
-      processShortStayVoiceSearch(query, targetHour, searchId, false, false, false, currentMinutes, true);
+      processShortStayVoiceSearch(query, targetHour, searchId, false, false, false, currentMinutes, true, hours);
       return;
     }
     
@@ -3690,7 +3755,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   };
   
   // Process short stay voice search
-  const processShortStayVoiceSearch = (query, targetHour, searchId = null, explicitAM = false, explicitPM = false, forceJacuzzi = false, targetMinutes = null, isDuration = false) => {
+  const processShortStayVoiceSearch = (query, targetHour, searchId = null, explicitAM = false, explicitPM = false, forceJacuzzi = false, targetMinutes = null, isDuration = false, explicitDuration = null) => {
     console.log(`Processing short stay voice search: "${query}" with target hour ${targetHour}, AM: ${explicitAM}, PM: ${explicitPM}`);
     
     // Ensure microphone is completely turned off before showing results
@@ -3794,33 +3859,41 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     const currentMinutes = currentTime.getMinutes();
     console.log(`Current minutes: ${currentMinutes}`);
     
-    // Convert to hours
-    const rawHours = durationMs / (1000 * 60 * 60);
+    // Use explicitDuration if provided, otherwise calculate from time difference
     let durationHours;
     
-    // If current time is between 45-60 minutes past the hour, don't count the current hour
-    if (currentMinutes >= 45 && currentMinutes < 60) {
-      console.log('Current time is between 45-60 minutes past the hour, not counting this partial hour');
-      // Subtract the remaining minutes in this hour from the duration
-      const adjustedRawHours = rawHours - ((60 - currentMinutes) / 60);
-      durationHours = Math.ceil(adjustedRawHours);
-      console.log(`Adjusted raw hours: ${adjustedRawHours} hours`);
+    if (explicitDuration !== null) {
+      // Use the explicit duration provided in the voice command
+      durationHours = explicitDuration;
+      console.log(`Using explicit duration from voice command: ${durationHours} hours`);
     } else {
-      // For short stays, we always count a partial hour as a full hour
-      durationHours = Math.ceil(rawHours);
-    }
-    
-    console.log(`Raw hours calculation: ${rawHours} hours`);
-    console.log(`Rounded to: ${durationHours} hours`);
-    console.log(`From ${currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} to ${checkoutTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`);
-    
-    // Special case: if we're at exactly X:00 and checking out at Y:00,
-    // the hours should be Y-X (not counting the next day case)
-    if (currentTime.getMinutes() === 0 && checkoutTime.getDate() === currentTime.getDate()) {
-      const hourDiff = checkoutTime.getHours() - currentTime.getHours();
-      if (hourDiff > 0) {
-        console.log(`Exact hour difference: ${hourDiff} hours`);
-        durationHours = hourDiff;
+      // Calculate duration from time difference
+      const rawHours = durationMs / (1000 * 60 * 60);
+      
+      // If current time is between 45-60 minutes past the hour, don't count the current hour
+      if (currentMinutes >= 45 && currentMinutes < 60) {
+        console.log('Current time is between 45-60 minutes past the hour, not counting this partial hour');
+        // Subtract the remaining minutes in this hour from the duration
+        const adjustedRawHours = rawHours - ((60 - currentMinutes) / 60);
+        durationHours = Math.ceil(adjustedRawHours);
+        console.log(`Adjusted raw hours: ${adjustedRawHours} hours`);
+      } else {
+        // For short stays, we always count a partial hour as a full hour
+        durationHours = Math.ceil(rawHours);
+      }
+      
+      console.log(`Raw hours calculation: ${rawHours} hours`);
+      console.log(`Rounded to: ${durationHours} hours`);
+      console.log(`From ${currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} to ${checkoutTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`);
+      
+      // Special case: if we're at exactly X:00 and checking out at Y:00,
+      // the hours should be Y-X (not counting the next day case)
+      if (currentTime.getMinutes() === 0 && checkoutTime.getDate() === currentTime.getDate()) {
+        const hourDiff = checkoutTime.getHours() - currentTime.getHours();
+        if (hourDiff > 0) {
+          console.log(`Exact hour difference: ${hourDiff} hours`);
+          durationHours = hourDiff;
+        }
       }
     }
     console.log(`Duration: ${durationHours} hours`);
