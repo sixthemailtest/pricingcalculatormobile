@@ -19,6 +19,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
+  // New state for multiple room results
+  const [multipleRoomResults, setMultipleRoomResults] = useState([]);
+  const [activeRoomIndex, setActiveRoomIndex] = useState(0);
   const [voiceSearchResults, setVoiceSearchResults] = useState({
     showModal: false,
     foundMatch: false,
@@ -3604,6 +3607,35 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         // Set the results with the refresh data
         setVoiceSearchResults(refreshedResults);
         
+        // If this is a valid room search result, add it to multiple room results
+        if (refreshedResults.foundMatch) {
+          // Create a display name for this room type
+          const roomDisplayName = `${refreshedResults.bedType === 'Queen2Beds' ? 'Queen 2 Beds' : refreshedResults.bedType}${refreshedResults.hasJacuzzi ? ' with Jacuzzi' : ''}`;
+          
+          // Add display name to the results
+          const resultWithDisplayName = {
+            ...refreshedResults,
+            displayName: roomDisplayName
+          };
+          
+          // Check if the current room type is already in the multiple room results
+          setMultipleRoomResults(prevResults => {
+            // Don't add duplicates of the same room type
+            const isAlreadyAdded = prevResults.some(room => 
+              room.bedType === refreshedResults.bedType && 
+              room.hasJacuzzi === refreshedResults.hasJacuzzi);
+              
+            if (!isAlreadyAdded) {
+              console.log(`Adding ${roomDisplayName} to multiple room results`);
+              // Add new room and set it as active
+              const newResults = [...prevResults, resultWithDisplayName];
+              setActiveRoomIndex(newResults.length - 1);
+              return newResults;
+            }
+            return prevResults;
+          });
+        }
+        
         // Apply the results to app state immediately
         applyVoiceSearchResults(refreshedResults);
         
@@ -4311,9 +4343,16 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Hide the modal
     setShowVoiceSearchResults(false);
     
-    // Clear the results after a short delay to allow for animation
+    // Note: We're NOT clearing multipleRoomResults here to preserve room data
+    // We only hide the modal but keep the room data for when we reopen
+    
+    // If there are multiple rooms saved, we keep the current voiceSearchResults
+    // otherwise, we clear it as before
     setTimeout(() => {
-      setVoiceSearchResults(null);
+      // Only clear voice search results if we don't have any saved rooms
+      if (multipleRoomResults.length === 0) {
+        setVoiceSearchResults(null);
+      }
     }, 300);
     
     // Check if this is an iOS device
@@ -5397,8 +5436,133 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                   </div>
                 )}
                 
-                <div>
-                  <strong style={{ fontSize: '13px' }}>Stay Details:</strong>
+                {/* Room selector UI - only show when we have multiple rooms */}
+                {multipleRoomResults.length > 0 && (
+                  <div style={{ marginBottom: '10px' }}>
+                    <div style={{ fontSize: '12px', marginBottom: '5px' }}>Select room to view:</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
+                      {multipleRoomResults.map((room, index) => (
+                        <button 
+                          key={`room-${index}`}
+                          onClick={() => {
+                            // Set the active room index and update the current results
+                            setActiveRoomIndex(index);
+                            setVoiceSearchResults(multipleRoomResults[index]);
+                          }}
+                          style={{
+                            backgroundColor: '#3f51b5',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '5px 8px',
+                            fontSize: '11px',
+                            cursor: 'pointer',
+                            opacity: activeRoomIndex === index ? 1 : 0.8
+                          }}
+                        >
+                          {room.displayName}
+                        </button>
+                      ))}
+                      {voiceSearchResults && !multipleRoomResults.some(room => 
+                        room.bedType === voiceSearchResults.bedType && 
+                        room.hasJacuzzi === voiceSearchResults.hasJacuzzi
+                      ) && (
+                        <button 
+                          onClick={() => {
+                            // Save current results if not already in the list
+                            if (voiceSearchResults && voiceSearchResults.foundMatch) {
+                              const roomWithName = {
+                                ...voiceSearchResults,
+                                displayName: `${voiceSearchResults.bedType === 'Queen2Beds' ? 'Queen 2 Beds' : voiceSearchResults.bedType}${voiceSearchResults.hasJacuzzi ? ' with Jacuzzi' : ''}`
+                              };
+                              const newResults = [...multipleRoomResults, roomWithName];
+                              setMultipleRoomResults(newResults);
+                              setActiveRoomIndex(newResults.length - 1);
+                            }
+                          }}
+                          style={{
+                            backgroundColor: '#3f51b5',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '5px 8px',
+                            fontSize: '11px',
+                            cursor: 'pointer',
+                            opacity: 0.9
+                          }}
+                        >
+                          Current Room
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                <div style={{ position: 'relative' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <strong style={{ fontSize: '13px' }}>Stay Details:</strong>
+                    {/* Add room button inline with Stay Details (only for overnight stays) */}
+                    {!voiceSearchResults.isShortStay && (
+                      <button 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          console.log('Add room button clicked - saving current results and activating voice recognition');
+                          
+                          // Save the current search results to multipleRoomResults if it's not already there
+                          if (voiceSearchResults && voiceSearchResults.foundMatch) {
+                            setMultipleRoomResults(prevResults => {
+                              // Check if this room is already in the results
+                              const isAlreadyAdded = prevResults.some(room => 
+                                room.bedType === voiceSearchResults.bedType && 
+                                room.hasJacuzzi === voiceSearchResults.hasJacuzzi);
+                                
+                              if (!isAlreadyAdded) {
+                                console.log('Adding current room to multiple results');
+                                // Create a copy with a friendly name for display
+                                const roomWithName = {
+                                  ...voiceSearchResults,
+                                  displayName: `${voiceSearchResults.bedType === 'Queen2Beds' ? 'Queen 2 Beds' : voiceSearchResults.bedType}${voiceSearchResults.hasJacuzzi ? ' with Jacuzzi' : ''}`
+                                };
+                                return [...prevResults, roomWithName];
+                              }
+                              return prevResults;
+                            });
+                          }
+                          
+                          // Keep the modal visible and activate the voice button
+                          setIsButtonActive(true);
+                          
+                          // Toggle the listening state manually
+                          if (recognitionRef.current) {
+                            try {
+                              recognitionRef.current.abort();
+                            } catch (err) {
+                              console.log('Error stopping existing recognition:', err);
+                            }
+                          }
+                          
+                          // Start a new voice recognition session
+                          startImprovedVoiceRecognition();
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: '#3f51b5',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          padding: '2px 6px',
+                          cursor: 'pointer',
+                          fontSize: '11px',
+                          fontWeight: 'normal'
+                        }}
+                      >
+                        <span style={{ marginRight: '2px', fontSize: '12px' }}>+</span>
+                        Add room
+                      </button>
+                    )}
+                  </div>
                   <ul style={{ paddingLeft: '16px', marginTop: '6px', fontSize: '12px' }}>
                     <li>Check-in: {voiceSearchResults.isShortStay && voiceSearchResults.formattedCheckInTime ? 
                       voiceSearchResults.formattedCheckInTime : 
@@ -5842,6 +6006,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                           </div>
 
                         </li>
+
+
                       </>
                     )}
                   </ul>
