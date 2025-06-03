@@ -3609,8 +3609,16 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         
         // If this is a valid room search result, add it to multiple room results
         if (refreshedResults.foundMatch) {
-          // Create a display name for this room type
-          const roomDisplayName = `${refreshedResults.bedType === 'Queen2Beds' ? 'Queen 2 Beds' : refreshedResults.bedType}${refreshedResults.hasJacuzzi ? ' with Jacuzzi' : ''}`;
+          // Create a display name for this room type including date information
+          let roomDisplayName = `${refreshedResults.bedType === 'Queen2Beds' ? 'Queen 2 Beds' : refreshedResults.bedType}${refreshedResults.hasJacuzzi ? ' with Jacuzzi' : ''}`;
+          
+          // Add date information if available
+          if (refreshedResults.checkInDate && refreshedResults.checkOutDate) {
+            // Format dates as short month/day for better readability
+            const checkInStr = refreshedResults.checkInDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const checkOutStr = refreshedResults.checkOutDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            roomDisplayName += ` (${checkInStr}-${checkOutStr})`;
+          }
           
           // Add display name to the results
           const resultWithDisplayName = {
@@ -3620,10 +3628,24 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           
           // Check if the current room type is already in the multiple room results
           setMultipleRoomResults(prevResults => {
-            // Don't add duplicates of the same room type
-            const isAlreadyAdded = prevResults.some(room => 
-              room.bedType === refreshedResults.bedType && 
-              room.hasJacuzzi === refreshedResults.hasJacuzzi);
+            // Don't add duplicates of the same room type with same dates
+            const isAlreadyAdded = prevResults.some(room => {
+              // Compare room type and jacuzzi status
+              const sameRoomType = room.bedType === refreshedResults.bedType && 
+                                   room.hasJacuzzi === refreshedResults.hasJacuzzi;
+              
+              // Compare check-in and check-out dates
+              // First, convert date objects to strings for comparison if they exist
+              const roomCheckInStr = room.checkInDate ? room.checkInDate.toISOString() : null;
+              const newCheckInStr = refreshedResults.checkInDate ? refreshedResults.checkInDate.toISOString() : null;
+              const roomCheckOutStr = room.checkOutDate ? room.checkOutDate.toISOString() : null;
+              const newCheckOutStr = refreshedResults.checkOutDate ? refreshedResults.checkOutDate.toISOString() : null;
+              
+              const sameDates = roomCheckInStr === newCheckInStr && roomCheckOutStr === newCheckOutStr;
+              
+              // Only consider it a duplicate if both room type and dates match
+              return sameRoomType && sameDates;
+            });
               
             if (!isAlreadyAdded) {
               console.log(`Adding ${roomDisplayName} to multiple room results`);
@@ -4093,6 +4115,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         stopVoiceRecognition();
         return;
       }
+      
+      // Clear previously saved rooms when starting a new search
+      // This ensures we have a clean slate for the new search
+      setMultipleRoomResults([]);
+      setActiveRoomIndex(-1);
       
       // Start voice recognition
       setIsButtonActive(true);
