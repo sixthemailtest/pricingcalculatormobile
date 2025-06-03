@@ -5557,10 +5557,38 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                             padding: '5px 8px',
                             fontSize: '11px',
                             cursor: 'pointer',
-                            opacity: activeRoomIndex === index ? 1 : 0.8
+                            opacity: activeRoomIndex === index ? 1 : 0.8,
+                            position: 'relative'
                           }}
                         >
-                          {room.displayName}
+                          <span>{room.displayName}</span>
+                          <span 
+                            style={{
+                              marginLeft: '6px',
+                              fontSize: '12px',
+                              cursor: 'pointer',
+                              fontWeight: 'bold',
+                              color: '#ff0000',
+                              position: 'relative',
+                              top: '-1px'
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent the main button click
+                              const updatedRooms = [...multipleRoomResults];
+                              updatedRooms.splice(index, 1);
+                              setMultipleRoomResults(updatedRooms);
+                              // If we're removing the active room, reset the active index
+                              if (index === activeRoomIndex) {
+                                setActiveRoomIndex(updatedRooms.length > 0 ? 0 : -1);
+                                setVoiceSearchResults(updatedRooms.length > 0 ? updatedRooms[0] : null);
+                              } else if (index < activeRoomIndex) {
+                                // Adjust the active index if we're removing a room before it
+                                setActiveRoomIndex(activeRoomIndex - 1);
+                              }
+                            }}
+                          >
+                            ×
+                          </span>
                         </button>
                       ))}
                       {voiceSearchResults && !multipleRoomResults.some(room => 
