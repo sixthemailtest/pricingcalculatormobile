@@ -1936,6 +1936,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     const ultraSimpleHoursPattern = /^\s*(\d{1,2})\s*(?:hr|hrs|hour|hours|h)\s*$/i; // Just "8 hrs" or "8 h"
     const ultraSimpleHoursJacuzziPattern = /^\s*(\d{1,2})\s*(?:hr|hrs|hour|hours|h)\s*(?:jacuzzi|jets|spa|hot\s*tub)\s*$/i; // Just "8 hrs jacuzzi"
     
+    // Additional iOS Safari specific patterns to catch more hour variations
+    const iosSafariHoursPattern = /\b(\d{1,2})\s*(?:hr|hrs|hour|hours|h)\b/i; // Catch "8 hours" anywhere in the query
+    const iosSafariNumericPattern = /\b(?:(?:for|of)\s+)?(\d{1,2})\b/i; // Numbers with or without "for" prefix
+    
     // Extreme fallback patterns for Safari on .app domains
     const extremeFallbackHoursPattern = /^\s*(\d{1,2})\s*$/i; // Just the number itself, like "8"
     const fallbackHoursWithJacuzziPattern = /^\s*(\d{1,2})\s+(?:jacuzzi|jets|spa|hot\s*tub)\s*$/i; // "8 jacuzzi"
@@ -2175,6 +2179,45 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         const currentMinutes = currentTime.getMinutes();
         
         // Process as a regular short stay
+        processShortStayVoiceSearch(query, targetHour, searchId, false, false, false, currentMinutes, true, hours);
+        return;
+      }
+    }
+    
+    // Enhanced iOS Safari specific patterns for better hour detection
+    if (isIOS || forceIOSSafariHandling) {
+      // Try the more flexible iOS Safari hours pattern
+      const iosSafariHoursMatchResult = queryLower.match(iosSafariHoursPattern);
+      if (iosSafariHoursMatchResult && iosSafariHoursMatchResult[1]) {
+        console.log('iOS Safari - Enhanced hours pattern detected');
+        const hours = parseInt(iosSafariHoursMatchResult[1], 10);
+        console.log('Hours:', hours);
+        
+        // Calculate target hour based on current time + requested hours
+        const currentTime = new Date();
+        const targetHour = (currentTime.getHours() + hours) % 24;
+        const currentMinutes = currentTime.getMinutes();
+        
+        // Process as a regular short stay with the explicit duration
+        processShortStayVoiceSearch(query, targetHour, searchId, false, false, false, currentMinutes, true, hours);
+        return;
+      }
+      
+      // Try the numeric pattern which catches isolated numbers like "for 5"
+      const iosSafariNumericMatchResult = queryLower.match(iosSafariNumericPattern);
+      if (iosSafariNumericMatchResult && iosSafariNumericMatchResult[1] && 
+          // Only process this if there's also a context clue indicating it's about room or stay
+          /\b(?:room|stay|book|night|king|queen|bed)\b/i.test(queryLower)) {
+        console.log('iOS Safari - Enhanced numeric with room context pattern detected');
+        const hours = parseInt(iosSafariNumericMatchResult[1], 10);
+        console.log('Hours:', hours);
+        
+        // Calculate target hour based on current time + requested hours
+        const currentTime = new Date();
+        const targetHour = (currentTime.getHours() + hours) % 24;
+        const currentMinutes = currentTime.getMinutes();
+        
+        // Process as a regular short stay with the explicit duration
         processShortStayVoiceSearch(query, targetHour, searchId, false, false, false, currentMinutes, true, hours);
         return;
       }
@@ -3841,6 +3884,14 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       }
     } else {
       console.log('Duration-based request: Skip adding extra days to checkout time');
+      
+      // Ensure checkout time is always consistent with explicit duration
+      if (explicitDuration !== null) {
+        // Recalculate checkout time to be exactly explicit duration from now
+        // This handles any edge cases with larger hour values
+        checkoutTime.setTime(currentTime.getTime() + (explicitDuration * 60 * 60 * 1000));
+        console.log(`iOS Safari fix: Recalculated checkout time based on explicit duration: ${explicitDuration} hours`);
+      }
     }
     
     // Log the AM/PM status for debugging
