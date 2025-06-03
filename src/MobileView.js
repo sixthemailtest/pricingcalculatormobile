@@ -122,58 +122,15 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       console.error('Error loading rooms from local storage:', error);
     }
     
-    // For iOS devices, we need a different approach to avoid permission popups
+    // Skip automatic microphone permission checks
+    // Users will only be prompted when they explicitly use voice features
     if (('webkitSpeechRecognition' in window) || ('SpeechRecognition' in window)) {
-      // Check if this is an iOS device
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      // Set flag to indicate we're skipping auto permission checks
+      localStorage.setItem('micPermissionHandled', 'true');
+      console.log('Microphone permission checks disabled - will only request when user activates voice feature');
       
-      if (isIOS) {
-        // On iOS, we'll use a different approach to handle permissions silently
-        // We'll set a flag to indicate we've attempted to handle permissions
-        localStorage.setItem('micPermissionHandled', 'true');
-        
-        // For iOS, we'll rely on the first actual voice search to handle permissions
-        // This avoids showing any permission popups until the user actually wants to use voice search
-        console.log('iOS device detected - will handle microphone permissions during first voice search');
-      } else {
-        try {
-          // On non-iOS devices, we can use a more standard approach
-          // Create a temporary recognition instance with minimal settings
-          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-          const tempRecognition = new SpeechRecognition();
-          
-          // Configure minimal settings
-          tempRecognition.lang = 'en-US';
-          tempRecognition.continuous = false;
-          tempRecognition.interimResults = false;
-          
-          // Add minimal handlers
-          tempRecognition.onstart = () => {
-            console.log('Microphone permission check started');
-            // Stop immediately to minimize any UI impact
-            setTimeout(() => {
-              try {
-                tempRecognition.stop();
-              } catch (e) {
-                console.log('Error stopping temp recognition:', e);
-              }
-            }, 50);
-          };
-          
-          tempRecognition.onend = () => {
-            console.log('Microphone permission check completed');
-          };
-          
-          tempRecognition.onerror = (event) => {
-            console.log('Microphone permission check error:', event.error);
-          };
-          
-          // Start recognition to trigger permission prompt
-          tempRecognition.start();
-        } catch (error) {
-          console.error('Error requesting microphone permission:', error);
-        }
-      }
+      // No automatic permission checks for any device
+      // Permission will only be requested when voice features are explicitly used
     }
   }, []);  
   
