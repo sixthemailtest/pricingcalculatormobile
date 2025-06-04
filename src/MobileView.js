@@ -3779,77 +3779,80 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       }
     }
     
+    // Convert query to lowercase for easier matching
     const shortStayQueryLower = query.toLowerCase();
-    const currentTime = new Date(); // Get current time once
+    
+    // Determine if the target hour is AM or PM
+    let isPM = false;
+    
+    // If explicitly specified in the query, use that
+    if (explicitPM) {
+      isPM = true;
+      console.log('PM explicitly specified in query');
+    } else if (explicitAM) {
+      isPM = false;
+      console.log('AM explicitly specified in query');
+    } else {
+      // If not explicitly specified, use smart defaults
+      // For short stay, assume PM for hours 1-11 (more common for short stays)
+      isPM = (targetHour >= 1 && targetHour < 12);
+      console.log(`No explicit AM/PM, assuming ${isPM ? 'PM' : 'AM'} for hour ${targetHour}`);
+    }
+    
+    // Convert to 24-hour format
+    if (isPM && targetHour < 12) {
+      targetHour += 12;
+    } else if (!isPM && targetHour === 12) {
+      targetHour = 0;
+    }
+    
+    console.log(`Target hour in 24-hour format: ${targetHour}:00`);
+    
+    // Always use the actual current time when the function is called
+    const currentTime = new Date();
+    console.log(`Current time: ${currentTime.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`);    
+    
+    // Create checkout time based on target hour and minutes
+    const checkoutTime = new Date(currentTime);
+    
+    // Use current time minutes if no specific minutes were provided in the query
     const minutesToUse = targetMinutes !== null ? targetMinutes : currentTime.getMinutes();
-    let checkoutTime = new Date(currentTime); // Initialize checkoutTime
-
-    // targetHour from function signature is targetHourInput (1-12 or duration)
-    const targetHourInput = targetHour;
-
-    if (isDuration) {
-        let durationInHours = 0;
-        if (explicitDuration !== null) {
-            durationInHours = explicitDuration;
-            console.log(`Duration-based request with explicitDuration: ${durationInHours} hours.`);
-        } else {
-            // If isDuration is true but explicitDuration is null,
-            // it means targetHourInput likely holds the duration (e.g., "3 hours")
-            durationInHours = targetHourInput;
-            console.log(`Duration-based request, duration from targetHourInput: ${durationInHours} hours.`);
-        }
-        checkoutTime.setTime(currentTime.getTime() + (durationInHours * 60 * 60 * 1000));
-        console.log(`Checkout time for duration ${durationInHours} hours: ${checkoutTime.toLocaleString()}`);
-    } else if (explicitAM || explicitPM) { // Not duration, but has explicit AM/PM
-        let finalTargetHour24 = targetHourInput; // targetHourInput is 1-12
-        if (explicitPM) { // User said "X PM"
-            if (targetHourInput < 12) finalTargetHour24 = targetHourInput + 12; // 1 PM -> 13, 11 PM -> 23
-            // If targetHourInput is 12 (12 PM), it's already 12.
-        } else { // explicitAM. User said "X AM"
-            if (targetHourInput === 12) finalTargetHour24 = 0; // 12 AM is 0 hours
-            // If targetHourInput is 1-11 AM (e.g. 9 AM), it's already correct for 24h format (9)
-        }
-        checkoutTime.setHours(finalTargetHour24, minutesToUse, 0, 0);
-        
-        // If the calculated time is in the past for the current day, advance to the next day.
-        if (checkoutTime <= currentTime) {
-            console.log('Explicit AM/PM checkout time is in the past or same as current, advancing to next day.');
-            checkoutTime.setDate(checkoutTime.getDate() + 1);
-        }
-        console.log(`Explicit AM/PM: Checkout time set to ${checkoutTime.toLocaleString()}`);
-    } else { // Not duration, no explicit AM/PM. User said "till X". targetHourInput is 1-12.
-        console.log(`No explicit AM/PM for target hour ${targetHourInput}. Determining next chronological occurrence.`);
-        const hour12 = targetHourInput; 
-
-        // Candidate 1: AM version of hour12
-        let checkoutHourAM_24 = (hour12 === 12) ? 0 : hour12; // 12 AM is 00:00, 1-11 AM are 1-11 for 24h
-        let dateAM = new Date(currentTime);
-        dateAM.setHours(checkoutHourAM_24, minutesToUse, 0, 0);
-        if (dateAM <= currentTime) { // If this AM time today is already past, then it's for tomorrow
-            dateAM.setDate(dateAM.getDate() + 1);
-        }
-
-        // Candidate 2: PM version of hour12
-        let checkoutHourPM_24 = (hour12 === 12) ? 12 : hour12 + 12; // 12 PM is 12:00, 1-11 PM are 13-23 for 24h
-        let datePM = new Date(currentTime);
-        datePM.setHours(checkoutHourPM_24, minutesToUse, 0, 0);
-        if (datePM <= currentTime) { // If this PM time today is already past, then it's for tomorrow
-            datePM.setDate(datePM.getDate() + 1);
-        }
-
-        // Choose the earlier of the two future dates
-        if (dateAM < datePM) {
-            checkoutTime = dateAM;
-            console.log(`No explicit AM/PM: Selected AM for checkout: ${checkoutTime.toLocaleString()}`);
-        } else {
-            checkoutTime = datePM;
-            console.log(`No explicit AM/PM: Selected PM for checkout: ${checkoutTime.toLocaleString()}`);
-        }
+    
+    console.log(`Setting checkout time to exactly ${targetHour}:${String(minutesToUse).padStart(2, '0')}`);
+    // Set the hours and minutes, with seconds and milliseconds set to 0
+    checkoutTime.setHours(targetHour, minutesToUse, 0, 0);
+    
+    // Skip date adjustments if this is a duration-based request (e.g., "7 hrs")
+    if (!isDuration) {
+      // Special handling for AM hours (3 AM, 4 AM, 5 AM, etc.)
+      if (explicitAM) {
+        // If AM is explicitly specified, ALWAYS set to next day
+        // This ensures early morning hours like 5 AM are always for the next day
+        console.log('EXPLICIT AM detected: ALWAYS setting checkout to next day');
+        checkoutTime.setDate(checkoutTime.getDate() + 1);
+      } else if (!isPM && currentTime.getHours() >= 12) {
+        // If current time is PM and target is implicitly AM, set to next day
+        console.log('IMPLICIT AM: Setting checkout to next day because current is PM and target is AM');
+        checkoutTime.setDate(checkoutTime.getDate() + 1);
+      } else if (checkoutTime <= currentTime) {
+        // If checkout time is earlier than current time, assume next day
+        console.log('Setting checkout to next day because checkout time is earlier than current time');
+        checkoutTime.setDate(checkoutTime.getDate() + 1);
+      }
+    } else {
+      console.log('Duration-based request: Skip adding extra days to checkout time');
+      
+      // Ensure checkout time is always consistent with explicit duration
+      if (explicitDuration !== null) {
+        // Recalculate checkout time to be exactly explicit duration from now
+        // This handles any edge cases with larger hour values
+        checkoutTime.setTime(currentTime.getTime() + (explicitDuration * 60 * 60 * 1000));
+        console.log(`iOS Safari fix: Recalculated checkout time based on explicit duration: ${explicitDuration} hours`);
+      }
     }
     
     // Log the AM/PM status for debugging
-    const finalCheckoutIsPM = checkoutTime.getHours() >= 12;
-    console.log(`Input hour: ${targetHourInput}, Final checkout time is ${finalCheckoutIsPM ? 'PM' : 'AM'}: ${checkoutTime.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`);    
+    console.log(`Checkout hour: ${targetHour}, isPM: ${isPM}, Final checkout time: ${checkoutTime.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`);    
     console.log(`Checkout time in 12-hour format: ${checkoutTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`);
     
     console.log(`Checkout time: ${checkoutTime.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}`);    
