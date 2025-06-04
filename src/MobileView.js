@@ -1847,17 +1847,16 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Check for short stay queries first
     const queryLower = query.toLowerCase();
     
-    // Short stay logic will now run regardless of overnight keywords.
-    // The original 'isLikelyOvernightStay' check has been removed to allow 24/7 short stays.
+    // Check if query is likely for an overnight stay
+    const isLikelyOvernightStay = containsOvernightKeywords(queryLower);
+    console.log(`Checking if query is for overnight stay: ${isLikelyOvernightStay}`);
     
-    // New patterns for flexible short stay voice commands
-    // Pattern for "X hrs" or "X hours" (e.g., "8 hrs", "for 8 hours", "jacuzzi for 9 hrs")
-    const durationHoursPattern = /(?:(?:jacuzzi|room|king|queen|bed)\s+(?:with\s+jacuzzi\s+)?for\s+)?(\d{1,2})\s*(?:hrs?|hours?)\b/i;
-
-    // Pattern for "room up to X.XX PM/AM" or just "X.XX PM/AM" (e.g., "room up to 8.00 PM", "9.00 PM")
-    const specificTimePattern = /(?:(?:room|king|queen|bed)\s+up\s+to\s+)?(\d{1,2})(?:[:.](\d{2}))?\s*(am|pm|a\.m\.|p\.m\.)/i;
-
-    // Original patterns (will be checked after the new ones)
+    // If the query contains overnight keywords, skip short stay processing
+    if (isLikelyOvernightStay) {
+      console.log('Query contains overnight stay keywords, not processing as short stay');
+      // Continue with regular voice search processing (will fall through to overnight processing)
+    } else {
+    
     // First, try to match the full pattern with explicit AM/PM
     // Handle various formats including "5.AM", "5 AM", "5:00 AM", etc.
     // Also handle "I want" and "I need" phrases
@@ -1907,54 +1906,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     const justTimeAmPattern = /\b(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*|\.)?(?:am|a\.m\.|a)\b/i;
     const justTimePmPattern = /\b(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*|\.)?(?:pm|p\.m\.|p)\b/i;
     const justTimeGenericPattern = /\b(?:till|until|to)\s+(\d{1,2})(?:[:.][0-9]{2})?(?:\s*(?:hrs|hours|hr|hour|o'clock))?\b/i;
-    // Check new flexible patterns first
-    const durationMatch = queryLower.match(durationHoursPattern);
-    if (durationMatch && durationMatch[1]) {
-      console.log('Short stay with DURATION detected (e.g., X hrs)');
-      const hoursDuration = parseInt(durationMatch[1], 10);
-      if (hoursDuration > 0 && hoursDuration <= 23) { // Basic sanity check for hours
-        const isJacuzziQuery = /jacuzzi/i.test(queryLower);
-        const currentTime = new Date();
-        let targetHour = (currentTime.getHours() + hoursDuration) % 24;
-        let targetMinutes = currentTime.getMinutes();
-        
-        // Determine if the calculated targetHour implies AM or PM for processShortStayVoiceSearch
-        // This is mainly for logging and consistency if processShortStayVoiceSearch uses it.
-        let isAm = targetHour < 12 || targetHour === 24; // 24 is midnight, treat as AM for next day context
-        let isPm = targetHour >= 12 && targetHour < 24;
-        if (targetHour === 0) targetHour = 12; // Midnight for display
-        else if (targetHour > 12) targetHour -=12; // Convert to 12hr format for processShortStayVoiceSearch if it expects it
-
-        console.log(`Duration: ${hoursDuration} hrs, Jacuzzi: ${isJacuzziQuery}, Calculated Target: ${targetHour}:${String(targetMinutes).padStart(2, '0')} ${isPm ? 'PM' : 'AM'}`);
-        processShortStayVoiceSearch(query, targetHour, searchId, isAm, isPm, isJacuzziQuery, targetMinutes, true, hoursDuration);
-        return;
-      }
-    }
-
-    const specificTimeMatch = queryLower.match(specificTimePattern);
-    if (specificTimeMatch && specificTimeMatch[1] && specificTimeMatch[3]) {
-      console.log('Short stay with SPECIFIC TIME detected (e.g., up to X PM, X AM)');
-      let hour = parseInt(specificTimeMatch[1], 10);
-      const minutes = specificTimeMatch[2] ? parseInt(specificTimeMatch[2], 10) : 0;
-      const period = specificTimeMatch[3].toLowerCase().replace(/\./g, ''); // am or pm
-      const isJacuzziQuery = /jacuzzi/i.test(queryLower);
-
-      if (hour >= 1 && hour <= 12 && minutes >= 0 && minutes <= 59) {
-        let isAm = period === 'am';
-        let isPm = period === 'pm';
-
-        // Convert to 24-hour format for internal logic if needed, but processShortStayVoiceSearch might expect 12hr + AM/PM flags
-        // For now, pass as is, assuming processShortStayVoiceSearch handles 12hr format with AM/PM flags.
-        if (hour === 12 && isAm) hour = 0; // Midnight AM
-        // if (hour < 12 && isPm) hour += 12; // Convert PM to 24hr format
-        // No change for 12 PM (noon)
-
-        console.log(`Specific Time: ${hour}:${String(minutes).padStart(2, '0')} ${period.toUpperCase()}, Jacuzzi: ${isJacuzziQuery}`);
-        processShortStayVoiceSearch(query, hour, searchId, isAm, isPm, isJacuzziQuery, minutes);
-        return;
-      }
-    }
-
+    
     // First check for Jacuzzi patterns with explicit AM/PM
     const amJacuzziMatch = queryLower.match(amJacuzziPattern);
     if (amJacuzziMatch && amJacuzziMatch[1]) {
@@ -2459,7 +2411,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       return;
     }
     
-
+    } // End of else block for short stay processing
     
     // Note: We already checked for empty queries at the beginning of the function
     
@@ -3502,8 +3454,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       { weekday: prices.weekday.withoutJacuzzi, friday: prices.friday.withoutJacuzzi, weekend: prices.weekend.withoutJacuzzi };
     
     // Calculate base price
-    let localBasePrice = 0;
-    const localCheckInDate = new Date(results.checkInDate);
+    let basePrice = 0;
+    const checkInDate = new Date(results.checkInDate);
     
     // Day names for display
     const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -3532,7 +3484,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           price: dayPrice.price
         });
         
-        localBasePrice += dayPrice.price;
+        basePrice += dayPrice.price;
       }
     } else {
       // Check if this is a non-consecutive days request
@@ -3543,7 +3495,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         
         // Clear the daily prices array first
         results.dailyPrices = [];
-        localBasePrice = 0;
+        basePrice = 0;
         
         // Use the exact dates we already calculated and stored in the results object
         for (const dateInfo of results.exactDates) {
