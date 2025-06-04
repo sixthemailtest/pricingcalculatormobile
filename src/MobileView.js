@@ -3787,6 +3787,28 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // targetHour from function signature is targetHourInput (1-12 or duration)
     const targetHourInput = targetHour;
 
+    // Initialize debug information object
+    const debugInfo = {
+      userInput: query,
+      parsedParameters: {
+        targetHourInput: targetHourInput,
+        searchId: searchId,
+        explicitAM: explicitAM,
+        explicitPM: explicitPM,
+        forceJacuzzi: forceJacuzzi,
+        targetMinutes: targetMinutes,
+        isDuration: isDuration,
+        explicitDuration: explicitDuration,
+        minutesToUse: minutesToUse
+      },
+      timeCalculationSteps: [],
+      finalCurrentTime: currentTime.toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'medium' }),
+      finalCheckoutTime: '', // Will be set later
+      calculatedDurationHours: null // Will be set later
+    };
+    debugInfo.timeCalculationSteps.push(`Initial currentTime: ${debugInfo.finalCurrentTime}`);
+    debugInfo.timeCalculationSteps.push(`Initial minutesToUse: ${minutesToUse}`);
+
     if (isDuration) {
         let durationInHours = 0;
         if (explicitDuration !== null) {
@@ -3799,6 +3821,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             console.log(`Duration-based request, duration from targetHourInput: ${durationInHours} hours.`);
         }
         checkoutTime.setTime(currentTime.getTime() + (durationInHours * 60 * 60 * 1000));
+        debugInfo.timeCalculationSteps.push(`Duration-based: Set checkoutTime by adding ${durationInHours} hours to currentTime.`);
         console.log(`Checkout time for duration ${durationInHours} hours: ${checkoutTime.toLocaleString()}`);
     } else if (explicitAM || explicitPM) { // Not duration, but has explicit AM/PM
         let finalTargetHour24 = targetHourInput; // targetHourInput is 1-12
@@ -3815,7 +3838,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         if (checkoutTime <= currentTime) {
             console.log('Explicit AM/PM checkout time is in the past or same as current, advancing to next day.');
             checkoutTime.setDate(checkoutTime.getDate() + 1);
+            debugInfo.timeCalculationSteps.push('Explicit AM/PM: Calculated time was past, advanced to next day.');
         }
+        debugInfo.timeCalculationSteps.push(`Explicit AM/PM: Checkout time set to ${checkoutTime.toLocaleString()}`);
         console.log(`Explicit AM/PM: Checkout time set to ${checkoutTime.toLocaleString()}`);
     } else { // Not duration, no explicit AM/PM. User said "till X". targetHourInput is 1-12.
         console.log(`No explicit AM/PM for target hour ${targetHourInput}. Determining next chronological occurrence.`);
@@ -3838,11 +3863,15 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         }
 
         // Choose the earlier of the two future dates
+        debugInfo.timeCalculationSteps.push(`Implicit AM/PM: Candidate AM: ${dateAM.toLocaleString()}`);
+        debugInfo.timeCalculationSteps.push(`Implicit AM/PM: Candidate PM: ${datePM.toLocaleString()}`);
         if (dateAM < datePM) {
             checkoutTime = dateAM;
+            debugInfo.timeCalculationSteps.push('Implicit AM/PM: Selected AM candidate as it is sooner.');
             console.log(`No explicit AM/PM: Selected AM for checkout: ${checkoutTime.toLocaleString()}`);
         } else {
             checkoutTime = datePM;
+            debugInfo.timeCalculationSteps.push('Implicit AM/PM: Selected PM candidate as it is sooner or same.');
             console.log(`No explicit AM/PM: Selected PM for checkout: ${checkoutTime.toLocaleString()}`);
         }
     }
@@ -3902,6 +3931,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       }
     }
     console.log(`Duration: ${durationHours} hours`);
+    debugInfo.calculatedDurationHours = durationHours;
+    debugInfo.finalCheckoutTime = checkoutTime.toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'medium' });
+    debugInfo.timeCalculationSteps.push(`Final calculated duration: ${durationHours} hours.`);
+    debugInfo.timeCalculationSteps.push(`Final checkoutTime: ${debugInfo.finalCheckoutTime}`);
     
     // Room type detection (reusing existing logic)
     let detectedBedType = 'Queen'; // Default
@@ -3996,6 +4029,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       // Store both the Date objects and formatted strings
       checkInDate: currentTime,
       checkOutDate: checkoutTime,
+      debugInfo: debugInfo,
       // Add formatted time strings for display
       formattedCheckInTime: formattedCheckInTime,
       formattedCheckOutTime: formattedCheckOutTime,
@@ -6157,20 +6191,19 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                   marginTop: '12px',
                   fontSize: '14px'
                 }}>
-                  {/* Daily price breakdown - only show if more than 1 night */}
-                  {voiceSearchResults.dailyPrices && voiceSearchResults.dailyPrices.length > 1 && (
-                    <div className="daily-price-breakdown">
-                      <div className="breakdown-header" style={{ fontSize: '12px' }}>Daily Price Breakdown (per room):</div>
+                  {/* Daily price breakdown - only show if more than 1 night and not short stay */}
+                  {!voiceSearchResults.isShortStay && voiceSearchResults.dailyPrices && voiceSearchResults.dailyPrices.length > 1 && (
+                    <div className="daily-price-breakdown" style={{marginBottom: '10px', paddingBottom: '10px', borderBottom: '1px solid rgba(255,255,255,0.2)'}}>
+                      <div className="breakdown-header" style={{ fontSize: '12px', fontWeight: 'bold', marginBottom: '5px' }}>Daily Price Breakdown (per room):</div>
                       {voiceSearchResults.dailyPrices.map((day, index) => (
-                        <div key={index} className="daily-price">
-                          <span style={{ fontSize: '11px' }}>{day.dayOfWeek}, {day.date}</span>
-                          <span style={{ fontSize: '11px' }}>${day.price.toFixed(2)}</span>
+                        <div key={index} className="daily-price" style={{display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '3px'}}>
+                          <span>{day.dayOfWeek}, {day.date}</span>
+                          <span>${day.price.toFixed(2)}</span>
                         </div>
                       ))}
                     </div>
                   )}
                   
-                  {/* Show single room price if multiple rooms */}
                   {voiceSearchResults.isShortStay ? (
                     <>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85em' }}>
@@ -6184,7 +6217,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                         </div>
                       )}
                       
-                      {/* Cash price */}
                       <div style={{ 
                         display: 'flex', 
                         justifyContent: 'space-between', 
@@ -6199,7 +6231,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                         <span style={{ fontSize: '11px' }}>${(Number(voiceSearchResults.cashTotal) || 0).toFixed(2)}</span>
                       </div>
                       
-                      {/* Credit card price with tax */}
                       <div style={{ marginTop: '10px', backgroundColor: 'rgba(0,0,255,0.1)', padding: '6px', borderRadius: '4px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px', fontSize: '0.85em' }}>
                           <span style={{ fontSize: '11px' }}>Credit Card Tax (15%):</span> 
@@ -6230,7 +6261,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                         <span>${(Number(voiceSearchResults.tax) || 0).toFixed(2)}</span>
                       </div>
                       
-                      {/* Show early check-in cost if applicable */}
                       {voiceSearchResults.earlyCheckInHours !== 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                           <span>Early Check-in ({voiceSearchResults.earlyCheckInHours} {voiceSearchResults.earlyCheckInHours === 1 ? 'hour' : 'hours'} @ $15/hr):</span>
@@ -6238,7 +6268,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                         </div>
                       )}
                       
-                      {/* Show late check-out cost if applicable */}
                       {voiceSearchResults.lateCheckOutHours > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                           <span>Late Check-out ({voiceSearchResults.lateCheckOutHours} {voiceSearchResults.lateCheckOutHours === 1 ? 'hour' : 'hours'} @ $15/hr):</span>
@@ -6259,7 +6288,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                         <span>${(Number(voiceSearchResults.total) || 0).toFixed(2)}</span>
                       </div>
                     </>
-                  ) : (
+                  ) : ( /* This is for a single overnight room */
                     <>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', alignItems: 'center' }}>
                         <span>Base Price:</span>
@@ -6269,30 +6298,55 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                         <span>Tax (15%):</span>
                         <span>${(Number(voiceSearchResults.tax) || 0).toFixed(2)}</span>
                       </div>
-                      
-                      {/* Show early check-in cost if applicable */}
                       {voiceSearchResults.earlyCheckInHours !== 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                           <span>Early Check-in ({voiceSearchResults.earlyCheckInHours} {voiceSearchResults.earlyCheckInHours === 1 ? 'hour' : 'hours'} @ $15/hr):</span>
                           <span>${voiceSearchResults.earlyCheckInCost.toFixed(2)}</span>
                         </div>
                       )}
-                      
-                      {/* Show late check-out cost if applicable */}
                       {voiceSearchResults.lateCheckOutHours > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                           <span>Late Check-out ({voiceSearchResults.lateCheckOutHours} {voiceSearchResults.lateCheckOutHours === 1 ? 'hour' : 'hours'} @ $15/hr):</span>
                           <span>${voiceSearchResults.lateCheckOutCost.toFixed(2)}</span>
                         </div>
                       )}
-                      
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold', fontSize: '13px', marginTop: '5px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.2)' }}>
                         <span style={{ fontSize: '11px' }}>Total:</span>
-                        <span style={{ fontSize: '11px' }}>${voiceSearchResults.total.toFixed(2)}</span>
+                        <span style={{ fontSize: '11px' }}>${(Number(voiceSearchResults.total) || 0).toFixed(2)}</span>
                       </div>
                     </>
                   )}
-                </div>
+                </div> {/* This closes voice-search-price-card div */}
+
+                {/* Debug Information Display */}
+                {voiceSearchResults.debugInfo && (
+                  <div className="debug-info-section" style={{
+                    marginTop: '12px',
+                    padding: '10px',
+                    border: '1px dashed #aaa',
+                    borderRadius: '4px',
+                    fontSize: '10px',
+                    backgroundColor: '#f8f8f8',
+                    color: '#333',
+                    maxHeight: '150px',
+                    overflowY: 'auto',
+                    whiteSpace: 'pre-wrap', 
+                    fontFamily: 'monospace'
+                  }}>
+                    <h5 style={{marginTop: 0, marginBottom: '5px', fontSize: '11px', fontWeight: 'bold'}}>Voice Processing Debug Info:</h5>
+                    <p style={{margin: '2px 0'}}><strong>Input:</strong> {voiceSearchResults.debugInfo.userInput}</p>
+                    <p style={{margin: '2px 0'}}><strong>Parameters:</strong> {JSON.stringify(voiceSearchResults.debugInfo.parsedParameters, null, 2)}</p>
+                    <p style={{margin: '2px 0'}}><strong>Time Calculation Steps:</strong></p>
+                    <ul style={{margin: '2px 0 5px 15px', paddingLeft: '10px'}}>
+                      {voiceSearchResults.debugInfo.timeCalculationSteps && voiceSearchResults.debugInfo.timeCalculationSteps.map((step, index) => 
+                        <li key={index} style={{fontSize: '9px'}}>{step}</li>
+                      )}
+                    </ul>
+                    <p style={{margin: '2px 0'}}><strong>Current Time Used:</strong> {voiceSearchResults.debugInfo.finalCurrentTime}</p>
+                    <p style={{margin: '2px 0'}}><strong>Calculated Checkout:</strong> {voiceSearchResults.debugInfo.finalCheckoutTime}</p>
+                    <p style={{margin: '2px 0'}}><strong>Calculated Duration:</strong> {voiceSearchResults.debugInfo.calculatedDurationHours} hours</p>
+                  </div>
+                )}
               </div>
             ) : (
               <div>Sorry, I couldn't understand your request. Please try again.</div>
