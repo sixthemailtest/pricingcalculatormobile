@@ -2808,10 +2808,34 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       // Split the query by "and" to check for multiple dates
       const parts = queryLower.split(' and ');
       
+      let lastKnownMonth = null;
+      let potentialYearForShortDates = null; // Store year if month rollover occurs
+
       for (const part of parts) {
-        const dateInfo = extractDate(part);
+        let dateInfo = extractDate(part.trim()); // Try to extract full date first
         if (dateInfo) {
           detectedDates.push(dateInfo);
+          lastKnownMonth = dateInfo.month;
+          // Determine if this date implies a year rollover for subsequent short dates
+          const tempDate = new Date(voiceToday.getFullYear(), dateInfo.month, dateInfo.day);
+          if (tempDate < voiceToday && dateInfo.month < voiceToday.getMonth()) {
+            potentialYearForShortDates = voiceToday.getFullYear() + 1;
+          } else if (tempDate < voiceToday && dateInfo.month === voiceToday.getMonth() && dateInfo.day < voiceToday.getDate()) {
+            potentialYearForShortDates = voiceToday.getFullYear() + 1;
+          } else {
+            potentialYearForShortDates = voiceToday.getFullYear();
+          }
+
+        } else if (lastKnownMonth !== null) {
+          // If full date extraction failed, try to parse just a day number, using the last known month
+          const dayOnlyMatch = part.trim().match(/^(\d{1,2})(?:st|nd|rd|th)?$/i);
+          if (dayOnlyMatch) {
+            const day = parseInt(dayOnlyMatch[1]);
+            if (day >= 1 && day <= 31) {
+              console.log(`Extracted day ${day} using last known month ${Object.keys(months).find(key => months[key] === lastKnownMonth)}`);
+              detectedDates.push({ day, month: lastKnownMonth, impliedYear: potentialYearForShortDates });
+            }
+          }
         }
       }
       
@@ -2851,10 +2875,24 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           year++;
         }
         
+        // Use impliedYear if it was set during parsing of short dates (e.g. June 30th and 1st -> 1st is July)
+        // Or if the dateInfo itself implies a year for a full date mention
+        let finalYear = dateInfo.impliedYear || year;
+        
+        // If the original dateInfo had a month and day that implies next year, prioritize that
+        if (!dateInfo.impliedYear) { // only re-evaluate year if not already implied
+            if (dateInfo.month < voiceToday.getMonth()) {
+                finalYear = currentYear + 1;
+            }
+            else if (dateInfo.month === voiceToday.getMonth() && dateInfo.day < voiceToday.getDate()) {
+                finalYear = currentYear + 1;
+            }
+        }
+
         return {
           ...dateInfo,
-          year,
-          date: new Date(year, dateInfo.month, dateInfo.day)
+          year: finalYear,
+          date: new Date(finalYear, dateInfo.month, dateInfo.day)
         };
       });
       
@@ -2971,54 +3009,56 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     // Check for "next week", "next X days", or other similar phrases
     if (queryLower.includes('next week') || hasSevenNightPhrase || customNights > 0) {
-      console.log('Detected request for next week, seven nights stay, or custom nights');
-      
-      // For "next X days" pattern, start from tomorrow
-      let checkInOffset = 1; // Default to tomorrow
-      
-      // For "next week" pattern, start from next Monday
-      if ((queryLower.includes('next week') || hasSevenNightPhrase) && !nextXDaysMatch) {
-        const currentDayIndex = voiceToday.getDay(); // 0 = Sunday, 1 = Monday, etc.
-        checkInOffset = (8 - currentDayIndex) % 7;
-        if (checkInOffset === 0) checkInOffset = 7; // If today is Monday, go to next Monday
+      console.log('Processing multi-night stay (next week, X nights, etc.). Current dateDetected:', dateDetected, 'customNights:', customNights, 'hasSevenNightPhrase:', hasSevenNightPhrase);
+
+      // If no specific start date (like "Monday", "tomorrow", "June 10th") was parsed yet, determine start date based on phrase.
+      if (!dateDetected) {
+        if (nextXDaysMatch) { // "next X nights"
+          voiceCheckInDate = new Date(voiceToday); // Base on today
+          voiceCheckInDate.setDate(voiceToday.getDate() + 1); // Start tomorrow
+          console.log('No prior date detected. "next X nights" starts tomorrow:', voiceCheckInDate.toDateString());
+        } else if (queryLower.includes('next week') && !customNights && !hasSevenNightPhrase) { 
+          // Specifically "next week" and not also "next 7 nights" (which customNights would catch)
+          voiceCheckInDate = new Date(voiceToday); // Base on today
+          const currentDayIndex = voiceToday.getDay(); // 0 = Sunday, 1 = Monday, etc.
+          let offset = (8 - currentDayIndex) % 7;
+          if (offset === 0) offset = 7; // If today is Monday, next Monday is 7 days away
+          voiceCheckInDate.setDate(voiceToday.getDate() + offset);
+          console.log('No prior date detected. "next week" starts next Monday:', voiceCheckInDate.toDateString());
+        } else if (customNights > 0 || hasSevenNightPhrase) {
+          // "for X nights", "X nights", or generic "seven nights" phrase - default to today if no prior date.
+          voiceCheckInDate = new Date(voiceToday); // Start today
+          console.log('No prior date detected. "X nights" or "seven nights" starts today:', voiceCheckInDate.toDateString());
+        }
+      } else {
+        // A specific start date was already detected (e.g., "from Monday", "tomorrow", "June 10th").
+        // voiceCheckInDate is already set to this specific date. We will use it.
+        console.log(`Prior date detected (${voiceCheckInDate.toDateString()}), using it as start date.`);
       }
-      
-      // Set check-in date
-      voiceCheckInDate = new Date(voiceToday);
-      voiceCheckInDate.setDate(voiceToday.getDate() + checkInOffset);
-      voiceCheckInDate.setHours(15, 0, 0, 0); // 3 PM check-in
-      
-      console.log(`Setting check-in to: ${voiceCheckInDate.toDateString()}`);
-      
+
+      voiceCheckInDate.setHours(15, 0, 0, 0); // Ensure 3 PM check-in time for the determined start date
+
       // Determine number of nights
-      let nightsToStay = 2; // Default
-      
-      // Check if user wants the "whole week" or similar phrases
-      const wholeWeekPhrases = ['whole week', 'full week', 'entire week', 'all week', 'week long'];
-      const isWholeWeek = wholeWeekPhrases.some(phrase => queryLower.includes(phrase));
-      
-      // For any of the seven night phrases or whole week phrases, set a 7-night stay
-      if (isWholeWeek || hasSevenNightPhrase || 
-          queryLower.includes('next whole week') || 
-          queryLower.includes('7 night') || queryLower.includes('seven night')) {
-        nightsToStay = 7;
-        console.log('Seven night stay detected');
-      } 
-      // For "next X days" or "for X days" pattern, use the custom number
-      else if (customNights > 0) {
+      let nightsToStay = 0;
+      if (customNights > 0) { // "X nights", "for X nights", "next X nights"
         nightsToStay = customNights;
-        console.log(`Custom ${customNights} night stay detected`);
+        console.log(`Using customNights: ${nightsToStay}`);
+      } else if (hasSevenNightPhrase || queryLower.includes('next week')) {
+        // Generic "seven nights" phrase or "next week" (if no custom nights specified for it)
+        nightsToStay = 7;
+        console.log('Using 7 nights for sevenNightPhrase or "next week".');
       }
-      
-      // Set check-out date based on the number of nights
-      voiceCheckOutDate = new Date(voiceCheckInDate);
-      voiceCheckOutDate.setDate(voiceCheckInDate.getDate() + nightsToStay);
-      voiceCheckOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
-      voiceNights = nightsToStay;
-      
-      console.log(`Setting ${voiceNights} nights stay, check-out: ${voiceCheckOutDate.toDateString()}`);
-      
-      dateDetected = true;
+
+      if (nightsToStay > 0) {
+        voiceCheckOutDate = new Date(voiceCheckInDate);
+        voiceCheckOutDate.setDate(voiceCheckInDate.getDate() + nightsToStay);
+        voiceCheckOutDate.setHours(11, 0, 0, 0); // 11 AM check-out
+        voiceNights = nightsToStay;
+        console.log(`Finalizing: ${voiceNights} nights. Check-in: ${voiceCheckInDate.toDateString()}, Check-out: ${voiceCheckOutDate.toDateString()}`);
+        dateDetected = true; // We have successfully processed dates for this multi-night stay.
+      } else {
+        console.warn("Could not determine nightsToStay in multi-night block. Date not fully detected.");
+      }
     }
     // Check for "weekend"
     else if (queryLower.includes('weekend')) {
