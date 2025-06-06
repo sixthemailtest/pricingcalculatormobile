@@ -472,11 +472,26 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     const day = currentDateTime.getDay();
     
     if (day === 5) { // Friday
-      return { regular: prices.friday.withoutJacuzzi, jacuzzi: prices.friday.withJacuzzi };
+      const regularBaseFriday = prices.friday.withoutJacuzzi;
+      const jacuzziBaseFriday = prices.friday.withJacuzzi;
+      return {
+        regular: regularBaseFriday + (regularBaseFriday * 0.15),
+        jacuzzi: jacuzziBaseFriday + (jacuzziBaseFriday * 0.15)
+      };
     } else if (day === 6) { // Saturday only
-      return { regular: prices.weekend.withoutJacuzzi, jacuzzi: prices.weekend.withJacuzzi };
+      const regularBaseWeekend = prices.weekend.withoutJacuzzi;
+      const jacuzziBaseWeekend = prices.weekend.withJacuzzi;
+      return {
+        regular: regularBaseWeekend + (regularBaseWeekend * 0.15),
+        jacuzzi: jacuzziBaseWeekend + (jacuzziBaseWeekend * 0.15)
+      };
     } else { // Weekday (including Sunday)
-      return { regular: prices.weekday.withoutJacuzzi, jacuzzi: prices.weekday.withJacuzzi };
+      const regularBaseWeekday = prices.weekday.withoutJacuzzi;
+      const jacuzziBaseWeekday = prices.weekday.withJacuzzi;
+      return {
+        regular: regularBaseWeekday + (regularBaseWeekday * 0.15),
+        jacuzzi: jacuzziBaseWeekday + (jacuzziBaseWeekday * 0.15)
+      };
     }
   }, [currentDateTime, prices]);
   
