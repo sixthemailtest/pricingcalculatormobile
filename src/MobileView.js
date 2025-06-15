@@ -4632,6 +4632,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             <button 
               className="small-clear-button" 
               onClick={clearShortStay}
+              style={{ backgroundColor: 'red', color: 'white' }}
             >
               Clear
             </button>
@@ -4644,6 +4645,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             <button 
               className="small-clear-button" 
               onClick={clearOvernightStay}
+              style={{ backgroundColor: 'red', color: 'white' }}
             >
               Clear
             </button>
