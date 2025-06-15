@@ -582,7 +582,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       
       // Define room data according to specific room types
       const roomData = {
-        // Ground floor (100s)
+        // First floor (100s)
         101: { bedType: 'Queen', isSmoking: true, hasJacuzzi: false },
         102: { bedType: 'Queen', isSmoking: true, hasJacuzzi: false },
         103: { bedType: 'Queen2Beds', isSmoking: false, hasJacuzzi: false },
@@ -598,7 +598,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         114: { bedType: 'Queen', isSmoking: false, hasJacuzzi: false },
         119: { bedType: 'Queen', isSmoking: true, hasJacuzzi: true },
         
-        // First floor (200s)
+        // Second floor (200s)
         200: { bedType: 'Queen', isSmoking: false, hasJacuzzi: false },
         201: { bedType: 'Queen2Beds', isSmoking: false, hasJacuzzi: false },
         202: { bedType: 'Queen', isSmoking: false, hasJacuzzi: false },
@@ -4695,13 +4695,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                 className={`floor-tab ${activeFloor === 'ground' ? 'active' : ''}`}
                 onClick={() => setActiveFloor('ground')}
               >
-                Ground Floor
+                First Floor
               </button>
               <button 
                 className={`floor-tab ${activeFloor === 'first' ? 'active' : ''}`}
                 onClick={() => setActiveFloor('first')}
               >
-                First Floor
+                Second Floor
               </button>
             </div>
             
@@ -4760,13 +4760,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                   className={`floor-tab ${activeFloor === 'ground' ? 'active' : ''}`}
                   onClick={() => setActiveFloor('ground')}
                 >
-                  Ground Floor
+                  First Floor
                 </button>
                 <button 
                   className={`floor-tab ${activeFloor === 'first' ? 'active' : ''}`}
                   onClick={() => setActiveFloor('first')}
                 >
-                  First Floor
+                  Second Floor
                 </button>
               </div>
               
@@ -4797,7 +4797,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                     );
                   })}
                   
-                {/* First Floor Rooms - Initially hidden via CSS */}
+                {/* Second Floor Rooms - Initially hidden via CSS */}
                 {availableRooms
                   .filter(room => room.floor === 'first')
                   .map(room => {

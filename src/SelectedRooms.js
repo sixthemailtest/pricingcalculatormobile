@@ -65,10 +65,10 @@ function SelectedRooms({ selectedRooms = [], onRemoveRoom }) {
     }
   });
   
-  // Sort each room category by floor (ground floor first, then first floor)
-  // Ground floor rooms have numbers 100-199, first floor rooms have numbers 200+
+  // Sort each room category by floor (first floor first, then second floor)
+  // First floor rooms have numbers 100-199, second floor rooms have numbers 200+
   const sortByFloor = (a, b) => {
-    // First sort by floor (ground floor first)
+    // First sort by floor (first floor first)
     const aIsGroundFloor = a.number < 200;
     const bIsGroundFloor = b.number < 200;
     

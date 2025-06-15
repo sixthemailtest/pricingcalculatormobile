@@ -1814,7 +1814,7 @@
   background-color: rgba(58, 123, 213, 0.05);
 }
 
-/* First floor rooms (initially hidden) */
+/* Second floor rooms (initially hidden) */
 .room-selector-card.first-floor {
   display: none;
 }
