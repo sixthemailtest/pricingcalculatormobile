@@ -4618,7 +4618,20 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         
         <div className="daily-price">
           <span className="price-label">Today's Room Prices</span>
-          <div className="price-value">${dailyPrices.regular} - ${dailyPrices.jacuzzi}</div>
+          <div className="price-value" style={{display: 'flex', flexDirection: 'column'}}>
+            <div style={{fontSize: '11px', display: 'flex', justifyContent: 'space-between'}}>
+              <span>Base:</span>
+              <span>${dailyPrices.regular} - ${dailyPrices.jacuzzi}</span>
+            </div>
+            <div style={{fontSize: '9px', display: 'flex', justifyContent: 'space-between'}}>
+              <span>Tax (15%):</span>
+              <span>${(dailyPrices.regular * 0.15).toFixed(0)} - ${(dailyPrices.jacuzzi * 0.15).toFixed(0)}</span>
+            </div>
+            <div style={{fontSize: '11px', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '2px', marginTop: '2px'}}>
+              <span>Total:</span>
+              <span>${Math.round(dailyPrices.regular * 1.15)} - ${Math.round(dailyPrices.jacuzzi * 1.15)}</span>
+            </div>
+          </div>
         </div>
       </div>
       
