@@ -1828,6 +1828,11 @@
   display: none;
 }
 
+/* Hide BOOKING labels */
+.booked-label {
+  display: none !important;
+}
+
 /* Tooltip styles */
 .price-tooltip {
   position: absolute;

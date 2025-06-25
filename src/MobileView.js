@@ -4771,9 +4771,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                                  ${bookedRooms.includes(room.number) ? 'booked' : ''}`}
                       style={bookedRooms.includes(room.number) ? {backgroundColor: '#00A651', borderRadius: '14px', border: 'none'} : {}}
                     >
-                      {bookedRooms.includes(room.number) && (
-                        <span className="booked-label">BOOKING</span>
-                      )}
+                      {/* BOOKING label removed */}
                       <span className="room-number">{room.number}</span>
                       <span className="room-type">
                         {room.bedType === 'Queen' ? 'Queen' : 

@@ -77,23 +77,7 @@
   font-weight: bold;
 }
 
-/* BOOKING label for booked rooms */
-.room-card.booked::before {
-  content: 'BOOKING';
-  position: absolute;
-  top: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: #006633;
-  color: white;
-  font-size: 8px;
-  font-weight: bold;
-  padding: 2px 5px;
-  border-radius: 3px;
-  border: 1px solid white;
-  white-space: nowrap;
-  z-index: 5;
-}
+/* BOOKING label removed */
 
 .room-card:hover {
   transform: translateY(-2px);

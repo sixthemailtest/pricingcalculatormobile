@@ -177,26 +177,7 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom }) {
                     position: 'relative'
                   }}
                 >
-                  {/* BOOKING label */}
-                  <span 
-                    style={{
-                      position: 'absolute',
-                      top: '-10px',
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      backgroundColor: '#006633',
-                      color: 'white',
-                      fontSize: '8px',
-                      fontWeight: 'bold',
-                      padding: '2px 5px',
-                      borderRadius: '3px',
-                      border: '1px solid white',
-                      whiteSpace: 'nowrap',
-                      zIndex: 5
-                    }}
-                  >
-                    BOOKING
-                  </span>
+                  {/* BOOKING label removed */}
                   
                   {/* Remove button */}
                   <button 
