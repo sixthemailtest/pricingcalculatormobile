@@ -1,7 +1,7 @@
 import React from 'react';
 import './SelectedRooms.css';
 
-function SelectedRooms({ selectedRooms = [], onRemoveRoom }) {
+function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom }) {
   // Group rooms by their characteristics
   const groupedRooms = {
     nonSmokingRegular: {
@@ -21,12 +21,16 @@ function SelectedRooms({ selectedRooms = [], onRemoveRoom }) {
     smokingJacuzzi: {
       queen: [],
       king: []
-    }
+    },
+    bookedRooms: [] // New category for booked rooms
   };
 
   // Sort rooms into their respective categories
   selectedRooms.forEach(room => {
-    if (room.hasJacuzzi) {
+    // Check if the room is booked
+    if (bookedRooms.includes(room.number)) {
+      groupedRooms.bookedRooms.push(room);
+    } else if (room.hasJacuzzi) {
       if (room.isSmoking) {
         // Jacuzzi + Smoking
         if (room.bedType === 'Queen') {
@@ -81,9 +85,15 @@ function SelectedRooms({ selectedRooms = [], onRemoveRoom }) {
   
   // Apply sorting to all room categories
   Object.keys(groupedRooms).forEach(category => {
-    Object.keys(groupedRooms[category]).forEach(bedType => {
-      groupedRooms[category][bedType].sort(sortByFloor);
-    });
+    if (category === 'bookedRooms') {
+      // Sort the flat bookedRooms array
+      groupedRooms.bookedRooms.sort(sortByFloor);
+    } else {
+      // Sort the nested structure for other categories
+      Object.keys(groupedRooms[category]).forEach(bedType => {
+        groupedRooms[category][bedType].sort(sortByFloor);
+      });
+    }
   });
 
   // Helper function to render a room card
@@ -91,7 +101,8 @@ function SelectedRooms({ selectedRooms = [], onRemoveRoom }) {
     const bedTypeClass = room.bedType === 'Queen' ? 'queen' : 
                          room.bedType === 'King' ? 'king' : 'queen-2-beds';
     
-    const classes = `room-card ${bedTypeClass} ${room.isSmoking ? 'smoking' : ''} ${room.hasJacuzzi ? 'jacuzzi' : ''}`;
+    const isBooked = bookedRooms.includes(room.number);
+    const classes = `room-card ${bedTypeClass} ${room.isSmoking ? 'smoking' : ''} ${room.hasJacuzzi ? 'jacuzzi' : ''} ${isBooked ? 'booked' : ''}`;
     
     // Determine the icon based on bed type
     const getBedIcon = () => {
@@ -101,7 +112,18 @@ function SelectedRooms({ selectedRooms = [], onRemoveRoom }) {
     };
     
     return (
-      <div key={room.id} className={classes}>
+      <div 
+        key={room.id} 
+        className={classes}
+        style={{
+          width: '70px',
+          height: '70px',
+          maxWidth: '70px',
+          maxHeight: '70px',
+          padding: '5px',
+          boxSizing: 'border-box'
+        }}
+      >
         {/* Remove button */}
         <button 
           className="remove-room-button"
@@ -125,6 +147,81 @@ function SelectedRooms({ selectedRooms = [], onRemoveRoom }) {
 
   return (
     <div className="selected-rooms-section">
+      {/* Booking Rooms Section */}
+      {groupedRooms.bookedRooms.length > 0 && (
+        <div className="selected-rooms-row booking-rooms-row">
+          <div className="row-label">Booking Rooms</div>
+          <div className="room-cards-container">
+            {groupedRooms.bookedRooms.map(room => {
+              const bedTypeClass = room.bedType === 'Queen' ? 'queen' : 
+                                   room.bedType === 'King' ? 'king' : 'queen-2-beds';
+              
+              // Determine the icon based on bed type
+              const getBedIcon = () => {
+                if (room.bedType === 'Queen') return '🛏️';
+                if (room.bedType === 'King') return '👑';
+                return '🛏️🛏️';
+              };
+              
+              return (
+                <div 
+                  key={room.id} 
+                  className={`room-card ${bedTypeClass} booking-card`}
+                  style={{
+                    width: '70px',
+                    height: '70px',
+                    backgroundColor: '#00A651',
+                    color: 'white',
+                    borderRadius: '8px',
+                    border: 'none',
+                    position: 'relative'
+                  }}
+                >
+                  {/* BOOKING label */}
+                  <span 
+                    style={{
+                      position: 'absolute',
+                      top: '-10px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      backgroundColor: '#006633',
+                      color: 'white',
+                      fontSize: '8px',
+                      fontWeight: 'bold',
+                      padding: '2px 5px',
+                      borderRadius: '3px',
+                      border: '1px solid white',
+                      whiteSpace: 'nowrap',
+                      zIndex: 5
+                    }}
+                  >
+                    BOOKING
+                  </span>
+                  
+                  {/* Remove button */}
+                  <button 
+                    className="remove-room-button"
+                    onClick={() => onRemoveRoom && onRemoveRoom(room.id)}
+                  >
+                    ×
+                  </button>
+                  
+                  {/* Room type icon */}
+                  <span className="room-icon" style={{color: 'white'}}>{getBedIcon()}</span>
+                  
+                  <span className="room-number" style={{color: 'white', fontWeight: 'bold'}}>{room.number}</span>
+                  <span className="room-type" style={{color: 'white', fontWeight: 'bold'}}>
+                    {room.bedType === 'Queen' ? 'Queen' : 
+                     room.bedType === 'King' ? 'King' : 'Queen 2 Beds'}
+                  </span>
+                  {room.hasJacuzzi && <div className="multiple-label">Multiple</div>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      
       {/* Row 1: Non-smoking Queen, King, Queen 2 Beds */}
       {(groupedRooms.nonSmokingRegular.queen.length > 0 || 
         groupedRooms.nonSmokingRegular.king.length > 0 || 

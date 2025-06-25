@@ -2025,3 +2025,113 @@
   transform: translateY(-2px);
   opacity: 0.9;
 }
+
+/* Booked Room Styling */
+/* Container styling for booked rooms */
+.room-card-container.booked-container {
+  background-color: #00A651 !important;
+  box-shadow: 0 0 8px rgba(0, 166, 81, 0.6) !important;
+  transform: scale(1.02);
+  z-index: 10;
+  border-radius: 14px !important;
+  overflow: hidden;
+  border: none !important;
+  padding: 0 !important;
+}
+
+/* Card styling for booked rooms - using very specific selectors to override everything */
+.all-rooms-container .room-card-container.booked-container .room-card.booked,
+.room-card.booked.queen,
+.room-card.booked.king,
+.room-card.booked.queen-2-beds,
+.room-card.booked.smoking,
+.room-card.booked.jacuzzi,
+.room-card.booked {
+  border: none !important;
+  background-color: #00A651 !important;
+  background-image: none !important;
+  background: #00A651 !important;
+  color: white !important;
+  position: relative;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 14px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.room-card.booked .room-number {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  font-weight: bold;
+  font-size: 115%;
+}
+
+.room-card.booked .room-type {
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  font-weight: bold;
+}
+
+.room-card.booked .feature {
+  background-color: #005C2D !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  font-weight: bold;
+}
+
+/* Override any potential border colors */
+.room-card-container.booked-container div,
+.room-card-container.booked-container > div {
+  background-color: #00A651 !important;
+  border-color: #00A651 !important;
+}
+
+/* Room selector modal booked rooms */
+.room-selector-card.booked {
+  background-color: #00A651 !important;
+  border: none !important;
+  color: white !important;
+  position: relative;
+}
+
+.room-selector-card.booked .room-number,
+.room-selector-card.booked .room-type {
+  color: white !important;
+  font-weight: bold;
+}
+
+.room-selector-card .booked-label {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background-color: #005C2D;
+  color: white;
+  font-size: 10px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-weight: bold;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  z-index: 2;
+}
+
+.booked-label {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background-color: #005C2D;
+  color: white;
+  font-size: 10px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-weight: bold;
+  z-index: 10;
+  letter-spacing: 0.5px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  text-shadow: 0 1px 1px rgba(0,0,0,0.2);
+  border: 1px solid white;
+}

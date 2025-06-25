@@ -12,6 +12,25 @@
   position: relative;
 }
 
+/* Special styling for booking rooms row */
+.booking-rooms-row {
+  background-color: #e6f7ef;
+  border-left: 4px solid #00A651;
+}
+
+/* Ensure room cards in booking section have consistent size */
+.booking-rooms-row .room-card {
+  width: 70px !important;
+  height: 70px !important;
+  max-width: 70px !important;
+  max-height: 70px !important;
+  flex: 0 0 70px !important;
+  transform: none !important;
+  padding: 5px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
 .row-label {
   font-weight: 600;
   margin-bottom: 10px;
@@ -42,6 +61,38 @@
   transition: all 0.2s ease;
   padding: 5px;
   overflow: visible;
+}
+
+/* Booked room card styles */
+.room-card.booked {
+  background-color: #00A651;
+  color: white;
+  border: none !important;
+  box-shadow: 0 3px 6px rgba(0, 166, 81, 0.3);
+}
+
+.room-card.booked .room-number,
+.room-card.booked .room-type {
+  color: white;
+  font-weight: bold;
+}
+
+/* BOOKING label for booked rooms */
+.room-card.booked::before {
+  content: 'BOOKING';
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #006633;
+  color: white;
+  font-size: 8px;
+  font-weight: bold;
+  padding: 2px 5px;
+  border-radius: 3px;
+  border: 1px solid white;
+  white-space: nowrap;
+  z-index: 5;
 }
 
 .room-card:hover {

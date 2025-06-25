@@ -5,6 +5,8 @@ import './MobileView.css';
 import SelectedRooms from './SelectedRooms';
 
 function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices, shortStayPrices }) {
+  // List of booked room numbers
+  const bookedRooms = [225, 209, 220, 222, 201, 215, 211];
   // State for selected rooms
   const [selectedRooms, setSelectedRooms] = useState([]);
   const [showRoomSelector, setShowRoomSelector] = useState(false);
@@ -4726,6 +4728,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         {activeTab === 'short' && selectedRooms.length > 0 && (
           <SelectedRooms 
             selectedRooms={selectedRooms} 
+            bookedRooms={bookedRooms}
             onRemoveRoom={handleRemoveRoom} 
           />
         )}
@@ -4754,7 +4757,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                 .map(room => (
                   <div 
                     key={room.id}
-                    className="room-card-container"
+                    className={`room-card-container ${bookedRooms.includes(room.number) ? 'booked-container' : ''}`}
+                    style={bookedRooms.includes(room.number) ? {backgroundColor: '#00A651'} : {}}
                     onMouseEnter={(e) => handleCardMouseEnter(room, e)}
                     onMouseLeave={handleCardMouseLeave}
                     onMouseMove={handleCardMouseMove}
@@ -4763,8 +4767,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                       className={`room-card ${room.bedType === 'Queen' ? 'queen' : 
                                  room.bedType === 'King' ? 'king' : 'queen-2-beds'} 
                                  ${room.isSmoking ? 'smoking' : ''} 
-                                 ${room.hasJacuzzi ? 'jacuzzi' : ''}`}
+                                 ${room.hasJacuzzi ? 'jacuzzi' : ''}
+                                 ${bookedRooms.includes(room.number) ? 'booked' : ''}`}
+                      style={bookedRooms.includes(room.number) ? {backgroundColor: '#00A651', borderRadius: '14px', border: 'none'} : {}}
                     >
+                      {bookedRooms.includes(room.number) && (
+                        <span className="booked-label">BOOKING</span>
+                      )}
                       <span className="room-number">{room.number}</span>
                       <span className="room-type">
                         {room.bedType === 'Queen' ? 'Queen' : 
@@ -4820,15 +4829,17 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                     const isSelected = selectedRooms.some(r => r.id === room.id);
                     const bedTypeClass = room.bedType === 'Queen' ? 'queen' : 
                                        room.bedType === 'King' ? 'king' : 'queen-2-beds';
-                    
-                    const classes = `room-selector-card ${bedTypeClass} ${room.isSmoking ? 'smoking' : ''} ${room.hasJacuzzi ? 'jacuzzi' : ''} ${isSelected ? 'selected' : ''}`;
+                    const isBooked = bookedRooms.includes(room.number);
+                    const classes = `room-selector-card ${bedTypeClass} ${room.isSmoking ? 'smoking' : ''} ${room.hasJacuzzi ? 'jacuzzi' : ''} ${isSelected ? 'selected' : ''} ${isBooked ? 'booked' : ''}`;
                     
                     return (
                       <div 
                         key={room.id} 
                         className={classes}
+                        style={isBooked ? {backgroundColor: '#00A651', borderRadius: '14px', border: 'none'} : {}}
                         onClick={() => handleRoomSelect(room)}
                       >
+                        {isBooked && <span className="booked-label">BOOKING</span>}
                         <span className="room-number">{room.number}</span>
                         <span className="room-type">
                           {room.bedType === 'Queen' ? 'Queen' : 
@@ -4847,15 +4858,17 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                     const isSelected = selectedRooms.some(r => r.id === room.id);
                     const bedTypeClass = room.bedType === 'Queen' ? 'queen' : 
                                        room.bedType === 'King' ? 'king' : 'queen-2-beds';
-                    
-                    const classes = `room-selector-card first-floor ${bedTypeClass} ${room.isSmoking ? 'smoking' : ''} ${room.hasJacuzzi ? 'jacuzzi' : ''} ${isSelected ? 'selected' : ''}`;
+                    const isBooked = bookedRooms.includes(room.number);
+                    const classes = `room-selector-card first-floor ${bedTypeClass} ${room.isSmoking ? 'smoking' : ''} ${room.hasJacuzzi ? 'jacuzzi' : ''} ${isSelected ? 'selected' : ''} ${isBooked ? 'booked' : ''}`;
                     
                     return (
                       <div 
                         key={room.id} 
                         className={classes}
+                        style={isBooked ? {backgroundColor: '#00A651', borderRadius: '14px', border: 'none'} : {}}
                         onClick={() => handleRoomSelect(room)}
                       >
+                        {isBooked && <span className="booked-label">BOOKING</span>}
                         <span className="room-number">{room.number}</span>
                         <span className="room-type">
                           {room.bedType === 'Queen' ? 'Queen' : 
