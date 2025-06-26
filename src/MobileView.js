@@ -4620,47 +4620,29 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         </div>
         
         <div className="daily-price">
-          <span className="price-label">Today's Room Prices</span>
-          <div className="price-value" style={{display: 'flex', flexDirection: 'column'}}>
-            <div style={{fontSize: '11px', display: 'flex', justifyContent: 'space-between'}}>
-              <span>Base:</span>
-              <span>
-                <span style={{display: 'inline-flex', alignItems: 'center'}}>
-                  <span style={{display: 'inline-block', width: '30px', textAlign: 'right'}}>${dailyPrices.regular}</span>
-                  <span style={{fontSize: '8px', marginLeft: '2px', opacity: 0.8}}>(No Jacuzzi)</span>
-                </span>
-                <span style={{margin: '0 5px'}}>-</span>
-                <span style={{display: 'inline-flex', alignItems: 'center'}}>
-                  <span style={{display: 'inline-block', width: '30px', textAlign: 'right'}}>${dailyPrices.jacuzzi}</span>
-                  <span style={{fontSize: '8px', marginLeft: '2px', opacity: 0.8}}>(Jacuzzi)</span>
-                </span>
-              </span>
-            </div>
-            <div style={{fontSize: '9px', display: 'flex', justifyContent: 'space-between'}}>
-              <span>Tax (15%):</span>
-              <span>
-                <span style={{display: 'inline-flex', alignItems: 'center'}}>
-                  <span style={{display: 'inline-block', width: '30px', textAlign: 'right'}}>${(dailyPrices.regular * 0.15).toFixed(0)}</span>
-                  <span style={{width: '45px'}}></span>
-                </span>
-                <span style={{display: 'inline-flex', alignItems: 'center'}}>
-                  <span style={{display: 'inline-block', width: '30px', textAlign: 'right'}}>${(dailyPrices.jacuzzi * 0.15).toFixed(0)}</span>
-                  <span style={{width: '30px'}}></span>
-                </span>
-              </span>
-            </div>
-            <div style={{fontSize: '11px', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', borderTop: '1px solid rgba(255,255,255,0.2)', paddingTop: '2px', marginTop: '2px'}}>
-              <span>Total:</span>
-              <span>
-                <span style={{display: 'inline-flex', alignItems: 'center'}}>
-                  <span style={{display: 'inline-block', width: '30px', textAlign: 'right'}}>${Math.round(dailyPrices.regular * 1.15)}</span>
-                  <span style={{width: '45px'}}></span>
-                </span>
-                <span style={{display: 'inline-flex', alignItems: 'center'}}>
-                  <span style={{display: 'inline-block', width: '30px', textAlign: 'right'}}>${Math.round(dailyPrices.jacuzzi * 1.15)}</span>
-                  <span style={{width: '30px'}}></span>
-                </span>
-              </span>
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+            <span style={{fontSize: '8px', whiteSpace: 'nowrap', marginRight: '5px'}}>Today's Room Prices</span>
+            <div style={{display: 'flex', alignItems: 'center', fontSize: '7px'}}>
+              {/* Regular Room Price Format */}
+              <div style={{display: 'flex', alignItems: 'center'}}>
+                <span style={{fontSize: '10px', fontWeight: 'bold'}}>${dailyPrices.regular}</span>
+                <span style={{fontSize: '8px', margin: '0 1px'}}>+</span>
+                <span style={{fontSize: '9px'}}>${(dailyPrices.regular * 0.15).toFixed(0)}</span>
+                <span style={{fontSize: '8px', margin: '0 1px'}}>=</span>
+                <span style={{fontSize: '10px', fontWeight: 'bold', color: '#FFA500'}}>${Math.round(dailyPrices.regular * 1.15)}</span>
+              </div>
+              
+              {/* Separator */}
+              <span style={{margin: '0 5px', fontSize: '10px'}}>-</span>
+              
+              {/* Jacuzzi Room Price Format */}
+              <div style={{display: 'flex', alignItems: 'center'}}>
+                <span style={{fontSize: '10px', fontWeight: 'bold'}}>${dailyPrices.jacuzzi}</span>
+                <span style={{fontSize: '8px', margin: '0 1px'}}>+</span>
+                <span style={{fontSize: '9px'}}>${(dailyPrices.jacuzzi * 0.15).toFixed(0)}</span>
+                <span style={{fontSize: '8px', margin: '0 1px'}}>=</span>
+                <span style={{fontSize: '10px', fontWeight: 'bold', color: '#FFA500'}}>${Math.round(dailyPrices.jacuzzi * 1.15)}</span>
+              </div>
             </div>
           </div>
         </div>
