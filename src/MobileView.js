@@ -4621,7 +4621,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         
         <div className="daily-price">
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-            <span style={{fontSize: '8px', whiteSpace: 'nowrap', marginRight: '5px'}}>Today's Room Prices</span>
+            
             <div style={{display: 'flex', alignItems: 'center', fontSize: '7px'}}>
               {/* Regular Room Price Format */}
               <div style={{display: 'flex', alignItems: 'center'}}>
