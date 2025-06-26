@@ -503,10 +503,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [extraHours, hasJacuzzi, paymentMethod, extraHourRate, currentTime]);
   
-  // Clear short stay selections
+  // Clear short stay selections (but keep selected rooms)
   const clearShortStay = () => {
     setExtraHours(0);
-    setSelectedRooms([]);
+    // Keep selected rooms intact
+    // setSelectedRooms([]);
     setBedType('Queen');
     setHasJacuzzi(false);
     setIsSmoking(false);
@@ -518,15 +519,15 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     calculateCheckoutTime();
     setShowShortStayPriceSummary(false);
     
-    // Clear selected rooms from local storage
-    try {
-      localStorage.removeItem('selectedRooms');
-    } catch (error) {
-      console.error('Error clearing rooms from local storage:', error);
-    }
+    // Keep selected rooms in local storage
+    // try {
+    //   localStorage.removeItem('selectedRooms');
+    // } catch (error) {
+    //   console.error('Error clearing rooms from local storage:', error);
+    // }
   };
   
-  // Clear overnight stay selections
+  // Clear overnight stay selections (but keep selected rooms)
   const clearOvernightStay = () => {
     // Reset to default check-in date (today at 3 PM)
     const defaultCheckIn = new Date();
@@ -548,13 +549,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     setOvernightBedType('Queen');
     setShowOvernightPriceSummary(false);
     
-    // Clear selected rooms from local storage
-    try {
-      localStorage.removeItem('selectedRooms');
-      setSelectedRooms([]);
-    } catch (error) {
-      console.error('Error clearing rooms from local storage:', error);
-    }
+    // Keep selected rooms in local storage and state
+    // try {
+    //   localStorage.removeItem('selectedRooms');
+    //   setSelectedRooms([]);
+    // } catch (error) {
+    //   console.error('Error clearing rooms from local storage:', error);
+    // }
   };
   
   // Calculate overnight price info
