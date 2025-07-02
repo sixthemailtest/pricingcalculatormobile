@@ -356,15 +356,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     const extraHoursCheckOutCost = overnightCheckoutExtraHours * hourlyRate;
     const totalExtraHoursCost = extraHoursCheckInCost + extraHoursCheckOutCost;
     
-    // Calculate tax based on payment method
-    let taxAmount;
-    if (overnightPayment === 'credit') {
-      // Apply 15% tax to both base price and extra hours for credit card
-      taxAmount = (totalBasePrice + totalExtraHoursCost) * 0.15;
-    } else {
-      // For cash payment, only apply tax to base price
-      taxAmount = totalBasePrice * 0.15;
-    }
+    // Calculate tax based on payment method - apply tax to both base price and extra hours
+    const taxAmount = (totalBasePrice + totalExtraHoursCost) * 0.15;
     
     // Calculate total
     const totalPrice = totalBasePrice + taxAmount + extraHoursCheckInCost + extraHoursCheckOutCost;
@@ -5291,20 +5284,20 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                 </div>
                 {overnightPriceInfo.taxAmount > 0 && (
                   <div className="price-row">
-                    <span>Tax (15%):</span>
+                    <span>Tax (15% on room + extra hrs):</span>
                     <span>${overnightPriceInfo.taxAmount?.toFixed(2)}</span>
                   </div>
                 )}
                 {overnightPriceInfo.extraHoursCheckInCost > 0 && (
                   <div className="price-row">
-                    <span>Early Check-in ({Math.abs(overnightExtraHours)} hrs @ {overnightRateType === 'regular' ? '$15' : '$10'}/hr):</span>
-                    <span>${overnightPriceInfo.extraHoursCheckInCost?.toFixed(2)}</span>
+                    <span>Early Check-in (<span style={{color: '#FFA500'}}>{Math.abs(overnightExtraHours)} hrs</span> @ {overnightRateType === 'regular' ? '$15' : '$10'}/hr):</span>
+                    <span style={{color: '#FFA500'}}>${overnightPriceInfo.extraHoursCheckInCost?.toFixed(2)}</span>
                   </div>
                 )}
                 {overnightPriceInfo.extraHoursCheckOutCost > 0 && (
                   <div className="price-row">
-                    <span>Late Check-out ({overnightCheckoutExtraHours} hrs @ {overnightRateType === 'regular' ? '$15' : '$10'}/hr):</span>
-                    <span>${overnightPriceInfo.extraHoursCheckOutCost?.toFixed(2)}</span>
+                    <span>Late Check-out (<span style={{color: '#FFA500'}}>{overnightCheckoutExtraHours} hrs</span> @ {overnightRateType === 'regular' ? '$15' : '$10'}/hr):</span>
+                    <span style={{color: '#FFA500'}}>${overnightPriceInfo.extraHoursCheckOutCost?.toFixed(2)}</span>
                   </div>
                 )}
 
