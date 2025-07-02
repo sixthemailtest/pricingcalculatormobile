@@ -4623,7 +4623,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
             {/* Regular Room Price Format */}
             <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
-              <span style={{fontSize: '8px', fontWeight: 'bold', marginBottom: '2px'}}>Reg.</span>
+              <span style={{fontSize: '7px', fontWeight: 'bold', marginBottom: '2px'}}>Regular Room</span>
               <div style={{display: 'flex', alignItems: 'center'}}>
                 <span style={{fontSize: '10px', fontWeight: 'bold'}}>${dailyPrices.regular}</span>
                 <span style={{fontSize: '8px', margin: '0 1px'}}>+</span>
