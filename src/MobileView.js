@@ -4633,7 +4633,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               </div>
             </div>
             
-            <span style={{margin: '0 5px', fontSize: '10px'}}>-</span>
+            <span style={{margin: '0 5px', fontSize: '10px'}}> </span>
             
             {/* Jacuzzi Room Price Format */}
             <div style={{display: 'flex', flexDirection: 'column', alignItems: 'center'}}>
