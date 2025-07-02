@@ -4621,28 +4621,15 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         
         <div className="daily-price">
           <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+            <span style={{margin: '0 5px', fontSize: '10px'}}>-</span>
             
-            <div style={{display: 'flex', alignItems: 'center', fontSize: '7px'}}>
-              {/* Regular Room Price Format */}
-              <div style={{display: 'flex', alignItems: 'center'}}>
-                <span style={{fontSize: '10px', fontWeight: 'bold'}}>${dailyPrices.regular}</span>
-                <span style={{fontSize: '8px', margin: '0 1px'}}>+</span>
-                <span style={{fontSize: '9px'}}>${(dailyPrices.regular * 0.15).toFixed(0)}</span>
-                <span style={{fontSize: '8px', margin: '0 1px'}}>=</span>
-                <span style={{fontSize: '10px', fontWeight: 'bold', color: '#FFA500'}}>${Math.round(dailyPrices.regular * 1.15)}</span>
-              </div>
-              
-              {/* Separator */}
-              <span style={{margin: '0 5px', fontSize: '10px'}}>-</span>
-              
-              {/* Jacuzzi Room Price Format */}
-              <div style={{display: 'flex', alignItems: 'center'}}>
-                <span style={{fontSize: '10px', fontWeight: 'bold'}}>${dailyPrices.jacuzzi}</span>
-                <span style={{fontSize: '8px', margin: '0 1px'}}>+</span>
-                <span style={{fontSize: '9px'}}>${(dailyPrices.jacuzzi * 0.15).toFixed(0)}</span>
-                <span style={{fontSize: '8px', margin: '0 1px'}}>=</span>
-                <span style={{fontSize: '10px', fontWeight: 'bold', color: '#FFA500'}}>${Math.round(dailyPrices.jacuzzi * 1.15)}</span>
-              </div>
+            {/* Jacuzzi Room Price Format */}
+            <div style={{display: 'flex', alignItems: 'center'}}>
+              <span style={{fontSize: '10px', fontWeight: 'bold'}}>${dailyPrices.jacuzzi}</span>
+              <span style={{fontSize: '8px', margin: '0 1px'}}>+</span>
+              <span style={{fontSize: '9px'}}><span style={{fontSize: '7px', marginRight: '1px'}}>Tax</span>${(dailyPrices.jacuzzi * 0.15).toFixed(0)}</span>
+              <span style={{fontSize: '8px', margin: '0 1px'}}>=</span>
+              <span style={{fontSize: '10px', fontWeight: 'bold', color: '#FFA500'}}>${Math.round(dailyPrices.jacuzzi * 1.15)}</span>
             </div>
           </div>
         </div>
