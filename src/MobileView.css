@@ -2083,7 +2083,7 @@
 }
 
 .room-card.booked .feature {
-  background-color: #005C2D !important;
+  background-color: #00A651 !important;
   color: #ffffff !important;
   border: 1px solid rgba(255, 255, 255, 0.4);
   font-weight: bold;
@@ -2094,6 +2094,11 @@
 .room-card-container.booked-container > div {
   background-color: #00A651 !important;
   border-color: #00A651 !important;
+}
+
+/* Make people icons white in booked rooms */
+.room-card.booked .people-icon {
+  color: #ffffff !important;
 }
 
 /* Room selector modal booked rooms */
