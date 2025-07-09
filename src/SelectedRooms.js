@@ -1,7 +1,8 @@
 import React from 'react';
 import './SelectedRooms.css';
+import './RoomIndicators.css';
 
-function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom }) {
+function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom, onClearBookedRooms }) {
   // Group rooms by their characteristics
   const groupedRooms = {
     nonSmokingRegular: {
@@ -104,13 +105,47 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom }) {
     const isBooked = bookedRooms.includes(room.number);
     const classes = `room-card ${bedTypeClass} ${room.isSmoking ? 'smoking' : ''} ${room.hasJacuzzi ? 'jacuzzi' : ''} ${isBooked ? 'booked' : ''}`;
     
-    // Determine the icon based on bed type
-    const getBedIcon = () => {
-      if (room.bedType === 'Queen') return '🛏️';
-      if (room.bedType === 'King') return '👑';
-      return '🛏️🛏️';
-    };
+    // For non-booking room cards, use black text and no icons
+    if (!isBooked) {
+      return (
+        <div 
+          key={room.id} 
+          className={classes}
+          style={{
+            width: '70px',
+            height: '70px',
+            maxWidth: '70px',
+            maxHeight: '70px',
+            padding: '5px',
+            boxSizing: 'border-box',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          {/* Remove button */}
+          <button 
+            className="remove-room-button"
+            onClick={() => onRemoveRoom && onRemoveRoom(room.id)}
+          >
+            ×
+          </button>
+          
+          {/* Room number */}
+          <span className="room-number" style={{color: 'black', fontWeight: 'bold', fontSize: '16px'}}>{room.number}</span>
+          
+          {/* Room type */}
+          <span className="room-type" style={{color: 'black', fontSize: '10px', marginTop: '2px'}}>
+            {room.bedType === 'Queen' ? 'Queen' : 
+             room.bedType === 'King' ? 'King' : 'Queen 2B'}
+          </span>
+        </div>
+      );
+    }
     
+    // For booking room cards, keep the icons and white text
     return (
       <div 
         key={room.id} 
@@ -121,7 +156,12 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom }) {
           maxWidth: '70px',
           maxHeight: '70px',
           padding: '5px',
-          boxSizing: 'border-box'
+          boxSizing: 'border-box',
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'flex-start'
         }}
       >
         {/* Remove button */}
@@ -132,14 +172,30 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom }) {
           ×
         </button>
         
-        {/* Room type icon */}
-        <span className="room-icon">{getBedIcon()}</span>
+        {/* Room number */}
+        <span className="room-number" style={{color: 'white', fontWeight: 'bold', fontSize: '14px', marginTop: '8px'}}>{room.number}</span>
         
-        <span className="room-number">{room.number}</span>
-        <span className="room-type">
+        {/* Room type */}
+        <span className="room-type" style={{color: 'white', fontSize: '9px', marginTop: '-2px', marginBottom: '3px'}}>
           {room.bedType === 'Queen' ? 'Queen' : 
-           room.bedType === 'King' ? 'King' : 'Queen 2 Beds'}
+           room.bedType === 'King' ? 'King' : 'Queen 2B'}
         </span>
+        
+        {/* Room feature indicators */}
+        <div className="room-indicator">
+          {/* Smoking status indicator */}
+          <span className={`indicator-icon ${room.isSmoking ? 'smoking-icon' : 'non-smoking-icon'}`}>
+            {room.isSmoking ? '🚬' : '🚭'}
+          </span>
+          
+          {/* Jacuzzi indicator */}
+          {room.hasJacuzzi && (
+            <span className="indicator-icon jacuzzi-icon">
+              💦
+            </span>
+          )}
+        </div>
+        
         {room.hasJacuzzi && <div className="multiple-label">Multiple</div>}
       </div>
     );
@@ -150,18 +206,13 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom }) {
       {/* Booking Rooms Section */}
       {groupedRooms.bookedRooms.length > 0 && (
         <div className="selected-rooms-row booking-rooms-row">
-          <div className="row-label">Booking Rooms</div>
+          <div className="row-label-container">
+            <div className="row-label">Booking Rooms</div>
+          </div>
           <div className="room-cards-container">
             {groupedRooms.bookedRooms.map(room => {
               const bedTypeClass = room.bedType === 'Queen' ? 'queen' : 
                                    room.bedType === 'King' ? 'king' : 'queen-2-beds';
-              
-              // Determine the icon based on bed type
-              const getBedIcon = () => {
-                if (room.bedType === 'Queen') return '🛏️';
-                if (room.bedType === 'King') return '👑';
-                return '🛏️🛏️';
-              };
               
               return (
                 <div 
@@ -174,11 +225,13 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom }) {
                     color: 'white',
                     borderRadius: '8px',
                     border: 'none',
-                    position: 'relative'
+                    position: 'relative',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'flex-start'
                   }}
                 >
-                  {/* BOOKING label removed */}
-                  
                   {/* Remove button */}
                   <button 
                     className="remove-room-button"
@@ -187,15 +240,29 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom }) {
                     ×
                   </button>
                   
-                  {/* Room type icon */}
-                  <span className="room-icon" style={{color: 'white'}}>{getBedIcon()}</span>
+                  {/* Room number */}
+                  <span className="room-number" style={{color: 'white', fontWeight: 'bold', fontSize: '14px', marginTop: '8px'}}>{room.number}</span>
                   
-                  <span className="room-number" style={{color: 'white', fontWeight: 'bold'}}>{room.number}</span>
-                  <span className="room-type" style={{color: 'white', fontWeight: 'bold'}}>
+                  {/* Room type */}
+                  <span className="room-type" style={{color: 'white', fontSize: '9px', marginTop: '-2px', marginBottom: '3px'}}>
                     {room.bedType === 'Queen' ? 'Queen' : 
-                     room.bedType === 'King' ? 'King' : 'Queen 2 Beds'}
+                     room.bedType === 'King' ? 'King' : 'Queen 2B'}
                   </span>
-                  {room.hasJacuzzi && <div className="multiple-label">Multiple</div>}
+                  
+                  {/* Room feature indicators */}
+                  <div className="room-indicator">
+                    {/* Smoking status indicator */}
+                    <span className={`indicator-icon ${room.isSmoking ? 'smoking-icon' : 'non-smoking-icon'}`}>
+                      {room.isSmoking ? '🚬' : '🚭'}
+                    </span>
+                    
+                    {/* Jacuzzi indicator */}
+                    {room.hasJacuzzi && (
+                      <span className="indicator-icon jacuzzi-icon">
+                        💦
+                      </span>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -208,7 +275,9 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom }) {
         groupedRooms.nonSmokingRegular.king.length > 0 || 
         groupedRooms.nonSmokingRegular.queen2Beds.length > 0) && (
         <div className="selected-rooms-row">
-          <div className="row-label">Non-Smoking Rooms</div>
+          <div className="row-label-container">
+            <div className="row-label">Non-Smoking Rooms</div>
+          </div>
           <div className="room-cards-container">
             {groupedRooms.nonSmokingRegular.queen.map(renderRoomCard)}
             {groupedRooms.nonSmokingRegular.king.map(renderRoomCard)}
@@ -222,7 +291,9 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom }) {
         groupedRooms.smokingRegular.king.length > 0 || 
         groupedRooms.smokingRegular.queen2Beds.length > 0) && (
         <div className="selected-rooms-row">
-          <div className="row-label">Smoking Rooms</div>
+          <div className="row-label-container">
+            <div className="row-label">Smoking Rooms</div>
+          </div>
           <div className="room-cards-container">
             {groupedRooms.smokingRegular.queen.map(renderRoomCard)}
             {groupedRooms.smokingRegular.king.map(renderRoomCard)}
@@ -235,7 +306,9 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom }) {
       {(groupedRooms.nonSmokingJacuzzi.queen.length > 0 || 
         groupedRooms.nonSmokingJacuzzi.king.length > 0) && (
         <div className="selected-rooms-row">
-          <div className="row-label">Jacuzzi Non-Smoking Rooms</div>
+          <div className="row-label-container">
+            <div className="row-label">Jacuzzi Non-Smoking Rooms</div>
+          </div>
           <div className="room-cards-container">
             {groupedRooms.nonSmokingJacuzzi.queen.map(renderRoomCard)}
             {groupedRooms.nonSmokingJacuzzi.king.map(renderRoomCard)}
@@ -247,7 +320,9 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom }) {
       {(groupedRooms.smokingJacuzzi.queen.length > 0 || 
         groupedRooms.smokingJacuzzi.king.length > 0) && (
         <div className="selected-rooms-row">
-          <div className="row-label">Jacuzzi Smoking Rooms</div>
+          <div className="row-label-container">
+            <div className="row-label">Jacuzzi Smoking Rooms</div>
+          </div>
           <div className="room-cards-container">
             {groupedRooms.smokingJacuzzi.queen.map(renderRoomCard)}
             {groupedRooms.smokingJacuzzi.king.map(renderRoomCard)}

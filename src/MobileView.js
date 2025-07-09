@@ -6,7 +6,7 @@ import SelectedRooms from './SelectedRooms';
 
 function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices, shortStayPrices }) {
   // List of booked room numbers
-  const bookedRooms = [225, 209, 220, 222, 201, 215, 211];
+  const [bookedRooms, setBookedRooms] = useState([225, 209, 220, 222, 201, 215, 211]);
   // State for selected rooms
   const [selectedRooms, setSelectedRooms] = useState([]);
   const [showRoomSelector, setShowRoomSelector] = useState(false);
@@ -498,26 +498,37 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   
   // Clear short stay selections (but keep selected rooms)
   const clearShortStay = () => {
-    setExtraHours(0);
     // Keep selected rooms intact
-    // setSelectedRooms([]);
-    setBedType('Queen');
-    setHasJacuzzi(false);
-    setIsSmoking(false);
-    setPaymentMethod('cash');
-    setTaxAmount(0);
+    setExtraHours(0);
     setBasePrice(0);
     setExtraHoursCost(0);
+    setTaxAmount(0);
     setTotalPrice(0);
+    setHasJacuzzi(false);
+    setIsSmoking(false);
+    setBedType('');
+    setPaymentMethod('cash');
     calculateCheckoutTime();
     setShowShortStayPriceSummary(false);
     
     // Keep selected rooms in local storage
-    // try {
-    //   localStorage.removeItem('selectedRooms');
-    // } catch (error) {
-    //   console.error('Error clearing rooms from local storage:', error);
-    // }
+    try {
+      localStorage.setItem('selectedRooms', JSON.stringify(selectedRooms));
+    } catch (error) {
+      console.error('Error clearing rooms from local storage:', error);
+    }
+  };
+  
+  // Clear only short stay and multiple night prices, but keep room cards
+  const clearAllRooms = () => {
+    // Clear short stay selections but keep selected rooms
+    clearShortStay();
+    
+    // Clear overnight stay selections but keep selected rooms
+    clearOvernightStay();
+    
+    // Log the action
+    console.log('Cleared short stay and multiple night prices, kept room cards');
   };
   
   // Clear overnight stay selections (but keep selected rooms)
@@ -4535,6 +4546,12 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     setSelectedRooms(selectedRooms.filter(room => room.id !== roomId));
   };
   
+  // Handle clearing all booked rooms at once
+  const handleClearBookedRooms = () => {
+    // Filter out all booked rooms from selectedRooms
+    setSelectedRooms(selectedRooms.filter(room => !bookedRooms.includes(room.number)));
+  };
+  
   // Toggle room selector modal
   const toggleRoomSelector = () => {
     setShowRoomSelector(!showRoomSelector);
@@ -4645,36 +4662,16 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       
       {/* Button container for select rooms and clear */}
       <div className="top-buttons-container">
-        {activeTab === 'short' ? (
-          <>
-            <button className="select-rooms-top-button" onClick={toggleRoomSelector}>
-              {selectedRooms.length > 0 ? `Selected Rooms (${selectedRooms.length})` : 'Select Rooms'}
-            </button>
-            <button 
-              className="small-clear-button" 
-              onClick={clearShortStay}
-              style={{ backgroundColor: 'red', color: 'white' }}
-            >
-              Clear
-            </button>
-          </>
-        ) : activeTab === 'overnight' ? (
-          <>
-            <button className="add-stay-button" onClick={saveCurrentStay}>
-              + Add Stay
-            </button>
-            <button 
-              className="small-clear-button" 
-              onClick={clearOvernightStay}
-              style={{ backgroundColor: 'red', color: 'white' }}
-            >
-              Clear
-            </button>
-          </>
-        ) : (
-          // No buttons for rooms tab
-          <div></div>
-        )}
+        <button className="select-rooms-top-button" onClick={toggleRoomSelector}>
+          {selectedRooms.length > 0 ? `Selected Rooms (${selectedRooms.length})` : 'Select Rooms'}
+        </button>
+        <button 
+          className="small-clear-button" 
+          onClick={clearAllRooms}
+          style={{ backgroundColor: 'red', color: 'white' }}
+        >
+          Clear
+        </button>
       </div>
       
       {/* Tabs */}
@@ -4707,7 +4704,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           <SelectedRooms 
             selectedRooms={selectedRooms} 
             bookedRooms={bookedRooms}
-            onRemoveRoom={handleRemoveRoom} 
+            onRemoveRoom={handleRemoveRoom}
+            onClearBookedRooms={handleClearBookedRooms}
           />
         )}
         
