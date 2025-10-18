@@ -22,16 +22,13 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom, onC
     smokingJacuzzi: {
       queen: [],
       king: []
-    },
-    bookedRooms: [] // New category for booked rooms
+    }
   };
 
   // Sort rooms into their respective categories
   selectedRooms.forEach(room => {
-    // Check if the room is booked
-    if (bookedRooms.includes(room.number)) {
-      groupedRooms.bookedRooms.push(room);
-    } else if (room.hasJacuzzi) {
+    // Categorize room regardless of booking status
+    if (room.hasJacuzzi) {
       if (room.isSmoking) {
         // Jacuzzi + Smoking
         if (room.bedType === 'Queen') {
@@ -86,15 +83,10 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom, onC
   
   // Apply sorting to all room categories
   Object.keys(groupedRooms).forEach(category => {
-    if (category === 'bookedRooms') {
-      // Sort the flat bookedRooms array
-      groupedRooms.bookedRooms.sort(sortByFloor);
-    } else {
-      // Sort the nested structure for other categories
-      Object.keys(groupedRooms[category]).forEach(bedType => {
-        groupedRooms[category][bedType].sort(sortByFloor);
-      });
-    }
+    // Sort the nested structure for all categories
+    Object.keys(groupedRooms[category]).forEach(bedType => {
+      groupedRooms[category][bedType].sort(sortByFloor);
+    });
   });
 
   // Helper function to render a room card
@@ -161,7 +153,10 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom, onC
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'flex-start'
+          justifyContent: 'flex-start',
+          backgroundColor: '#00A651',
+          border: 'none',
+          borderRadius: '8px'
         }}
       >
         {/* Remove button */}
@@ -203,73 +198,6 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom, onC
 
   return (
     <div className="selected-rooms-section">
-      {/* Booking Rooms Section */}
-      {groupedRooms.bookedRooms.length > 0 && (
-        <div className="selected-rooms-row booking-rooms-row">
-          <div className="row-label-container">
-            <div className="row-label">Booking Rooms</div>
-          </div>
-          <div className="room-cards-container">
-            {groupedRooms.bookedRooms.map(room => {
-              const bedTypeClass = room.bedType === 'Queen' ? 'queen' : 
-                                   room.bedType === 'King' ? 'king' : 'queen-2-beds';
-              
-              return (
-                <div 
-                  key={room.id} 
-                  className={`room-card ${bedTypeClass} booking-card`}
-                  style={{
-                    width: '70px',
-                    height: '70px',
-                    backgroundColor: '#00A651',
-                    color: 'white',
-                    borderRadius: '8px',
-                    border: 'none',
-                    position: 'relative',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'flex-start'
-                  }}
-                >
-                  {/* Remove button */}
-                  <button 
-                    className="remove-room-button"
-                    onClick={() => onRemoveRoom && onRemoveRoom(room.id)}
-                  >
-                    ×
-                  </button>
-                  
-                  {/* Room number */}
-                  <span className="room-number" style={{color: 'white', fontWeight: 'bold', fontSize: '14px', marginTop: '8px'}}>{room.number}</span>
-                  
-                  {/* Room type */}
-                  <span className="room-type" style={{color: 'white', fontSize: '9px', marginTop: '-2px', marginBottom: '3px'}}>
-                    {room.bedType === 'Queen' ? 'Queen' : 
-                     room.bedType === 'King' ? 'King' : 'Queen 2B'}
-                  </span>
-                  
-                  {/* Room feature indicators */}
-                  <div className="room-indicator">
-                    {/* Smoking status indicator */}
-                    <span className={`indicator-icon ${room.isSmoking ? 'smoking-icon' : 'non-smoking-icon'}`}>
-                      {room.isSmoking ? '🚬' : '🚭'}
-                    </span>
-                    
-                    {/* Jacuzzi indicator */}
-                    {room.hasJacuzzi && (
-                      <span className="indicator-icon jacuzzi-icon">
-                        💦
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-      
       {/* Row 1: Non-smoking Queen, King, Queen 2 Beds */}
       {(groupedRooms.nonSmokingRegular.queen.length > 0 || 
         groupedRooms.nonSmokingRegular.king.length > 0 || 
