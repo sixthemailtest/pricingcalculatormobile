@@ -139,4 +139,5 @@
 .room-type {
   font-size: 10px;
   color: #4a5568;
+  white-space: nowrap;
 }

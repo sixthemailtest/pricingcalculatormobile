@@ -4678,7 +4678,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             
             {/* Double Row */}
             <div style={{display: 'flex', alignItems: 'center', gap: '2px'}}>
-              <span style={{width: '38px', fontWeight: 'bold', fontSize: '7px'}}>Double</span>
+              <span style={{width: '38px', fontWeight: 'bold', fontSize: '5.5px'}}>Queen 2 Beds</span>
               <div style={{width: '75px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', fontSize: '7px'}}>
                 <span style={{fontWeight: 'bold'}}>${dailyPrices.regular + 10}</span>
                 <span>+</span>
@@ -4792,12 +4792,12 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               const categories = [
                 { label: 'Non-Smoking Queen', filter: (r) => !r.isSmoking && !r.hasJacuzzi && r.bedType === 'Queen' },
                 { label: 'Non-Smoking King', filter: (r) => !r.isSmoking && !r.hasJacuzzi && r.bedType === 'King' },
-                { label: 'Non-Smoking Double', filter: (r) => !r.isSmoking && !r.hasJacuzzi && r.bedType === 'Queen2Beds' },
+                { label: 'Non-Smoking Queen 2 Beds', filter: (r) => !r.isSmoking && !r.hasJacuzzi && r.bedType === 'Queen2Beds' },
                 { label: 'Non-Smoking Queen with Jacuzzi', filter: (r) => !r.isSmoking && r.hasJacuzzi && r.bedType === 'Queen' },
                 { label: 'Non-Smoking King with Jacuzzi', filter: (r) => !r.isSmoking && r.hasJacuzzi && r.bedType === 'King' },
                 { label: 'Smoking Queen', filter: (r) => r.isSmoking && !r.hasJacuzzi && r.bedType === 'Queen' },
                 { label: 'Smoking King', filter: (r) => r.isSmoking && !r.hasJacuzzi && r.bedType === 'King' },
-                { label: 'Smoking Double', filter: (r) => r.isSmoking && !r.hasJacuzzi && r.bedType === 'Queen2Beds' },
+                { label: 'Smoking Queen 2 Beds', filter: (r) => r.isSmoking && !r.hasJacuzzi && r.bedType === 'Queen2Beds' },
                 { label: 'Smoking Queen with Jacuzzi', filter: (r) => r.isSmoking && r.hasJacuzzi && r.bedType === 'Queen' },
                 { label: 'Smoking King with Jacuzzi', filter: (r) => r.isSmoking && r.hasJacuzzi && r.bedType === 'King' },
               ];
