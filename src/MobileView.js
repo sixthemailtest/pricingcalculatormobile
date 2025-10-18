@@ -4644,14 +4644,14 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               <div style={{width: '75px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', fontSize: '7px'}}>
                 <span style={{fontWeight: 'bold'}}>${dailyPrices.regular}</span>
                 <span>+</span>
-                <span><span style={{fontSize: '5px'}}>tax</span>${(dailyPrices.regular * 0.15).toFixed(0)}</span>
+                <span><span style={{fontSize: '5px'}}>tax</span> ${(dailyPrices.regular * 0.15).toFixed(0)}</span>
                 <span>=</span>
                 <span style={{fontWeight: 'bold', color: '#FFA500'}}>${Math.round(dailyPrices.regular * 1.15)}</span>
               </div>
               <div style={{width: '75px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', fontSize: '7px'}}>
                 <span style={{fontWeight: 'bold'}}>${dailyPrices.jacuzzi}</span>
                 <span>+</span>
-                <span><span style={{fontSize: '5px'}}>tax</span>${(dailyPrices.jacuzzi * 0.15).toFixed(0)}</span>
+                <span><span style={{fontSize: '5px'}}>tax</span> ${(dailyPrices.jacuzzi * 0.15).toFixed(0)}</span>
                 <span>=</span>
                 <span style={{fontWeight: 'bold', color: '#FFA500'}}>${Math.round(dailyPrices.jacuzzi * 1.15)}</span>
               </div>
@@ -4663,14 +4663,14 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               <div style={{width: '75px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', fontSize: '7px'}}>
                 <span style={{fontWeight: 'bold'}}>${dailyPrices.regular + 5}</span>
                 <span>+</span>
-                <span><span style={{fontSize: '5px'}}>tax</span>${((dailyPrices.regular + 5) * 0.15).toFixed(0)}</span>
+                <span><span style={{fontSize: '5px'}}>tax</span> ${((dailyPrices.regular + 5) * 0.15).toFixed(0)}</span>
                 <span>=</span>
                 <span style={{fontWeight: 'bold', color: '#FFA500'}}>${Math.round((dailyPrices.regular + 5) * 1.15)}</span>
               </div>
               <div style={{width: '75px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', fontSize: '7px'}}>
                 <span style={{fontWeight: 'bold'}}>${dailyPrices.jacuzzi + 5}</span>
                 <span>+</span>
-                <span><span style={{fontSize: '5px'}}>tax</span>${((dailyPrices.jacuzzi + 5) * 0.15).toFixed(0)}</span>
+                <span><span style={{fontSize: '5px'}}>tax</span> ${((dailyPrices.jacuzzi + 5) * 0.15).toFixed(0)}</span>
                 <span>=</span>
                 <span style={{fontWeight: 'bold', color: '#FFA500'}}>${Math.round((dailyPrices.jacuzzi + 5) * 1.15)}</span>
               </div>
@@ -4682,14 +4682,14 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               <div style={{width: '75px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', fontSize: '7px'}}>
                 <span style={{fontWeight: 'bold'}}>${dailyPrices.regular + 10}</span>
                 <span>+</span>
-                <span><span style={{fontSize: '5px'}}>tax</span>${((dailyPrices.regular + 10) * 0.15).toFixed(0)}</span>
+                <span><span style={{fontSize: '5px'}}>tax</span> ${((dailyPrices.regular + 10) * 0.15).toFixed(0)}</span>
                 <span>=</span>
                 <span style={{fontWeight: 'bold', color: '#FFA500'}}>${Math.round((dailyPrices.regular + 10) * 1.15)}</span>
               </div>
               <div style={{width: '75px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', fontSize: '7px'}}>
                 <span style={{fontWeight: 'bold'}}>${dailyPrices.jacuzzi + 10}</span>
                 <span>+</span>
-                <span><span style={{fontSize: '5px'}}>tax</span>${((dailyPrices.jacuzzi + 10) * 0.15).toFixed(0)}</span>
+                <span><span style={{fontSize: '5px'}}>tax</span> ${((dailyPrices.jacuzzi + 10) * 0.15).toFixed(0)}</span>
                 <span>=</span>
                 <span style={{fontWeight: 'bold', color: '#FFA500'}}>${Math.round((dailyPrices.jacuzzi + 10) * 1.15)}</span>
               </div>
