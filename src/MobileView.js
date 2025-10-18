@@ -4801,7 +4801,26 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               ];
 
               return categories.map(({ label, filter }) => {
-                const rooms = availableRooms.filter(filter).sort((a, b) => a.number - b.number);
+                const rooms = availableRooms.filter(filter).sort((a, b) => {
+                  // First sort by floor (first floor first)
+                  const aIsFirstFloor = a.number < 200;
+                  const bIsFirstFloor = b.number < 200;
+                  
+                  if (aIsFirstFloor && !bIsFirstFloor) return -1;
+                  if (!aIsFirstFloor && bIsFirstFloor) return 1;
+                  
+                  // For first floor, sort by room number
+                  if (aIsFirstFloor && bIsFirstFloor) {
+                    return a.number - b.number;
+                  }
+                  
+                  // For second floor, sort by bed type (Queen, King, Queen2Beds), then room number
+                  const bedTypeOrder = { 'Queen': 1, 'King': 2, 'Queen2Beds': 3 };
+                  const aOrder = bedTypeOrder[a.bedType];
+                  const bOrder = bedTypeOrder[b.bedType];
+                  if (aOrder !== bOrder) return aOrder - bOrder;
+                  return a.number - b.number;
+                });
                 
                 // Only render section if there are rooms
                 if (rooms.length === 0) return null;

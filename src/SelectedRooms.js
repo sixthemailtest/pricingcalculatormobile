@@ -207,9 +207,29 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom, onC
             <div className="row-label">Non-Smoking Rooms</div>
           </div>
           <div className="room-cards-container">
-            {groupedRooms.nonSmokingRegular.queen.map(renderRoomCard)}
-            {groupedRooms.nonSmokingRegular.king.map(renderRoomCard)}
-            {groupedRooms.nonSmokingRegular.queen2Beds.map(renderRoomCard)}
+            {[
+              ...groupedRooms.nonSmokingRegular.queen,
+              ...groupedRooms.nonSmokingRegular.king,
+              ...groupedRooms.nonSmokingRegular.queen2Beds
+            ].sort((a, b) => {
+              // First sort by floor
+              const aIsFirstFloor = a.number < 200;
+              const bIsFirstFloor = b.number < 200;
+              if (aIsFirstFloor && !bIsFirstFloor) return -1;
+              if (!aIsFirstFloor && bIsFirstFloor) return 1;
+              
+              // For first floor, sort by room number
+              if (aIsFirstFloor && bIsFirstFloor) {
+                return a.number - b.number;
+              }
+              
+              // For second floor, sort by bed type (Queen, King, Queen2Beds), then room number
+              const bedTypeOrder = { 'Queen': 1, 'King': 2, 'Queen2Beds': 3 };
+              const aOrder = bedTypeOrder[a.bedType];
+              const bOrder = bedTypeOrder[b.bedType];
+              if (aOrder !== bOrder) return aOrder - bOrder;
+              return a.number - b.number;
+            }).map(renderRoomCard)}
           </div>
         </div>
       )}
@@ -223,9 +243,29 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom, onC
             <div className="row-label">Smoking Rooms</div>
           </div>
           <div className="room-cards-container">
-            {groupedRooms.smokingRegular.queen.map(renderRoomCard)}
-            {groupedRooms.smokingRegular.king.map(renderRoomCard)}
-            {groupedRooms.smokingRegular.queen2Beds.map(renderRoomCard)}
+            {[
+              ...groupedRooms.smokingRegular.queen,
+              ...groupedRooms.smokingRegular.king,
+              ...groupedRooms.smokingRegular.queen2Beds
+            ].sort((a, b) => {
+              // First sort by floor
+              const aIsFirstFloor = a.number < 200;
+              const bIsFirstFloor = b.number < 200;
+              if (aIsFirstFloor && !bIsFirstFloor) return -1;
+              if (!aIsFirstFloor && bIsFirstFloor) return 1;
+              
+              // For first floor, sort by room number
+              if (aIsFirstFloor && bIsFirstFloor) {
+                return a.number - b.number;
+              }
+              
+              // For second floor, sort by bed type (Queen, King, Queen2Beds), then room number
+              const bedTypeOrder = { 'Queen': 1, 'King': 2, 'Queen2Beds': 3 };
+              const aOrder = bedTypeOrder[a.bedType];
+              const bOrder = bedTypeOrder[b.bedType];
+              if (aOrder !== bOrder) return aOrder - bOrder;
+              return a.number - b.number;
+            }).map(renderRoomCard)}
           </div>
         </div>
       )}
@@ -238,8 +278,28 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom, onC
             <div className="row-label">Jacuzzi Non-Smoking Rooms</div>
           </div>
           <div className="room-cards-container">
-            {groupedRooms.nonSmokingJacuzzi.queen.map(renderRoomCard)}
-            {groupedRooms.nonSmokingJacuzzi.king.map(renderRoomCard)}
+            {[
+              ...groupedRooms.nonSmokingJacuzzi.queen,
+              ...groupedRooms.nonSmokingJacuzzi.king
+            ].sort((a, b) => {
+              // First sort by floor
+              const aIsFirstFloor = a.number < 200;
+              const bIsFirstFloor = b.number < 200;
+              if (aIsFirstFloor && !bIsFirstFloor) return -1;
+              if (!aIsFirstFloor && bIsFirstFloor) return 1;
+              
+              // For first floor, sort by room number
+              if (aIsFirstFloor && bIsFirstFloor) {
+                return a.number - b.number;
+              }
+              
+              // For second floor, sort by bed type (Queen, King), then room number
+              const bedTypeOrder = { 'Queen': 1, 'King': 2 };
+              const aOrder = bedTypeOrder[a.bedType];
+              const bOrder = bedTypeOrder[b.bedType];
+              if (aOrder !== bOrder) return aOrder - bOrder;
+              return a.number - b.number;
+            }).map(renderRoomCard)}
           </div>
         </div>
       )}
@@ -252,8 +312,28 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom, onC
             <div className="row-label">Jacuzzi Smoking Rooms</div>
           </div>
           <div className="room-cards-container">
-            {groupedRooms.smokingJacuzzi.queen.map(renderRoomCard)}
-            {groupedRooms.smokingJacuzzi.king.map(renderRoomCard)}
+            {[
+              ...groupedRooms.smokingJacuzzi.queen,
+              ...groupedRooms.smokingJacuzzi.king
+            ].sort((a, b) => {
+              // First sort by floor
+              const aIsFirstFloor = a.number < 200;
+              const bIsFirstFloor = b.number < 200;
+              if (aIsFirstFloor && !bIsFirstFloor) return -1;
+              if (!aIsFirstFloor && bIsFirstFloor) return 1;
+              
+              // For first floor, sort by room number
+              if (aIsFirstFloor && bIsFirstFloor) {
+                return a.number - b.number;
+              }
+              
+              // For second floor, sort by bed type (Queen, King), then room number
+              const bedTypeOrder = { 'Queen': 1, 'King': 2 };
+              const aOrder = bedTypeOrder[a.bedType];
+              const bOrder = bedTypeOrder[b.bedType];
+              if (aOrder !== bOrder) return aOrder - bOrder;
+              return a.number - b.number;
+            }).map(renderRoomCard)}
           </div>
         </div>
       )}
