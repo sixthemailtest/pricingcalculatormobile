@@ -30,21 +30,21 @@ function App() {
       setCurrentDateTime(now);
       
       // Format day
-      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const dayName = days[now.getDay()];
-      setCurrentDay(dayName);
+      setCurrentDay(dayName); 
       
       // Set day style based on weekday/weekend
-      if (dayName === 'Friday') {
+      if (dayName === 'Fri') {
         setDayStyle({ color: '#FF9500' }); // Orange for Friday
-      } else if (dayName === 'Saturday' || dayName === 'Sunday') {
+      } else if (dayName === 'Sat' || dayName === 'Sun') {
         setDayStyle({ color: '#FF3B30' }); // Red for weekend
       } else {
         setDayStyle({ color: '#34C759' }); // Green for weekdays
       }
       
       // Format date
-      const options = { year: 'numeric', month: 'long', day: 'numeric' };
+      const options = { year: 'numeric', month: 'short', day: 'numeric' };
       setCurrentDate(now.toLocaleDateString('en-US', options));
     };
     
