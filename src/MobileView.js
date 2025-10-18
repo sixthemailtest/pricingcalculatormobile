@@ -4676,7 +4676,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               </div>
             </div>
             
-            {/* Double Row */}
+            {/* Queen 2 Beds Row - Regular only, no Jacuzzi */}
             <div style={{display: 'flex', alignItems: 'center', gap: '2px'}}>
               <span style={{width: '38px', fontWeight: 'bold', fontSize: '5.5px'}}>Queen 2 Beds</span>
               <div style={{width: '75px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', fontSize: '7px'}}>
@@ -4686,12 +4686,8 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                 <span>=</span>
                 <span style={{fontWeight: 'bold', color: '#FFA500'}}>${Math.round((dailyPrices.regular + 10) * 1.15)}</span>
               </div>
-              <div style={{width: '75px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', fontSize: '7px'}}>
-                <span style={{fontWeight: 'bold'}}>${dailyPrices.jacuzzi + 10}</span>
-                <span>+</span>
-                <span><span style={{fontSize: '5px'}}>tax</span> ${((dailyPrices.jacuzzi + 10) * 0.15).toFixed(0)}</span>
-                <span>=</span>
-                <span style={{fontWeight: 'bold', color: '#FFA500'}}>${Math.round((dailyPrices.jacuzzi + 10) * 1.15)}</span>
+              <div style={{width: '75px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', fontSize: '7px', color: '#999'}}>
+                <span style={{fontSize: '6px'}}>N/A</span>
               </div>
             </div>
           </div>
@@ -4790,14 +4786,16 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               );
 
               const categories = [
+                // Regular rooms first
                 { label: 'Non-Smoking Queen', filter: (r) => !r.isSmoking && !r.hasJacuzzi && r.bedType === 'Queen' },
                 { label: 'Non-Smoking King', filter: (r) => !r.isSmoking && !r.hasJacuzzi && r.bedType === 'King' },
                 { label: 'Non-Smoking Queen 2 Beds', filter: (r) => !r.isSmoking && !r.hasJacuzzi && r.bedType === 'Queen2Beds' },
-                { label: 'Non-Smoking Queen with Jacuzzi', filter: (r) => !r.isSmoking && r.hasJacuzzi && r.bedType === 'Queen' },
-                { label: 'Non-Smoking King with Jacuzzi', filter: (r) => !r.isSmoking && r.hasJacuzzi && r.bedType === 'King' },
                 { label: 'Smoking Queen', filter: (r) => r.isSmoking && !r.hasJacuzzi && r.bedType === 'Queen' },
                 { label: 'Smoking King', filter: (r) => r.isSmoking && !r.hasJacuzzi && r.bedType === 'King' },
                 { label: 'Smoking Queen 2 Beds', filter: (r) => r.isSmoking && !r.hasJacuzzi && r.bedType === 'Queen2Beds' },
+                // Jacuzzi rooms at the bottom
+                { label: 'Non-Smoking Queen with Jacuzzi', filter: (r) => !r.isSmoking && r.hasJacuzzi && r.bedType === 'Queen' },
+                { label: 'Non-Smoking King with Jacuzzi', filter: (r) => !r.isSmoking && r.hasJacuzzi && r.bedType === 'King' },
                 { label: 'Smoking Queen with Jacuzzi', filter: (r) => r.isSmoking && r.hasJacuzzi && r.bedType === 'Queen' },
                 { label: 'Smoking King with Jacuzzi', filter: (r) => r.isSmoking && r.hasJacuzzi && r.bedType === 'King' },
               ];
@@ -4810,7 +4808,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                 
                 return (
                   <div key={label} className="room-category-section">
-                    <h3 className="category-label">{label}</h3>
+                    <h3 className={`category-label ${label.includes('Jacuzzi') ? 'jacuzzi-category' : ''}`}>{label}</h3>
                     <div className="all-rooms-container">
                       {rooms.map(renderRoomCard)}
                     </div>

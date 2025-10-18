@@ -192,6 +192,11 @@
   letter-spacing: 0.5px;
 }
 
+.category-label.jacuzzi-category {
+  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+  box-shadow: 0 2px 6px rgba(255, 107, 53, 0.3);
+}
+
 .all-rooms-container {
   display: flex;
   flex-wrap: wrap;
