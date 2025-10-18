@@ -4750,63 +4750,74 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         {/* Rooms Tab Content */}
         {activeTab === 'rooms' && (
           <div className="rooms-tab-content">
-            <div className="floor-tabs">
-              <button 
-                className={`floor-tab ${activeFloor === 'ground' ? 'active' : ''}`}
-                onClick={() => setActiveFloor('ground')}
-              >
-                First Floor
-              </button>
-              <button 
-                className={`floor-tab ${activeFloor === 'first' ? 'active' : ''}`}
-                onClick={() => setActiveFloor('first')}
-              >
-                Second Floor
-              </button>
-            </div>
-            
-            <div className="all-rooms-container">
-              {availableRooms
-                .filter(room => room.floor === (activeFloor === 'ground' ? 'ground' : 'first'))
-                .map(room => (
+            {/* Helper function to render room cards */}
+            {(() => {
+              const renderRoomCard = (room) => (
+                <div 
+                  key={room.id}
+                  className={`room-card-container ${bookedRooms.includes(room.number) ? 'booked-container' : ''}`}
+                  style={bookedRooms.includes(room.number) ? {backgroundColor: '#00A651'} : {}}
+                  onMouseEnter={(e) => handleCardMouseEnter(room, e)}
+                  onMouseLeave={handleCardMouseLeave}
+                  onMouseMove={handleCardMouseMove}
+                >
                   <div 
-                    key={room.id}
-                    className={`room-card-container ${bookedRooms.includes(room.number) ? 'booked-container' : ''}`}
-                    style={bookedRooms.includes(room.number) ? {backgroundColor: '#00A651'} : {}}
-                    onMouseEnter={(e) => handleCardMouseEnter(room, e)}
-                    onMouseLeave={handleCardMouseLeave}
-                    onMouseMove={handleCardMouseMove}
+                    className={`room-card ${room.bedType === 'Queen' ? 'queen' : 
+                               room.bedType === 'King' ? 'king' : 'queen-2-beds'} 
+                               ${room.isSmoking ? 'smoking' : ''} 
+                               ${room.hasJacuzzi ? 'jacuzzi' : ''}
+                               ${bookedRooms.includes(room.number) ? 'booked' : ''}`}
+                    style={bookedRooms.includes(room.number) ? {backgroundColor: '#00A651', borderRadius: '14px', border: 'none'} : {}}
                   >
-                    <div 
-                      className={`room-card ${room.bedType === 'Queen' ? 'queen' : 
-                                 room.bedType === 'King' ? 'king' : 'queen-2-beds'} 
-                                 ${room.isSmoking ? 'smoking' : ''} 
-                                 ${room.hasJacuzzi ? 'jacuzzi' : ''}
-                                 ${bookedRooms.includes(room.number) ? 'booked' : ''}`}
-                      style={bookedRooms.includes(room.number) ? {backgroundColor: '#00A651', borderRadius: '14px', border: 'none'} : {}}
-                    >
-                      {/* BOOKING label removed */}
-                      <span className="room-number">{room.number}</span>
-                      <span className="room-type">
-                        {room.bedType === 'Queen' ? 'Queen' : 
-                         room.bedType === 'King' ? 'King' : 'Queen 2 Beds'}
+                    <span className="room-number">{room.number}</span>
+                    <span className="room-type">
+                      {room.bedType === 'Queen' ? 'Queen' : 
+                       room.bedType === 'King' ? 'King' : 'Queen 2 Beds'}
+                    </span>
+                    <div className="room-features">
+                      {room.hasJacuzzi && <span className="feature jacuzzi">Jacuzzi</span>}
+                      <span className="feature smoking-status">
+                        {room.isSmoking ? 'Smoking' : 'Non-Smoking'}
                       </span>
-                      <div className="room-features">
-                        {room.hasJacuzzi && <span className="feature jacuzzi">Jacuzzi</span>}
-                        <span className="feature smoking-status">
-                          {room.isSmoking ? 'Smoking' : 'Non-Smoking'}
-                        </span>
-                        <span className="feature capacity">
-                          {room.bedType === 'Queen' && '👤👤'}
-                          {room.bedType === 'King' && '👤👤👤'}
-                          {room.bedType === 'Queen2Beds' && '👤👤👤👤'}
-                        </span>
-                      </div>
+                      <span className="feature capacity">
+                        {room.bedType === 'Queen' && '👤👤'}
+                        {room.bedType === 'King' && '👤👤👤'}
+                        {room.bedType === 'Queen2Beds' && '👤👤👤👤'}
+                      </span>
                     </div>
                   </div>
-                ))
-              }
-            </div>
+                </div>
+              );
+
+              const categories = [
+                { label: 'Non-Smoking Queen', filter: (r) => !r.isSmoking && !r.hasJacuzzi && r.bedType === 'Queen' },
+                { label: 'Non-Smoking King', filter: (r) => !r.isSmoking && !r.hasJacuzzi && r.bedType === 'King' },
+                { label: 'Non-Smoking Double', filter: (r) => !r.isSmoking && !r.hasJacuzzi && r.bedType === 'Queen2Beds' },
+                { label: 'Non-Smoking Queen with Jacuzzi', filter: (r) => !r.isSmoking && r.hasJacuzzi && r.bedType === 'Queen' },
+                { label: 'Non-Smoking King with Jacuzzi', filter: (r) => !r.isSmoking && r.hasJacuzzi && r.bedType === 'King' },
+                { label: 'Smoking Queen', filter: (r) => r.isSmoking && !r.hasJacuzzi && r.bedType === 'Queen' },
+                { label: 'Smoking King', filter: (r) => r.isSmoking && !r.hasJacuzzi && r.bedType === 'King' },
+                { label: 'Smoking Double', filter: (r) => r.isSmoking && !r.hasJacuzzi && r.bedType === 'Queen2Beds' },
+                { label: 'Smoking Queen with Jacuzzi', filter: (r) => r.isSmoking && r.hasJacuzzi && r.bedType === 'Queen' },
+                { label: 'Smoking King with Jacuzzi', filter: (r) => r.isSmoking && r.hasJacuzzi && r.bedType === 'King' },
+              ];
+
+              return categories.map(({ label, filter }) => {
+                const rooms = availableRooms.filter(filter).sort((a, b) => a.number - b.number);
+                
+                // Only render section if there are rooms
+                if (rooms.length === 0) return null;
+                
+                return (
+                  <div key={label} className="room-category-section">
+                    <h3 className="category-label">{label}</h3>
+                    <div className="all-rooms-container">
+                      {rooms.map(renderRoomCard)}
+                    </div>
+                  </div>
+                );
+              });
+            })()}
           </div>
         )}
         
