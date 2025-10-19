@@ -5467,29 +5467,53 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           className="price-tooltip" 
           style={{
             position: 'fixed',
-            top: mousePos.y - 100,
+            top: mousePos.y - 130,
             left: mousePos.x,
             transform: 'none',
             opacity: 1,
             visibility: 'visible',
             pointerEvents: 'none',
             zIndex: 10000,
-            width: '110px',
-            fontSize: '10px'
+            width: '140px',
+            fontSize: '10px',
+            padding: '8px'
           }}
         >
-          <div className="price-row">
-            <span>Base:</span>
-            <span>${hoveredCard.basePrice.toFixed(2)}</span>
+          {/* 1 Day pricing */}
+          <div style={{marginBottom: '6px', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.2)'}}>
+            <div style={{fontSize: '9px', color: '#ddd', marginBottom: '2px', fontWeight: 'bold'}}>1 Day</div>
+            <div className="price-row" style={{fontSize: '9px'}}>
+              <span>Base:</span>
+              <span>${hoveredCard.basePrice.toFixed(2)}</span>
+            </div>
+            <div className="price-row" style={{fontSize: '9px'}}>
+              <span>Tax:</span>
+              <span>${hoveredCard.tax.toFixed(2)}</span>
+            </div>
+            <div className="price-row total" style={{fontSize: '10px', fontWeight: 'bold'}}>
+              <span>Total:</span>
+              <span>${hoveredCard.total.toFixed(2)}</span>
+            </div>
           </div>
-          <div className="price-row">
-            <span>Tax:</span>
-            <span>${hoveredCard.tax.toFixed(2)}</span>
+          
+          {/* 2 Days pricing */}
+          <div style={{marginBottom: '6px', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.2)'}}>
+            <div style={{fontSize: '9px', color: '#ddd', marginBottom: '2px', fontWeight: 'bold'}}>2 Days</div>
+            <div className="price-row total" style={{fontSize: '10px', fontWeight: 'bold'}}>
+              <span>Total:</span>
+              <span>${(hoveredCard.total * 2).toFixed(2)}</span>
+            </div>
           </div>
-          <div className="price-row total">
-            <span>Total:</span>
-            <span>${hoveredCard.total.toFixed(2)}</span>
+          
+          {/* 3 Days pricing */}
+          <div>
+            <div style={{fontSize: '9px', color: '#ddd', marginBottom: '2px', fontWeight: 'bold'}}>3 Days</div>
+            <div className="price-row total" style={{fontSize: '10px', fontWeight: 'bold'}}>
+              <span>Total:</span>
+              <span>${(hoveredCard.total * 3).toFixed(2)}</span>
+            </div>
           </div>
+          
           <div className="tooltip-arrow"></div>
         </div>
       )}
