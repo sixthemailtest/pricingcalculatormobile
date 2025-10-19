@@ -545,14 +545,40 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     
     setCheckInDate(defaultCheckIn);
     setCheckOutDate(defaultCheckOut);
-    setOvernightExtraHours(0);
+    
+    // Recalculate early hours based on check-in time mode
+    if (checkInTimeMode === 'current') {
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      
+      if (currentHour >= 9) {
+        // After 9 AM: calculate from 11 AM to 3 PM = 4 hours early
+        setOvernightExtraHours(-4);
+      } else {
+        // Before 9 AM: calculate from current time to 3 PM (15:00)
+        const currentTimeInHours = currentHour + (currentMinute / 60);
+        const checkInTime = 15; // 3 PM
+        const hoursEarly = checkInTime - currentTimeInHours;
+        setOvernightExtraHours(-Math.round(hoursEarly));
+      }
+      // Keep rate type as regular for current time mode
+      setOvernightRateType('regular');
+    } else {
+      // Regular mode: reset to 0 (3 PM)
+      setOvernightExtraHours(0);
+      setOvernightRateType('regular');
+    }
+    
     setOvernightCheckoutExtraHours(0);
     setHasJacuzziOvernight(false);
     setOvernightSmoking(false);
     setOvernightPayment('cash');
-    setOvernightRateType('regular');
     setOvernightBedType('Queen');
-    setShowOvernightPriceSummary(false);
+    setShowOvernightPriceSummary(true); // Keep summary visible
+    
+    // Trigger price recalculation with default values
+    setTimeout(() => calculateOvernightPrice(), 100);
     
     // Keep selected rooms in local storage and state
     // try {
