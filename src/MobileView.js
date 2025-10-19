@@ -4689,7 +4689,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                 <span style={{fontWeight: 'bold', color: '#FFA500'}}>${Math.round((dailyPrices.regular + 10) * 1.15)}</span>
               </div>
               <div style={{width: '75px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', fontSize: '7px', color: '#999'}}>
-                <span style={{fontSize: '6px'}}>N/A</span>
+                
               </div>
             </div>
           </div>
