@@ -15,13 +15,13 @@
 
 /* Ensure room cards in booking section have consistent size */
 .booking-rooms-row .room-card {
-  width: 70px !important;
-  height: 70px !important;
-  max-width: 70px !important;
-  max-height: 70px !important;
-  flex: 0 0 70px !important;
+  width: 60px !important;
+  height: 60px !important;
+  max-width: 60px !important;
+  max-height: 60px !important;
+  flex: 0 0 60px !important;
   transform: none !important;
-  padding: 5px !important;
+  padding: 4px !important;
   margin: 0 !important;
   box-sizing: border-box !important;
 }
@@ -68,22 +68,22 @@
 .room-cards-container {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   align-items: flex-start;
   justify-content: flex-start;
-  padding: 10px;
+  padding: 8px;
   background-color: #f8f9fa;
   border-radius: 8px;
 }
 
 /* Room card styles */
 .room-card {
-  width: 70px;
-  height: 70px;
-  min-width: 70px;
-  max-width: 70px;
-  min-height: 70px;
-  max-height: 70px;
+  width: 60px;
+  height: 60px;
+  min-width: 60px;
+  max-width: 60px;
+  min-height: 60px;
+  max-height: 60px;
   flex-shrink: 0;
   border-radius: 8px;
   display: flex;
@@ -94,7 +94,7 @@
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   position: relative;
   transition: all 0.2s ease;
-  padding: 5px;
+  padding: 4px;
   box-sizing: border-box;
   overflow: visible;
 }
@@ -140,22 +140,22 @@
 
 /* Room icon */
 .room-icon {
-  font-size: 14px;
+  font-size: 12px;
   margin-bottom: 2px;
 }
 
 /* Remove button */
 .remove-room-button {
   position: absolute;
-  top: -5px;
-  right: -5px;
-  width: 14px;
-  height: 14px;
+  top: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background-color: #ff3b30;
   color: white;
   border: none;
-  font-size: 10px;
+  font-size: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -183,10 +183,10 @@
 .room-number {
   font-weight: 700;
   color: #2d3748;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .room-type {
-  font-size: 10px;
+  font-size: 9px;
   color: #4a5568;
 }

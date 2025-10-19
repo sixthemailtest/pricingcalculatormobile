@@ -149,7 +149,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   // State for saved stays
   const [savedStays, setSavedStays] = useState([]);
   // State for active tab
-  const [activeTab, setActiveTab] = useState('available');
+  const [activeTab, setActiveTab] = useState('short');
   
   // State for tooltip
   const [hoveredCard, setHoveredCard] = useState(null);
@@ -4653,13 +4653,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     <div className="iphone-container">
       {/* Top bar with date and price */}
       <div className="iphone-top-bar">
-        <div className="date-time">
+        <div className="date-time" style={{paddingBottom: '8px'}}>
           <span className="day" style={dayStyle}>{currentDay}</span>
           <span className="date">{currentDate}</span>
         </div>
         
         <div className="daily-price">
-          <div style={{display: 'flex', flexDirection: 'column', gap: '3px'}}>
+          <div style={{display: 'flex', flexDirection: 'column', gap: '3px', paddingBottom: '8px'}}>
             {/* Header Row */}
             <div style={{display: 'flex', alignItems: 'center', gap: '2px'}}>
               <span style={{width: '38px', fontWeight: 'bold', fontSize: '6px'}}>Room</span>
@@ -4723,25 +4723,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         </div>
       </div>
       
-      {/* Button container for select rooms and clear */}
-      <div className="top-buttons-container" style={{
-        justifyContent: activeTab === 'available' ? 'center' : 'space-between'
-      }}>
-        <button className="select-rooms-top-button" onClick={toggleRoomSelector}>
-          {selectedRooms.length > 0 ? `Selected Rooms (${selectedRooms.length})` : 'Select Rooms'}
-        </button>
-        {activeTab !== 'available' && (
-          <button 
-            className="small-clear-button" 
-            onClick={clearAllRooms}
-            style={{ backgroundColor: 'red', color: 'white' }}
-          >
-            Clear
-          </button>
-        )}
-      </div>
-      
-      {/* Tabs */}
+      {/* Tabs - Moved directly under top blue bar */}
       <div className="tabs">
         <button 
           className={`tab ${activeTab === 'available' ? 'active' : ''}`}
@@ -4769,6 +4751,57 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         </button>
       </div>
       
+      {/* Button container - Under tabs */}
+      {(activeTab === 'available' || activeTab === 'short' || activeTab === 'overnight') && (
+        <div className="top-buttons-container" style={{
+          justifyContent: 'center',
+          padding: '10px 20px',
+          display: 'flex',
+          gap: '10px'
+        }}>
+          {activeTab === 'available' ? (
+            <>
+              <button className="select-rooms-top-button" onClick={toggleRoomSelector}>
+                {selectedRooms.length > 0 ? `Selected Rooms (${selectedRooms.length})` : 'Select Rooms'}
+              </button>
+              {selectedRooms.length > 0 && (
+                <button 
+                  onClick={() => {
+                    setSelectedRooms([]);
+                    try {
+                      localStorage.removeItem('selectedRooms');
+                    } catch (error) {
+                      console.error('Error clearing rooms from localStorage:', error);
+                    }
+                  }}
+                  style={{
+                    backgroundColor: '#EF4444',
+                    color: 'white',
+                    padding: '6px 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                  }}
+                >
+                  Clear All
+                </button>
+              )}
+            </>
+          ) : (
+            <button 
+              className="small-clear-button" 
+              onClick={clearAllRooms}
+              style={{ backgroundColor: 'red', color: 'white', width: 'auto', padding: '8px 40px' }}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+      
       {/* Tab content */}
       <div className="tab-content" data-tab={activeTab}>
         
@@ -4776,43 +4809,12 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         {activeTab === 'available' && (
           <div style={{padding: '16px'}}>
             {selectedRooms.length > 0 ? (
-              <>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  marginBottom: '16px'
-                }}>
-                  <button 
-                    onClick={() => {
-                      setSelectedRooms([]);
-                      try {
-                        localStorage.removeItem('selectedRooms');
-                      } catch (error) {
-                        console.error('Error clearing rooms from localStorage:', error);
-                      }
-                    }}
-                    style={{
-                      backgroundColor: '#EF4444',
-                      color: 'white',
-                      padding: '8px 24px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      fontSize: '14px',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                    }}
-                  >
-                    Clear All Rooms
-                  </button>
-                </div>
-                <SelectedRooms 
-                  selectedRooms={selectedRooms} 
-                  bookedRooms={bookedRooms}
-                  onRemoveRoom={handleRemoveRoom}
-                  onClearBookedRooms={handleClearBookedRooms}
-                />
-              </>
+              <SelectedRooms 
+                selectedRooms={selectedRooms} 
+                bookedRooms={bookedRooms}
+                onRemoveRoom={handleRemoveRoom}
+                onClearBookedRooms={handleClearBookedRooms}
+              />
             ) : (
               <div style={{
                 textAlign: 'center',

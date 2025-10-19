@@ -17,7 +17,7 @@
 /* Top bar with date and price */
 .iphone-top-bar {
   background: #2d4373;
-  padding: 8px 15px 12px 15px;
+  padding: 8px 15px 8px 15px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -99,6 +99,7 @@
 .tabs {
   display: flex;
   margin-bottom: 10px;
+  margin-top: 0;
   border-radius: 8px;
   overflow: hidden;
 }
