@@ -598,12 +598,12 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         106: { bedType: 'Queen', isSmoking: false, hasJacuzzi: false },
         107: { bedType: 'Queen2Beds', isSmoking: false, hasJacuzzi: false },
         108: { bedType: 'Queen', isSmoking: false, hasJacuzzi: false },
-        109: { bedType: 'Queen', isSmoking: false, hasJacuzzi: true },
-        110: { bedType: 'Queen', isSmoking: true, hasJacuzzi: true },
-        111: { bedType: 'Queen', isSmoking: false, hasJacuzzi: true },
-        112: { bedType: 'Queen', isSmoking: true, hasJacuzzi: true },
+        109: { bedType: 'Queen', isSmoking: false, hasJacuzzi: true, isMultiPurpose: true },
+        110: { bedType: 'Queen', isSmoking: true, hasJacuzzi: true, isMultiPurpose: true },
+        111: { bedType: 'Queen', isSmoking: false, hasJacuzzi: true, isMultiPurpose: true },
+        112: { bedType: 'Queen', isSmoking: true, hasJacuzzi: true, isMultiPurpose: true },
         114: { bedType: 'Queen', isSmoking: false, hasJacuzzi: false },
-        119: { bedType: 'Queen', isSmoking: true, hasJacuzzi: true },
+        119: { bedType: 'Queen', isSmoking: true, hasJacuzzi: true, isMultiPurpose: true },
         
         // Second floor (200s)
         200: { bedType: 'Queen', isSmoking: false, hasJacuzzi: false },
@@ -614,12 +614,12 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         205: { bedType: 'Queen2Beds', isSmoking: false, hasJacuzzi: false },
         206: { bedType: 'Queen', isSmoking: true, hasJacuzzi: false },
         207: { bedType: 'Queen2Beds', isSmoking: true, hasJacuzzi: false },
-        208: { bedType: 'King', isSmoking: false, hasJacuzzi: true },
+        208: { bedType: 'King', isSmoking: false, hasJacuzzi: true, isMultiPurpose: true },
         209: { bedType: 'Queen', isSmoking: false, hasJacuzzi: false },
-        210: { bedType: 'King', isSmoking: true, hasJacuzzi: true },
+        210: { bedType: 'King', isSmoking: true, hasJacuzzi: true, isMultiPurpose: true },
         211: { bedType: 'King', isSmoking: true, hasJacuzzi: false },
         212: { bedType: 'King', isSmoking: false, hasJacuzzi: false },
-        214: { bedType: 'King', isSmoking: false, hasJacuzzi: true },
+        214: { bedType: 'King', isSmoking: false, hasJacuzzi: true, isMultiPurpose: true },
         215: { bedType: 'Queen2Beds', isSmoking: false, hasJacuzzi: false },
         216: { bedType: 'Queen', isSmoking: false, hasJacuzzi: false },
         217: { bedType: 'Queen2Beds', isSmoking: false, hasJacuzzi: false },
@@ -644,6 +644,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             isSmoking: roomData[number].isSmoking,
             hasJacuzzi: roomData[number].hasJacuzzi,
             bedType: roomData[number].bedType,
+            isMultiPurpose: roomData[number].isMultiPurpose || false,
             isAvailable: true
           });
         }
@@ -660,6 +661,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             isSmoking: roomData[number].isSmoking,
             hasJacuzzi: roomData[number].hasJacuzzi,
             bedType: roomData[number].bedType,
+            isMultiPurpose: roomData[number].isMultiPurpose || false,
             isAvailable: true
           });
         }

@@ -28,6 +28,7 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom, onC
   // Sort rooms into their respective categories
   selectedRooms.forEach(room => {
     // Categorize room regardless of booking status
+    // Multi-purpose rooms appear in BOTH jacuzzi AND non-jacuzzi sections
     if (room.hasJacuzzi) {
       if (room.isSmoking) {
         // Jacuzzi + Smoking
@@ -36,12 +37,30 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom, onC
         } else if (room.bedType === 'King') {
           groupedRooms.smokingJacuzzi.king.push(room);
         }
+        
+        // Also add to regular smoking if multi-purpose
+        if (room.isMultiPurpose) {
+          if (room.bedType === 'Queen') {
+            groupedRooms.smokingRegular.queen.push(room);
+          } else if (room.bedType === 'King') {
+            groupedRooms.smokingRegular.king.push(room);
+          }
+        }
       } else {
         // Jacuzzi + Non-Smoking
         if (room.bedType === 'Queen') {
           groupedRooms.nonSmokingJacuzzi.queen.push(room);
         } else if (room.bedType === 'King') {
           groupedRooms.nonSmokingJacuzzi.king.push(room);
+        }
+        
+        // Also add to regular non-smoking if multi-purpose
+        if (room.isMultiPurpose) {
+          if (room.bedType === 'Queen') {
+            groupedRooms.nonSmokingRegular.queen.push(room);
+          } else if (room.bedType === 'King') {
+            groupedRooms.nonSmokingRegular.king.push(room);
+          }
         }
       }
     } else {
@@ -90,18 +109,20 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom, onC
   });
 
   // Helper function to render a room card
-  const renderRoomCard = (room) => {
+  // showAsRegular parameter is used for multi-purpose rooms shown in regular sections
+  const renderRoomCard = (room, showAsRegular = false) => {
     const bedTypeClass = room.bedType === 'Queen' ? 'queen' : 
                          room.bedType === 'King' ? 'king' : 'queen-2-beds';
     
     const isBooked = bookedRooms.includes(room.number);
-    const classes = `room-card ${bedTypeClass} ${room.isSmoking ? 'smoking' : ''} ${room.hasJacuzzi ? 'jacuzzi' : ''} ${isBooked ? 'booked' : ''}`;
+    const isMultiPurposeInRegular = showAsRegular && room.isMultiPurpose && room.hasJacuzzi;
+    const classes = `room-card ${bedTypeClass} ${room.isSmoking ? 'smoking' : ''} ${room.hasJacuzzi && !isMultiPurposeInRegular ? 'jacuzzi' : ''} ${isBooked ? 'booked' : ''}`;
     
     // For non-booking room cards, use black text and no icons
     if (!isBooked) {
       return (
         <div 
-          key={room.id} 
+          key={`${room.id}-${showAsRegular ? 'regular' : 'jacuzzi'}`} 
           className={classes}
           style={{
             width: '70px',
@@ -125,6 +146,25 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom, onC
             ×
           </button>
           
+          {/* Multi-purpose indicator for regular sections */}
+          {isMultiPurposeInRegular && (
+            <div style={{
+              position: 'absolute',
+              top: '3px',
+              left: '3px',
+              fontSize: '6px',
+              backgroundColor: '#FFA500',
+              color: 'white',
+              padding: '1px 3px',
+              borderRadius: '3px',
+              fontWeight: 'bold',
+              lineHeight: '1',
+              zIndex: 10
+            }}>
+              OOO
+            </div>
+          )}
+          
           {/* Room number */}
           <span className="room-number" style={{color: 'black', fontWeight: 'bold', fontSize: '16px'}}>{room.number}</span>
           
@@ -140,7 +180,7 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom, onC
     // For booking room cards, keep the icons and white text
     return (
       <div 
-        key={room.id} 
+        key={`${room.id}-${showAsRegular ? 'regular' : 'jacuzzi'}`}
         className={classes}
         style={{
           width: '70px',
@@ -167,6 +207,25 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom, onC
           ×
         </button>
         
+        {/* Multi-purpose indicator for regular sections - show on booked rooms too */}
+        {isMultiPurposeInRegular && (
+          <div style={{
+            position: 'absolute',
+            top: '15px',
+            left: '3px',
+            fontSize: '6px',
+            backgroundColor: '#FFA500',
+            color: 'white',
+            padding: '1px 3px',
+            borderRadius: '3px',
+            fontWeight: 'bold',
+            lineHeight: '1',
+            zIndex: 10
+          }}>
+            OOO
+          </div>
+        )}
+        
         {/* Room number */}
         <span className="room-number" style={{color: 'white', fontWeight: 'bold', fontSize: '14px', marginTop: '8px'}}>{room.number}</span>
         
@@ -176,22 +235,24 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom, onC
            room.bedType === 'King' ? 'King' : 'Queen 2B'}
         </span>
         
-        {/* Room feature indicators */}
-        <div className="room-indicator">
-          {/* Smoking status indicator */}
-          <span className={`indicator-icon ${room.isSmoking ? 'smoking-icon' : 'non-smoking-icon'}`}>
-            {room.isSmoking ? '🚬' : '🚭'}
-          </span>
-          
-          {/* Jacuzzi indicator */}
-          {room.hasJacuzzi && (
-            <span className="indicator-icon jacuzzi-icon">
-              💦
+        {/* Room feature indicators - only show if NOT in regular section */}
+        {!isMultiPurposeInRegular && (
+          <div className="room-indicator">
+            {/* Smoking status indicator */}
+            <span className={`indicator-icon ${room.isSmoking ? 'smoking-icon' : 'non-smoking-icon'}`}>
+              {room.isSmoking ? '🚬' : '🚭'}
             </span>
-          )}
-        </div>
+            
+            {/* Jacuzzi indicator */}
+            {room.hasJacuzzi && (
+              <span className="indicator-icon jacuzzi-icon">
+                💦
+              </span>
+            )}
+          </div>
+        )}
         
-        {room.hasJacuzzi && <div className="multiple-label">Multiple</div>}
+        {room.hasJacuzzi && !isMultiPurposeInRegular && <div className="multiple-label">Multiple</div>}
       </div>
     );
   };
@@ -229,7 +290,7 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom, onC
               const bOrder = bedTypeOrder[b.bedType];
               if (aOrder !== bOrder) return aOrder - bOrder;
               return a.number - b.number;
-            }).map(renderRoomCard)}
+            }).map(room => renderRoomCard(room, true))}
           </div>
         </div>
       )}
@@ -265,7 +326,7 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom, onC
               const bOrder = bedTypeOrder[b.bedType];
               if (aOrder !== bOrder) return aOrder - bOrder;
               return a.number - b.number;
-            }).map(renderRoomCard)}
+            }).map(room => renderRoomCard(room, true))}
           </div>
         </div>
       )}
@@ -299,7 +360,7 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom, onC
               const bOrder = bedTypeOrder[b.bedType];
               if (aOrder !== bOrder) return aOrder - bOrder;
               return a.number - b.number;
-            }).map(renderRoomCard)}
+            }).map(room => renderRoomCard(room, false))}
           </div>
         </div>
       )}
@@ -333,7 +394,7 @@ function SelectedRooms({ selectedRooms = [], bookedRooms = [], onRemoveRoom, onC
               const bOrder = bedTypeOrder[b.bedType];
               if (aOrder !== bOrder) return aOrder - bOrder;
               return a.number - b.number;
-            }).map(renderRoomCard)}
+            }).map(room => renderRoomCard(room, false))}
           </div>
         </div>
       )}
