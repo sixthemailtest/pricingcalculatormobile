@@ -149,7 +149,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   // State for saved stays
   const [savedStays, setSavedStays] = useState([]);
   // State for active tab
-  const [activeTab, setActiveTab] = useState('short');
+  const [activeTab, setActiveTab] = useState('available');
   
   // State for tooltip
   const [hoveredCard, setHoveredCard] = useState(null);
@@ -4724,21 +4724,31 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       </div>
       
       {/* Button container for select rooms and clear */}
-      <div className="top-buttons-container">
+      <div className="top-buttons-container" style={{
+        justifyContent: activeTab === 'available' ? 'center' : 'space-between'
+      }}>
         <button className="select-rooms-top-button" onClick={toggleRoomSelector}>
           {selectedRooms.length > 0 ? `Selected Rooms (${selectedRooms.length})` : 'Select Rooms'}
         </button>
-        <button 
-          className="small-clear-button" 
-          onClick={clearAllRooms}
-          style={{ backgroundColor: 'red', color: 'white' }}
-        >
-          Clear
-        </button>
+        {activeTab !== 'available' && (
+          <button 
+            className="small-clear-button" 
+            onClick={clearAllRooms}
+            style={{ backgroundColor: 'red', color: 'white' }}
+          >
+            Clear
+          </button>
+        )}
       </div>
       
       {/* Tabs */}
       <div className="tabs">
+        <button 
+          className={`tab ${activeTab === 'available' ? 'active' : ''}`}
+          onClick={() => setActiveTab('available')}
+        >
+          Available Rooms
+        </button>
         <button 
           className={`tab ${activeTab === 'short' ? 'active' : ''}`}
           onClick={() => setActiveTab('short')}
@@ -4762,14 +4772,58 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       {/* Tab content */}
       <div className="tab-content" data-tab={activeTab}>
         
-        {/* Selected Rooms Component - Only show in short stay tab */}
-        {activeTab === 'short' && selectedRooms.length > 0 && (
-          <SelectedRooms 
-            selectedRooms={selectedRooms} 
-            bookedRooms={bookedRooms}
-            onRemoveRoom={handleRemoveRoom}
-            onClearBookedRooms={handleClearBookedRooms}
-          />
+        {/* Available Rooms Tab Content */}
+        {activeTab === 'available' && (
+          <div style={{padding: '16px'}}>
+            {selectedRooms.length > 0 ? (
+              <>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  marginBottom: '16px'
+                }}>
+                  <button 
+                    onClick={() => {
+                      setSelectedRooms([]);
+                      try {
+                        localStorage.removeItem('selectedRooms');
+                      } catch (error) {
+                        console.error('Error clearing rooms from localStorage:', error);
+                      }
+                    }}
+                    style={{
+                      backgroundColor: '#EF4444',
+                      color: 'white',
+                      padding: '8px 24px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      fontSize: '14px',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                    }}
+                  >
+                    Clear All Rooms
+                  </button>
+                </div>
+                <SelectedRooms 
+                  selectedRooms={selectedRooms} 
+                  bookedRooms={bookedRooms}
+                  onRemoveRoom={handleRemoveRoom}
+                  onClearBookedRooms={handleClearBookedRooms}
+                />
+              </>
+            ) : (
+              <div style={{
+                textAlign: 'center',
+                padding: '40px 20px',
+                color: '#999',
+                fontSize: '14px'
+              }}>
+                No rooms selected. Go to "Select Rooms" tab to select rooms.
+              </div>
+            )}
+          </div>
         )}
         
         {/* Rooms Tab Content */}

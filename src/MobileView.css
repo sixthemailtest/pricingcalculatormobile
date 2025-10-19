@@ -116,28 +116,38 @@
   font-family: Arial, sans-serif;
 }
 
-/* Tab colors - updated for 3 tabs */
+/* Tab colors - updated for 4 tabs */
 .tab:nth-child(1) {
-  background-color: #d2c5a0;
+  background-color: #A78BFA; /* Light purple for Available Rooms */
+  color: white;
 }
 
 .tab:nth-child(2) {
-  background-color: #c9bd97;
+  background-color: #d2c5a0;
 }
 
 .tab:nth-child(3) {
+  background-color: #c9bd97;
+}
+
+.tab:nth-child(4) {
   background-color: #c5b78f;
 }
 
 .tab.active:nth-child(1) {
-  background-color: #bfb082;
+  background-color: #8B5CF6; /* Darker purple when active */
+  color: white;
 }
 
 .tab.active:nth-child(2) {
-  background-color: #b8aa7d;
+  background-color: #bfb082;
 }
 
 .tab.active:nth-child(3) {
+  background-color: #b8aa7d;
+}
+
+.tab.active:nth-child(4) {
   background-color: #b3a578;
 }
 
