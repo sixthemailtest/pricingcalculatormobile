@@ -176,6 +176,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   const [overnightCheckoutExtraHours, setOvernightCheckoutExtraHours] = useState(0);
   const [hasJacuzziOvernight, setHasJacuzziOvernight] = useState(false);
   const [overnightBedType, setOvernightBedType] = useState('Queen');
+  const [checkInTimeMode, setCheckInTimeMode] = useState('regular'); // 'regular' or 'current'
   
   // State for price summary visibility
   const [showShortStayPriceSummary, setShowShortStayPriceSummary] = useState(true);
@@ -5155,6 +5156,70 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         {/* Overnight Stay Tab Content */}
         {activeTab === 'overnight' && (
           <div className="multi-night-section">
+            {/* Check-in Time Mode Tabs */}
+            <div style={{
+              display: 'flex',
+              gap: '6px',
+              marginBottom: '12px',
+              justifyContent: 'center'
+            }}>
+              <button
+                onClick={() => {
+                  setCheckInTimeMode('regular');
+                  setOvernightExtraHours(0); // Reset to 3 PM
+                }}
+                style={{
+                  padding: '4px 12px',
+                  fontSize: '10px',
+                  background: checkInTimeMode === 'regular' ? 'linear-gradient(135deg, #2d4373, #4a69bd)' : '#E8E0D0',
+                  color: checkInTimeMode === 'regular' ? 'white' : '#666',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: checkInTimeMode === 'regular' ? 'bold' : 'normal'
+                }}
+              >
+                Regular Check-in Time
+              </button>
+              <button
+                onClick={() => {
+                  setCheckInTimeMode('current');
+                  setOvernightRateType('regular'); // Always use regular rate for current time
+                  
+                  // Calculate extra hours based on current time
+                  const now = new Date();
+                  const currentHour = now.getHours();
+                  const currentMinute = now.getMinutes();
+                  
+                  if (currentHour >= 9) {
+                    // After 9 AM: calculate from 11 AM to 3 PM = 4 hours early
+                    setOvernightExtraHours(-4);
+                  } else {
+                    // Before 9 AM: calculate from current time to 3 PM (15:00)
+                    const currentTimeInHours = currentHour + (currentMinute / 60);
+                    const checkInTime = 15; // 3 PM
+                    const hoursEarly = checkInTime - currentTimeInHours;
+                    setOvernightExtraHours(-Math.round(hoursEarly));
+                  }
+                  
+                  // Trigger price recalculation
+                  setTimeout(() => calculateOvernightPrice(), 100);
+                }}
+                style={{
+                  padding: '4px 12px',
+                  fontSize: '10px',
+                  background: checkInTimeMode === 'current' ? 'linear-gradient(135deg, #2d4373, #4a69bd)' : '#E8E0D0',
+                  color: checkInTimeMode === 'current' ? 'white' : '#666',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: checkInTimeMode === 'current' ? 'bold' : 'normal'
+                }}
+              >
+                Check-in with Current Time
+              </button>
+            </div>
+            
             <div className="date-pickers">
               <div className="date-picker-container">
                 <span>Check-in Date</span>
@@ -5177,157 +5242,208 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               </div>
             </div>
             
-            <div className="option-group">
-              <label>Room Type</label>
-              <div className="toggle-buttons bed-type">
-                <button 
-                  className={overnightBedType === 'Queen' ? 'active' : ''}
-                  onClick={() => setOvernightBedType('Queen')}
-                >
-                  Queen
-                </button>
-                <button 
-                  className={overnightBedType === 'King' ? 'active' : ''}
-                  onClick={() => setOvernightBedType('King')}
-                >
-                  King
-                </button>
-                {!hasJacuzziOvernight && (
+            {/* Two-column grid layout for options - COMPACT VERSION */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '8px',
+              marginBottom: '12px',
+              fontSize: '11px'
+            }}>
+              {/* Row 1: Room Type (spans both columns) */}
+              <div className="option-group" style={{gridColumn: '1 / -1', marginBottom: '0'}}>
+                <label style={{fontSize: '10px', marginBottom: '8px', display: 'block'}}>ROOM TYPE</label>
+                <div className="toggle-buttons bed-type" style={{gap: '4px'}}>
                   <button 
-                    className={overnightBedType === 'Queen2Beds' ? 'active' : ''}
-                    onClick={() => setOvernightBedType('Queen2Beds')}
+                    className={overnightBedType === 'Queen' ? 'active' : ''}
+                    onClick={() => setOvernightBedType('Queen')}
+                    style={{padding: '6px 10px', fontSize: '11px'}}
                   >
-                    Queen 2 Beds
+                    Queen
                   </button>
-                )}
+                  <button 
+                    className={overnightBedType === 'King' ? 'active' : ''}
+                    onClick={() => setOvernightBedType('King')}
+                    style={{padding: '6px 10px', fontSize: '11px'}}
+                  >
+                    King
+                  </button>
+                  {!hasJacuzziOvernight && (
+                    <button 
+                      className={overnightBedType === 'Queen2Beds' ? 'active' : ''}
+                      onClick={() => setOvernightBedType('Queen2Beds')}
+                      style={{padding: '6px 8px', fontSize: '11px'}}
+                    >
+                      Queen 2B
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-            
-            <div className="option-group">
-              <label><i className="fas fa-hot-tub" style={{"marginRight": "8px"}}></i>Jacuzzi</label>
-              <div className="toggle-buttons">
-                <button 
-                  className={!hasJacuzziOvernight ? 'active' : ''}
-                  onClick={() => setHasJacuzziOvernight(false)}
-                >
-                  No
-                </button>
-                <button 
-                  className={hasJacuzziOvernight ? 'active' : ''}
-                  onClick={() => setHasJacuzziOvernight(true)}
-                >
-                  Yes
-                </button>
+              
+              {/* Row 2, Column 1: Jacuzzi */}
+              <div className="option-group" style={{marginBottom: '0'}}>
+                <label style={{fontSize: '10px', marginBottom: '8px', display: 'block'}}><i className="fas fa-hot-tub" style={{"marginRight": "4px", fontSize: '9px'}}></i>JACUZZI</label>
+                <div className="toggle-buttons" style={{gap: '4px'}}>
+                  <button 
+                    className={!hasJacuzziOvernight ? 'active' : ''}
+                    onClick={() => setHasJacuzziOvernight(false)}
+                    style={{padding: '6px 12px', fontSize: '11px'}}
+                  >
+                    No
+                  </button>
+                  <button 
+                    className={hasJacuzziOvernight ? 'active' : ''}
+                    onClick={() => setHasJacuzziOvernight(true)}
+                    style={{padding: '6px 12px', fontSize: '11px'}}
+                  >
+                    Yes
+                  </button>
+                </div>
               </div>
-            </div>
-            
-            <div className="option-group">
-              <label>Smoking</label>
-              <div className="toggle-buttons">
-                <button 
-                  className={!overnightSmoking ? 'active' : ''}
-                  onClick={() => setOvernightSmoking(false)}
-                >
-                  Non-Smoking
-                </button>
-                <button 
-                  className={overnightSmoking ? 'active' : ''}
-                  onClick={() => setOvernightSmoking(true)}
-                >
-                  Smoking
-                </button>
+              
+              {/* Row 2, Column 2: Smoking */}
+              <div className="option-group" style={{marginBottom: '0'}}>
+                <label style={{fontSize: '10px', marginBottom: '8px', display: 'block'}}>SMOKING</label>
+                <div className="toggle-buttons" style={{gap: '4px'}}>
+                  <button 
+                    className={!overnightSmoking ? 'active' : ''}
+                    onClick={() => setOvernightSmoking(false)}
+                    style={{padding: '6px 6px', fontSize: '10px'}}
+                  >
+                    Non-Smoking
+                  </button>
+                  <button 
+                    className={overnightSmoking ? 'active' : ''}
+                    onClick={() => setOvernightSmoking(true)}
+                    style={{padding: '6px 10px', fontSize: '11px'}}
+                  >
+                    Smoking
+                  </button>
+                </div>
               </div>
-            </div>
-            
-            <div className="option-group">
-              <label><i className="fas fa-credit-card" style={{"marginRight": "8px"}}></i>Payment Method</label>
-              <div className="toggle-buttons">
-                <button 
-                  className={overnightPayment === 'cash' ? 'active' : ''}
-                  onClick={() => setOvernightPayment('cash')}
-                >
-                  Cash
-                </button>
-                <button 
-                  className={overnightPayment === 'credit' ? 'active' : ''}
-                  onClick={() => setOvernightPayment('credit')}
-                >
-                  Credit Card
-                </button>
+              
+              {/* Row 3, Column 1: Payment Method (spans both columns) */}
+              <div className="option-group" style={{gridColumn: '1 / -1', marginBottom: '0'}}>
+                <label style={{fontSize: '10px', marginBottom: '8px', display: 'block'}}><i className="fas fa-credit-card" style={{"marginRight": "4px", fontSize: '9px'}}></i>PAYMENT METHOD</label>
+                <div className="toggle-buttons" style={{gap: '4px'}}>
+                  <button 
+                    className={overnightPayment === 'cash' ? 'active' : ''}
+                    onClick={() => setOvernightPayment('cash')}
+                    style={{padding: '6px 12px', fontSize: '11px'}}
+                  >
+                    Cash
+                  </button>
+                  <button 
+                    className={overnightPayment === 'credit' ? 'active' : ''}
+                    onClick={() => setOvernightPayment('credit')}
+                    style={{padding: '6px 12px', fontSize: '11px'}}
+                  >
+                    Credit Card
+                  </button>
+                </div>
               </div>
-            </div>
-            
-            <div className="option-group">
-              <div className="centered-label">Early Check-in Hours</div>
-              <div className="counter-control">
-                <button 
-                  className="minus-button" 
-                  onClick={() => handleOvernightExtraHoursChange(-1)}
-                >
-                  -
-                </button>
-                <span>{Math.abs(overnightExtraHours)}</span>
-                <button 
-                  className="plus-button" 
-                  onClick={() => handleOvernightExtraHoursChange(1)}
-                >
-                  +
-                </button>
+              
+              {/* Row 4, Column 1: Early Check-in Hours */}
+              <div className="option-group" style={{marginBottom: '0'}}>
+                <div className="centered-label" style={{fontSize: '9px', marginBottom: '8px'}}>
+                  EARLY CHECK-IN HRS
+                  {checkInTimeMode === 'current' && <span style={{color: '#FF6B35', marginLeft: '4px'}}>(AUTO)</span>}
+                </div>
+                <div className="counter-control" style={{padding: '4px'}}>
+                  <button 
+                    className="minus-button" 
+                    onClick={() => handleOvernightExtraHoursChange(-1)}
+                    style={{
+                      width: '28px', 
+                      height: '28px', 
+                      fontSize: '14px'
+                    }}
+                  >
+                    -
+                  </button>
+                  <span style={{fontSize: '14px', minWidth: '25px'}}>{Math.abs(overnightExtraHours)}</span>
+                  <button 
+                    className="plus-button" 
+                    onClick={() => handleOvernightExtraHoursChange(1)}
+                    style={{
+                      width: '28px', 
+                      height: '28px', 
+                      fontSize: '14px'
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
+                <div className="time-label" style={{fontSize: '9px', marginTop: '2px'}}>
+                  Check-in @ {calculateCheckInTime(overnightExtraHours)}
+                </div>
               </div>
-              <div className="time-label">
-                Check-in @ {calculateCheckInTime(overnightExtraHours)}
+              
+              {/* Row 4, Column 2: Late Check-out Hours */}
+              <div className="option-group" style={{marginBottom: '0'}}>
+                <div className="centered-label" style={{fontSize: '9px', marginBottom: '8px'}}>LATE CHECK-OUT HRS</div>
+                <div className="counter-control" style={{padding: '4px'}}>
+                  <button 
+                    className="minus-button" 
+                    onClick={() => {
+                      // Ensure hours don't go below 0
+                      const newValue = Math.max(0, overnightCheckoutExtraHours - 1);
+                      // Update the time display and recalculate price
+                      updateLateCheckOutTime(newValue);
+                      // Force recalculation of price
+                      calculateOvernightPrice();
+                    }}
+                    style={{width: '28px', height: '28px', fontSize: '14px'}}
+                  >
+                    -
+                  </button>
+                  <span style={{fontSize: '14px', minWidth: '25px'}}>{overnightCheckoutExtraHours}</span>
+                  <button 
+                    className="plus-button" 
+                    onClick={() => {
+                      // Update the time display and recalculate price
+                      updateLateCheckOutTime(overnightCheckoutExtraHours + 1);
+                      // Force recalculation of price
+                      calculateOvernightPrice();
+                    }}
+                    style={{width: '28px', height: '28px', fontSize: '14px'}}
+                  >
+                    +
+                  </button>
+                </div>
+                <div className="time-label" style={{fontSize: '9px', marginTop: '2px'}}>
+                  Check-out @ {calculateCheckOutTime(overnightCheckoutExtraHours)}
+                </div>
               </div>
-            </div>
-            
-            <div className="option-group">
-              <div className="centered-label">Late Check-out Hours</div>
-              <div className="counter-control">
-                <button 
-                  className="minus-button" 
-                  onClick={() => {
-                    // Ensure hours don't go below 0
-                    const newValue = Math.max(0, overnightCheckoutExtraHours - 1);
-                    // Update the time display and recalculate price
-                    updateLateCheckOutTime(newValue);
-                    // Force recalculation of price
-                    calculateOvernightPrice();
-                  }}
-                >
-                  -
-                </button>
-                <span>{overnightCheckoutExtraHours}</span>
-                <button 
-                  className="plus-button" 
-                  onClick={() => {
-                    // Update the time display and recalculate price
-                    updateLateCheckOutTime(overnightCheckoutExtraHours + 1);
-                    // Force recalculation of price
-                    calculateOvernightPrice();
-                  }}
-                >
-                  +
-                </button>
-              </div>
-              <div className="time-label">
-                Check-out @ {calculateCheckOutTime(overnightCheckoutExtraHours)}
-              </div>
-            </div>
-            
-            <div className="option-group">
-              <label>Extra Hour Rate</label>
-              <div className="toggle-buttons">
-                <button 
-                  className={overnightRateType === 'regular' ? 'active' : ''}
-                  onClick={() => setOvernightRateType('regular')}
-                >
-                  Regular ($15)
-                </button>
-                <button 
-                  className={overnightRateType === 'discounted' ? 'active' : ''}
-                  onClick={() => setOvernightRateType('discounted')}
-                >
-                  Discounted ($10)
-                </button>
+              
+              {/* Row 5: Extra Hour Rate (spans both columns) */}
+              <div className="option-group" style={{gridColumn: '1 / -1', marginBottom: '0'}}>
+                <label style={{fontSize: '10px', marginBottom: '8px', display: 'block'}}>
+                  EXTRA HOUR RATE
+                  {checkInTimeMode === 'current' && <span style={{color: '#FF6B35', marginLeft: '4px'}}>(FIXED)</span>}
+                </label>
+                <div className="toggle-buttons" style={{gap: '4px'}}>
+                  <button 
+                    className={overnightRateType === 'regular' ? 'active' : ''}
+                    onClick={() => setOvernightRateType('regular')}
+                    style={{
+                      padding: '6px 10px', 
+                      fontSize: '11px'
+                    }}
+                  >
+                    Regular ($15)
+                  </button>
+                  <button 
+                    className={overnightRateType === 'discounted' ? 'active' : ''}
+                    onClick={() => setOvernightRateType('discounted')}
+                    style={{
+                      padding: '6px 10px', 
+                      fontSize: '11px'
+                    }}
+                  >
+                    Discounted ($10)
+                  </button>
+                </div>
               </div>
             </div>
             
