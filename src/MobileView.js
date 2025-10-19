@@ -5499,6 +5499,14 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           {/* 2 Days pricing */}
           <div style={{marginBottom: '6px', paddingBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.2)'}}>
             <div style={{fontSize: '9px', color: '#ddd', marginBottom: '2px', fontWeight: 'bold'}}>2 Days</div>
+            <div className="price-row" style={{fontSize: '9px'}}>
+              <span>Base:</span>
+              <span>${(hoveredCard.basePrice * 2).toFixed(2)}</span>
+            </div>
+            <div className="price-row" style={{fontSize: '9px'}}>
+              <span>Tax:</span>
+              <span>${(hoveredCard.tax * 2).toFixed(2)}</span>
+            </div>
             <div className="price-row total" style={{fontSize: '10px', fontWeight: 'bold'}}>
               <span>Total:</span>
               <span>${(hoveredCard.total * 2).toFixed(2)}</span>
@@ -5508,6 +5516,14 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
           {/* 3 Days pricing */}
           <div>
             <div style={{fontSize: '9px', color: '#ddd', marginBottom: '2px', fontWeight: 'bold'}}>3 Days</div>
+            <div className="price-row" style={{fontSize: '9px'}}>
+              <span>Base:</span>
+              <span>${(hoveredCard.basePrice * 3).toFixed(2)}</span>
+            </div>
+            <div className="price-row" style={{fontSize: '9px'}}>
+              <span>Tax:</span>
+              <span>${(hoveredCard.tax * 3).toFixed(2)}</span>
+            </div>
             <div className="price-row total" style={{fontSize: '10px', fontWeight: 'bold'}}>
               <span>Total:</span>
               <span>${(hoveredCard.total * 3).toFixed(2)}</span>
