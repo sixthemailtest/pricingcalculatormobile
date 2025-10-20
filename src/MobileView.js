@@ -15,15 +15,15 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   // State for voice search
   const [isButtonActive, setIsButtonActive] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  
   // State for draggable voice button position
   const [buttonPosition, setButtonPosition] = useState({ x: 20, y: window.innerHeight - 100 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
+  
   // New state for multiple room results
   const [multipleRoomResults, setMultipleRoomResults] = useState([]);
   const [activeRoomIndex, setActiveRoomIndex] = useState(0);
+  const [voiceSearchQuery, setVoiceSearchQuery] = useState('');
   const [voiceSearchResults, setVoiceSearchResults] = useState({
     showModal: false,
     foundMatch: false,
@@ -546,6 +546,15 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   
   // Calculate daily price based on current day
   const getDailyPrice = useCallback(() => {
+    // If custom prices are set, use them (same price for all days)
+    if (customPrices && (customPrices.regular || customPrices.jacuzzi)) {
+      return {
+        regular: customPrices.regular?.queen || prices.weekday.withoutJacuzzi,
+        jacuzzi: customPrices.jacuzzi?.queen || prices.weekday.withJacuzzi
+      };
+    }
+    
+    // Otherwise use day-specific pricing
     const day = currentDateTime.getDay();
     
     if (day === 5) { // Friday
@@ -555,7 +564,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     } else { // Weekday (including Sunday)
       return { regular: prices.weekday.withoutJacuzzi, jacuzzi: prices.weekday.withJacuzzi };
     }
-  }, [currentDateTime, prices]);
+  }, [currentDateTime, prices, customPrices]);
   
   // Initialize date and time on component mount and set up timer - EXACT COPY from pricecalculator
   useEffect(() => {
@@ -636,15 +645,17 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       const currentHour = now.getHours();
       const currentMinute = now.getMinutes();
       
-      if (currentHour >= 9) {
-        // After 9 AM: calculate from 11 AM to 3 PM = 4 hours early
-        setOvernightExtraHours(-4);
-      } else {
-        // Before 9 AM: calculate from current time to 3 PM (15:00)
-        const currentTimeInHours = currentHour + (currentMinute / 60);
-        const checkInTime = 15; // 3 PM
-        const hoursEarly = checkInTime - currentTimeInHours;
+      // Calculate hours from current time to 3 PM (15:00)
+      const currentTimeInHours = currentHour + (currentMinute / 60);
+      const checkInTime = 15; // 3 PM
+      const hoursEarly = checkInTime - currentTimeInHours;
+      
+      // Only charge for early check-in if current time is before 3 PM
+      if (hoursEarly > 0) {
         setOvernightExtraHours(-Math.round(hoursEarly));
+      } else {
+        // After 3 PM, no early check-in charges
+        setOvernightExtraHours(0);
       }
       // Keep rate type as regular for current time mode
       setOvernightRateType('regular');
@@ -5873,15 +5884,17 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                   const currentHour = now.getHours();
                   const currentMinute = now.getMinutes();
                   
-                  if (currentHour >= 9) {
-                    // After 9 AM: calculate from 11 AM to 3 PM = 4 hours early
-                    setOvernightExtraHours(-4);
-                  } else {
-                    // Before 9 AM: calculate from current time to 3 PM (15:00)
-                    const currentTimeInHours = currentHour + (currentMinute / 60);
-                    const checkInTime = 15; // 3 PM
-                    const hoursEarly = checkInTime - currentTimeInHours;
+                  // Calculate hours from current time to 3 PM (15:00)
+                  const currentTimeInHours = currentHour + (currentMinute / 60);
+                  const checkInTime = 15; // 3 PM
+                  const hoursEarly = checkInTime - currentTimeInHours;
+                  
+                  // Only charge for early check-in if current time is before 3 PM
+                  if (hoursEarly > 0) {
                     setOvernightExtraHours(-Math.round(hoursEarly));
+                  } else {
+                    // After 3 PM, no early check-in charges
+                    setOvernightExtraHours(0);
                   }
                   
                   // Trigger price recalculation
@@ -7258,7 +7271,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         </div>
       )}
       
-      {/* Floating Draggable Voice Search Button */}
+      {/* Voice button kept hidden to avoid reference errors */}
       <button 
         className={`voice-search-button ${isButtonActive ? 'active' : 'inactive'} ${isDragging ? 'dragging' : ''}`}
         onClick={handleVoiceButtonClick}
@@ -7266,30 +7279,14 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         style={{
+          display: 'none',
           position: 'fixed',
           left: `${buttonPosition.x}px`,
           top: `${buttonPosition.y}px`,
-          zIndex: 1000,
-          touchAction: 'none',
-          transition: isDragging ? 'none' : 'opacity 0.3s'
+          zIndex: -1
         }}
       >
-        {!isButtonActive && (
-          <i className="fas fa-microphone"></i>
-        )}
-        
-        {isListening && (
-          <div className="voice-wave-container">
-            <div className="voice-wave">
-              <div className="voice-wave-bar"></div>
-              <div className="voice-wave-bar"></div>
-              <div className="voice-wave-bar"></div>
-              <div className="voice-wave-bar"></div>
-              <div className="voice-wave-bar"></div>
-            </div>
-          </div>
-        )}
-
+        <i className="fas fa-microphone"></i>
       </button>
     </div>
   );
