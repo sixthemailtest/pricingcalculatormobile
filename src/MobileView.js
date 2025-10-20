@@ -145,6 +145,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     }
   }, [selectedRooms]);
   const [activeFloor, setActiveFloor] = useState('ground'); // 'ground' or 'first'
+  const [roomSearchQuery, setRoomSearchQuery] = useState(''); // Room search by number
   
   // State for saved stays
   const [savedStays, setSavedStays] = useState([]);
@@ -4831,6 +4832,31 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         {/* Rooms Tab Content */}
         {activeTab === 'rooms' && (
           <div className="rooms-tab-content">
+            {/* Room Search Input */}
+            <div style={{
+              padding: '10px 15px',
+              backgroundColor: '#f8f9fa',
+              borderBottom: '1px solid #e0e0e0'
+            }}>
+              <input
+                type="text"
+                placeholder="Search by room number..."
+                value={roomSearchQuery}
+                onChange={(e) => setRoomSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '10px 15px',
+                  fontSize: '14px',
+                  border: '2px solid #ddd',
+                  borderRadius: '8px',
+                  outline: 'none',
+                  transition: 'border-color 0.2s',
+                  boxSizing: 'border-box'
+                }}
+                onFocus={(e) => e.target.style.borderColor = '#4A90E2'}
+                onBlur={(e) => e.target.style.borderColor = '#ddd'}
+              />
+            </div>
             {/* Helper function to render room cards */}
             {(() => {
               const renderRoomCard = (room) => (
@@ -4870,6 +4896,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                 </div>
               );
 
+              // Filter rooms by search query
+              const filteredRooms = roomSearchQuery.trim() 
+                ? availableRooms.filter(room => 
+                    room.number.toString().includes(roomSearchQuery.trim())
+                  )
+                : availableRooms;
+
               const categories = [
                 // Regular rooms first
                 { label: 'Non-Smoking Queen', filter: (r) => !r.isSmoking && !r.hasJacuzzi && r.bedType === 'Queen' },
@@ -4886,7 +4919,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               ];
 
               return categories.map(({ label, filter }) => {
-                const rooms = availableRooms.filter(filter).sort((a, b) => {
+                const rooms = filteredRooms.filter(filter).sort((a, b) => {
                   // First sort by floor (first floor first)
                   const aIsFirstFloor = a.number < 200;
                   const bIsFirstFloor = b.number < 200;
