@@ -219,8 +219,8 @@
 /* Room card container for the Rooms tab */
 .room-card-container {
   position: relative;
-  width: 75px;
-  height: 75px;
+  width: 70px;
+  height: 70px;
   perspective: 1000px;
   transition: box-shadow 0.3s ease, transform 0.2s ease;
   border-radius: 14px;

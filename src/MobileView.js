@@ -529,8 +529,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     // Clear overnight stay selections but keep selected rooms
     clearOvernightStay();
     
+    // Clear saved stays
+    setSavedStays([]);
+    
     // Log the action
-    console.log('Cleared short stay and multiple night prices, kept room cards');
+    console.log('Cleared short stay, multiple night prices, and saved stays');
   };
   
   // Clear overnight stay selections (but keep selected rooms)
@@ -4752,56 +4755,227 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         </button>
       </div>
       
-      {/* Button container - Under tabs */}
-      {(activeTab === 'available' || activeTab === 'short' || activeTab === 'overnight') && (
-        <div className="top-buttons-container" style={{
-          justifyContent: 'center',
-          padding: '10px 20px',
-          display: 'flex',
-          gap: '10px'
-        }}>
-          {activeTab === 'available' ? (
-            <>
-              <button className="select-rooms-top-button" onClick={toggleRoomSelector}>
-                {selectedRooms.length > 0 ? `Selected Rooms (${selectedRooms.length})` : 'Select Rooms'}
-              </button>
-              {selectedRooms.length > 0 && (
-                <button 
-                  onClick={() => {
-                    setSelectedRooms([]);
-                    try {
-                      localStorage.removeItem('selectedRooms');
-                    } catch (error) {
-                      console.error('Error clearing rooms from localStorage:', error);
-                    }
-                  }}
-                  style={{
-                    backgroundColor: '#EF4444',
-                    color: 'white',
-                    padding: '6px 16px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
-                  }}
-                >
-                  Clear All
-                </button>
-              )}
-            </>
-          ) : (
+      {/* Modern Action Bar - Integrated design */}
+      <div style={{
+        background: 'linear-gradient(135deg, #2d4373 0%, #4a69bd 100%)',
+        padding: '10px 15px',
+        display: 'flex',
+        gap: '8px',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+      }}>
+        {activeTab === 'available' && (
+          <>
             <button 
-              className="small-clear-button" 
-              onClick={clearAllRooms}
-              style={{ backgroundColor: 'red', color: 'white', width: 'auto', padding: '8px 40px' }}
+              onClick={toggleRoomSelector}
+              style={{
+                flex: 1,
+                padding: '10px 20px',
+                background: '#ffffff',
+                border: 'none',
+                borderRadius: '12px',
+                color: '#2d4373',
+                fontSize: '13px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                transition: 'transform 0.2s'
+              }}
+              onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
+              onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
             >
-              Clear
+              <span style={{fontSize: '16px'}}>🏠</span>
+              <span>Select Rooms</span>
+              {selectedRooms.length > 0 && (
+                <span style={{
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  color: 'white',
+                  borderRadius: '12px',
+                  padding: '3px 10px',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  boxShadow: '0 2px 6px rgba(16,185,129,0.4)'
+                }}>{selectedRooms.length}</span>
+              )}
             </button>
-          )}
-        </div>
-      )}
+            {selectedRooms.length > 0 && (
+              <button 
+                onClick={() => {
+                  setSelectedRooms([]);
+                  try {
+                    localStorage.removeItem('selectedRooms');
+                  } catch (error) {
+                    console.error('Error clearing rooms from localStorage:', error);
+                  }
+                }}
+                style={{
+                  padding: '10px 18px',
+                  background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                  border: 'none',
+                  borderRadius: '12px',
+                  color: 'white',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  boxShadow: '0 3px 10px rgba(239,68,68,0.4)',
+                  transition: 'transform 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
+                onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
+              >
+                <span>🗑️</span>
+              </button>
+            )}
+          </>
+        )}
+        
+        {activeTab === 'short' && (
+          <button 
+            onClick={clearAllRooms}
+            style={{
+              flex: 1,
+              padding: '10px 20px',
+              background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+              border: 'none',
+              borderRadius: '12px',
+              color: 'white',
+              fontSize: '13px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '6px',
+              boxShadow: '0 4px 12px rgba(239,68,68,0.4)',
+              transition: 'transform 0.2s'
+            }}
+            onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
+            onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
+          >
+            <span>🗑️</span>
+            <span>Clear</span>
+          </button>
+        )}
+        
+        {activeTab === 'overnight' && (
+          <>
+            <button 
+              onClick={() => saveCurrentStay()}
+              style={{
+                flex: 1,
+                padding: '10px 20px',
+                background: '#ffffff',
+                border: 'none',
+                borderRadius: '12px',
+                color: '#2d4373',
+                fontSize: '13px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                transition: 'transform 0.2s'
+              }}
+              onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
+              onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
+            >
+              <span style={{fontSize: '16px'}}>➕</span>
+              <span>Add Stay</span>
+            </button>
+            <button 
+              onClick={clearAllRooms}
+              style={{
+                padding: '10px 18px',
+                background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                border: 'none',
+                borderRadius: '12px',
+                color: 'white',
+                fontSize: '12px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                boxShadow: '0 3px 10px rgba(239,68,68,0.4)',
+                transition: 'transform 0.2s'
+              }}
+              onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
+              onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
+            >
+              <span>🗑️</span>
+            </button>
+          </>
+        )}
+        
+        {activeTab === 'rooms' && (
+          <div style={{
+            flex: 1,
+            position: 'relative'
+          }}>
+            <span style={{
+              position: 'absolute',
+              left: '14px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              fontSize: '16px',
+              pointerEvents: 'none',
+              zIndex: 1
+            }}>🔍</span>
+            <input
+              type="text"
+              placeholder="Search room number..."
+              value={roomSearchQuery}
+              onChange={(e) => setRoomSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '10px 40px 10px 40px',
+                fontSize: '13px',
+                border: 'none',
+                borderRadius: '12px',
+                outline: 'none',
+                background: 'rgba(255,255,255,0.95)',
+                color: '#2d4373',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                boxSizing: 'border-box',
+                fontWeight: '600'
+              }}
+            />
+            {roomSearchQuery && (
+              <button
+                onClick={() => setRoomSearchQuery('')}
+                style={{
+                  position: 'absolute',
+                  right: '8px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '22px',
+                  height: '22px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '12px',
+                  color: 'white',
+                  boxShadow: '0 2px 6px rgba(239,68,68,0.4)',
+                  zIndex: 1
+                }}
+              >✕</button>
+            )}
+          </div>
+        )}
+      </div>
       
       {/* Tab content */}
       <div className="tab-content" data-tab={activeTab}>
@@ -4832,31 +5006,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         {/* Rooms Tab Content */}
         {activeTab === 'rooms' && (
           <div className="rooms-tab-content">
-            {/* Room Search Input */}
-            <div style={{
-              padding: '10px 15px',
-              backgroundColor: '#f8f9fa',
-              borderBottom: '1px solid #e0e0e0'
-            }}>
-              <input
-                type="text"
-                placeholder="Search by room number..."
-                value={roomSearchQuery}
-                onChange={(e) => setRoomSearchQuery(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '10px 15px',
-                  fontSize: '14px',
-                  border: '2px solid #ddd',
-                  borderRadius: '8px',
-                  outline: 'none',
-                  transition: 'border-color 0.2s',
-                  boxSizing: 'border-box'
-                }}
-                onFocus={(e) => e.target.style.borderColor = '#4A90E2'}
-                onBlur={(e) => e.target.style.borderColor = '#ddd'}
-              />
-            </div>
             {/* Helper function to render room cards */}
             {(() => {
               const renderRoomCard = (room) => (
@@ -5569,16 +5718,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                   <span>${overnightPriceInfo.totalBasePrice?.toFixed(2)}</span>
                 </div>
                 
-                {/* Daily price breakdown */}
-                <div className="daily-price-breakdown">
-                  <div className="breakdown-header">Daily Price Breakdown:</div>
-                  {overnightPriceInfo.dailyPrices?.map((day, index) => (
-                    <div key={index} className="price-row daily-price">
-                      <span>{day.dayOfWeek}, {day.date}:</span>
-                      <span>${day.price.toFixed(2)}</span>
-                    </div>
-                  ))}
-                </div>
                 {overnightPriceInfo.taxAmount > 0 && (
                   <div className="price-row">
                     <span>Tax (15% on room + extra hrs):</span>
@@ -5628,9 +5767,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                       
                       <div className="saved-stay-header">
                         <div className="saved-stay-dates">
-                          <span>{new Date(stay.checkInDate).toLocaleDateString()}</span>
+                          <span>{new Date(stay.checkInDate).toLocaleDateString('en-US', { weekday: 'short' })}, {new Date(stay.checkInDate).toLocaleDateString()}</span>
                           <span className="date-separator">→</span>
-                          <span>{new Date(stay.checkOutDate).toLocaleDateString()}</span>
+                          <span>{new Date(stay.checkOutDate).toLocaleDateString('en-US', { weekday: 'short' })}, {new Date(stay.checkOutDate).toLocaleDateString()}</span>
                         </div>
                         <div className="saved-stay-info">
                           <span>{stay.nights} nights</span>
@@ -5642,19 +5781,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                       </div>
                       
                       <div className="saved-stay-price-container">
-                        {/* Daily price breakdown for saved stays */}
-                        {!stay.isShortStay && stay.dailyPrices && stay.dailyPrices.length > 0 && (
-                          <div className="daily-price-breakdown">
-                            <div className="breakdown-header">Daily Price Breakdown:</div>
-                            {stay.dailyPrices.map((day, dayIndex) => (
-                              <div key={dayIndex} className="price-row daily-price">
-                                <span>{day.dayOfWeek}, {day.date}:</span>
-                                <span>${day.price.toFixed(2)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        
                         <div className="price-row">
                           <span>Tax (15%):</span>
                           <span>${stay.taxAmount.toFixed(2)}</span>
