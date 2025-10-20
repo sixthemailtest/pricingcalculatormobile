@@ -147,10 +147,46 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   const [activeFloor, setActiveFloor] = useState('ground'); // 'ground' or 'first'
   const [roomSearchQuery, setRoomSearchQuery] = useState(''); // Room search by number
   
+  // Custom price override state
+  const [customPrices, setCustomPrices] = useState(() => {
+    try {
+      const saved = localStorage.getItem('customRoomPrices');
+      return saved ? JSON.parse(saved) : null;
+    } catch (error) {
+      console.error('Error loading custom prices:', error);
+      return null;
+    }
+  });
+  
+  // Temporary state for editing prices before saving
+  const [tempPrices, setTempPrices] = useState(() => {
+    try {
+      const saved = localStorage.getItem('customRoomPrices');
+      return saved ? JSON.parse(saved) : {};
+    } catch (error) {
+      return {};
+    }
+  });
+  
   // State for saved stays
   const [savedStays, setSavedStays] = useState([]);
   // State for active tab
   const [activeTab, setActiveTab] = useState('short');
+  
+  // Function to save custom prices
+  const saveCustomPrices = () => {
+    // Check if any prices are set
+    const hasPrices = tempPrices && (tempPrices.regular || tempPrices.jacuzzi);
+    
+    if (hasPrices) {
+      setCustomPrices(tempPrices);
+      try {
+        localStorage.setItem('customRoomPrices', JSON.stringify(tempPrices));
+      } catch (error) {
+        console.error('Error saving custom prices:', error);
+      }
+    }
+  };
   
   // State for tooltip
   const [hoveredCard, setHoveredCard] = useState(null);
@@ -287,10 +323,47 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       weekend: 0
     };
     
-    // Define room prices based on jacuzzi option
-    const roomPrices = hasJacuzziOvernight ? 
+    // Define room prices based on jacuzzi option and custom prices
+    let baseRoomPrices;
+    
+    if (customPrices) {
+      // Use custom prices as base for all days if set
+      if (hasJacuzziOvernight) {
+        if (overnightBedType === 'King') {
+          const customPrice = customPrices.jacuzzi?.king;
+          baseRoomPrices = customPrice ? { weekday: customPrice, friday: customPrice, weekend: customPrice } :
+            { weekday: prices.weekday.withJacuzzi + 5, friday: prices.friday.withJacuzzi + 5, weekend: prices.weekend.withJacuzzi + 5 };
+        } else {
+          const customPrice = customPrices.jacuzzi?.queen;
+          baseRoomPrices = customPrice ? { weekday: customPrice, friday: customPrice, weekend: customPrice } :
+            { weekday: prices.weekday.withJacuzzi, friday: prices.friday.withJacuzzi, weekend: prices.weekend.withJacuzzi };
+        }
+      } else {
+        if (overnightBedType === 'King') {
+          const customPrice = customPrices.regular?.king;
+          baseRoomPrices = customPrice ? { weekday: customPrice, friday: customPrice, weekend: customPrice } :
+            { weekday: prices.weekday.withoutJacuzzi + 5, friday: prices.friday.withoutJacuzzi + 5, weekend: prices.weekend.withoutJacuzzi + 5 };
+        } else if (overnightBedType === 'Queen2Beds') {
+          const customPrice = customPrices.regular?.queen2beds;
+          baseRoomPrices = customPrice ? { weekday: customPrice, friday: customPrice, weekend: customPrice } :
+            { weekday: prices.weekday.withoutJacuzzi + 10, friday: prices.friday.withoutJacuzzi + 10, weekend: prices.weekend.withoutJacuzzi + 10 };
+        } else {
+          const customPrice = customPrices.regular?.queen;
+          baseRoomPrices = customPrice ? { weekday: customPrice, friday: customPrice, weekend: customPrice } :
+            { weekday: prices.weekday.withoutJacuzzi, friday: prices.friday.withoutJacuzzi, weekend: prices.weekend.withoutJacuzzi };
+        }
+      }
+      const roomPrices = baseRoomPrices;
+    } else {
+      // Use default pricing with day-of-week variations
+      const roomPrices = hasJacuzziOvernight ? 
+        { weekday: prices.weekday.withJacuzzi, friday: prices.friday.withJacuzzi, weekend: prices.weekend.withJacuzzi } :
+        { weekday: prices.weekday.withoutJacuzzi, friday: prices.friday.withoutJacuzzi, weekend: prices.weekend.withoutJacuzzi };
+    }
+    
+    const roomPrices = customPrices ? baseRoomPrices : (hasJacuzziOvernight ? 
       { weekday: prices.weekday.withJacuzzi, friday: prices.friday.withJacuzzi, weekend: prices.weekend.withJacuzzi } :
-      { weekday: prices.weekday.withoutJacuzzi, friday: prices.friday.withoutJacuzzi, weekend: prices.weekend.withoutJacuzzi };
+      { weekday: prices.weekday.withoutJacuzzi, friday: prices.friday.withoutJacuzzi, weekend: prices.weekend.withoutJacuzzi });
     
     // Clone check-in date to iterate through days
     const currentDate = new Date(checkInDate);
@@ -315,11 +388,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         dayPrice = roomPrices.weekday;
       }
       
-      // Add room type surcharge
-      if (overnightBedType === 'King') {
-        dayPrice += 5; // $5 extra per night for King
-      } else if (overnightBedType === 'Queen2Beds') {
-        dayPrice += 10; // $10 extra per night for Queen 2 Beds
+      // Add room type surcharge only if not using custom prices
+      if (!customPrices) {
+        if (overnightBedType === 'King') {
+          dayPrice += 5; // $5 extra per night for King
+        } else if (overnightBedType === 'Queen2Beds') {
+          dayPrice += 10; // $10 extra per night for Queen 2 Beds
+        }
       }
       
       // Add to daily prices array
@@ -339,13 +414,15 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       (daysBreakdown.friday * roomPrices.friday) +
       (daysBreakdown.weekend * roomPrices.weekend);
     
-    // Add extra charge per night based on room type
-    if (overnightBedType === 'King') {
-      // $5 extra per night for King
-      totalBasePrice += 5 * nights;
-    } else if (overnightBedType === 'Queen2Beds') {
-      // $10 extra per night for Queen 2 Beds
-      totalBasePrice += 10 * nights;
+    // Add extra charge per night based on room type only if not using custom prices
+    if (!customPrices) {
+      if (overnightBedType === 'King') {
+        // $5 extra per night for King
+        totalBasePrice += 5 * nights;
+      } else if (overnightBedType === 'Queen2Beds') {
+        // $10 extra per night for Queen 2 Beds
+        totalBasePrice += 10 * nights;
+      }
     }
     
     // Calculate extra hours cost first
@@ -376,7 +453,7 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
       extraHoursCheckOutCost,
       totalPrice
     };
-  }, [checkInDate, checkOutDate, hasJacuzziOvernight, overnightBedType, overnightExtraHours, overnightCheckoutExtraHours, overnightRateType, overnightPayment, prices, shortStayPrices]);
+  }, [checkInDate, checkOutDate, hasJacuzziOvernight, overnightBedType, overnightExtraHours, overnightCheckoutExtraHours, overnightRateType, overnightPayment, prices, shortStayPrices, customPrices]);
   
   // Handle extra hours change for short stay - simplified like in pricecalculator project
   const handleExtraHoursChange = (change) => {
@@ -717,14 +794,36 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   
   // Handle card mouse enter for tooltip
   const handleCardMouseEnter = (room, e) => {
-    // Get base price based on jacuzzi option
-    let basePrice = room.hasJacuzzi ? dailyPrices.jacuzzi : dailyPrices.regular;
+    // Get base price based on jacuzzi option and custom prices if set
+    let basePrice;
     
-    // Add surcharge based on bed type, matching the logic in Multinights section
-    if (room.bedType === 'King') {
-      basePrice += 5; // $5 extra for King beds
-    } else if (room.bedType === 'Queen2Beds') {
-      basePrice += 10; // $10 extra for Queen 2 beds
+    if (customPrices) {
+      // Use custom prices if available
+      if (room.hasJacuzzi) {
+        if (room.bedType === 'King') {
+          basePrice = customPrices.jacuzzi?.king || (dailyPrices.jacuzzi + 5);
+        } else {
+          basePrice = customPrices.jacuzzi?.queen || dailyPrices.jacuzzi;
+        }
+      } else {
+        if (room.bedType === 'King') {
+          basePrice = customPrices.regular?.king || (dailyPrices.regular + 5);
+        } else if (room.bedType === 'Queen2Beds') {
+          basePrice = customPrices.regular?.queen2beds || (dailyPrices.regular + 10);
+        } else {
+          basePrice = customPrices.regular?.queen || dailyPrices.regular;
+        }
+      }
+    } else {
+      // Use default prices
+      basePrice = room.hasJacuzzi ? dailyPrices.jacuzzi : dailyPrices.regular;
+      
+      // Add surcharge based on bed type, matching the logic in Multinights section
+      if (room.bedType === 'King') {
+        basePrice += 5; // $5 extra for King beds
+      } else if (room.bedType === 'Queen2Beds') {
+        basePrice += 10; // $10 extra for Queen 2 beds
+      }
     }
     
     const tax = basePrice * 0.15; // 15% tax
@@ -4753,6 +4852,12 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         >
           Rooms
         </button>
+        <button 
+          className={`tab ${activeTab === 'pricechange' ? 'active' : ''}`}
+          onClick={() => setActiveTab('pricechange')}
+        >
+          Price Change
+        </button>
       </div>
       
       {/* Modern Action Bar - Integrated design */}
@@ -4975,6 +5080,62 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             )}
           </div>
         )}
+        
+        {activeTab === 'pricechange' && (
+          <>
+            <button 
+              onClick={saveCustomPrices}
+              style={{
+                flex: 1,
+                padding: '10px 20px',
+                background: '#ffffff',
+                border: 'none',
+                borderRadius: '12px',
+                color: '#2d4373',
+                fontSize: '13px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                transition: 'transform 0.2s'
+              }}
+              onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
+              onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
+            >
+              <span>💾</span>
+              <span>Save Prices</span>
+            </button>
+            <button 
+              onClick={() => {
+                setCustomPrices(null);
+                setTempPrices({});
+                localStorage.removeItem('customRoomPrices');
+              }}
+              style={{
+                padding: '10px 18px',
+                background: 'linear-gradient(135deg, #ef4444, #dc2626)',
+                border: 'none',
+                borderRadius: '12px',
+                color: 'white',
+                fontSize: '12px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                boxShadow: '0 3px 10px rgba(239,68,68,0.4)',
+                transition: 'transform 0.2s'
+              }}
+              onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
+              onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
+            >
+              <span>🔄</span>
+            </button>
+          </>
+        )}
       </div>
       
       {/* Tab content */}
@@ -5102,6 +5263,249 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                 );
               });
             })()}
+          </div>
+        )}
+        
+        {/* Price Change Tab Content */}
+        {activeTab === 'pricechange' && (
+          <div style={{padding: '15px', backgroundColor: '#f8f9fa'}}>
+            <h3 style={{
+              margin: '0 0 15px 0',
+              fontSize: '18px',
+              fontWeight: 'bold',
+              color: '#2d4373',
+              textAlign: 'center'
+            }}>Custom Room Prices</h3>
+            
+            {/* Regular Rooms Section */}
+            <div style={{
+              background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
+              borderRadius: '16px',
+              padding: '20px',
+              marginBottom: '15px',
+              boxShadow: '0 4px 12px rgba(14,165,233,0.2)'
+            }}>
+                <h4 style={{
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  color: '#4a69bd',
+                  marginBottom: '12px',
+                  paddingBottom: '8px',
+                  borderBottom: '2px solid #e0e7ff'
+                }}>Regular Rooms</h4>
+                
+                {/* Queen Regular */}
+                <div style={{marginBottom: '15px'}}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: '#0369a1',
+                    marginBottom: '6px'
+                  }}>Queen</label>
+                  <input
+                    type="text"
+                    placeholder={`$${dailyPrices.regular}.00`}
+                    value={tempPrices?.regular?.queen ? `$${tempPrices.regular.queen.toFixed(2)}` : ''}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9.]/g, '');
+                      setTempPrices({
+                        ...tempPrices,
+                        regular: {
+                          ...(tempPrices?.regular || {}),
+                          queen: value ? parseFloat(value) : null
+                        }
+                      });
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 15px',
+                      fontSize: '14px',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      fontWeight: '600'
+                    }}
+                  />
+                </div>
+                
+                {/* King Regular */}
+                <div style={{marginBottom: '15px'}}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: '#0369a1',
+                    marginBottom: '6px'
+                  }}>King</label>
+                  <input
+                    type="text"
+                    placeholder={`$${(dailyPrices.regular + 5)}.00`}
+                    value={tempPrices?.regular?.king ? `$${tempPrices.regular.king.toFixed(2)}` : ''}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9.]/g, '');
+                      setTempPrices({
+                        ...tempPrices,
+                        regular: {
+                          ...(tempPrices?.regular || {}),
+                          king: value ? parseFloat(value) : null
+                        }
+                      });
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 15px',
+                      fontSize: '14px',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      fontWeight: '600'
+                    }}
+                  />
+                </div>
+                
+                {/* Queen 2 Beds Regular */}
+                <div style={{marginBottom: '0'}}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: '#0369a1',
+                    marginBottom: '6px'
+                  }}>Queen 2 Beds</label>
+                  <input
+                    type="text"
+                    placeholder={`$${(dailyPrices.regular + 10)}.00`}
+                    value={tempPrices?.regular?.queen2beds ? `$${tempPrices.regular.queen2beds.toFixed(2)}` : ''}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9.]/g, '');
+                      setTempPrices({
+                        ...tempPrices,
+                        regular: {
+                          ...(tempPrices?.regular || {}),
+                          queen2beds: value ? parseFloat(value) : null
+                        }
+                      });
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 15px',
+                      fontSize: '14px',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      fontWeight: '600'
+                    }}
+                  />
+                </div>
+              </div>
+              
+              {/* Jacuzzi Rooms Section */}
+              <div style={{
+                background: 'linear-gradient(135deg, #2d4373 0%, #4a69bd 100%)',
+                borderRadius: '16px',
+                padding: '20px',
+                boxShadow: '0 4px 12px rgba(45,67,115,0.3)'
+              }}>
+                <h4 style={{
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  color: 'white',
+                  marginBottom: '12px',
+                  paddingBottom: '8px',
+                  borderBottom: '2px solid rgba(255,255,255,0.3)'
+                }}>Jacuzzi Rooms</h4>
+                
+                {/* Queen Jacuzzi */}
+                <div style={{marginBottom: '15px'}}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: 'rgba(255,255,255,0.9)',
+                    marginBottom: '6px'
+                  }}>Queen with Jacuzzi</label>
+                  <input
+                    type="text"
+                    placeholder={`$${dailyPrices.jacuzzi}.00`}
+                    value={tempPrices?.jacuzzi?.queen ? `$${tempPrices.jacuzzi.queen.toFixed(2)}` : ''}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9.]/g, '');
+                      setTempPrices({
+                        ...tempPrices,
+                        jacuzzi: {
+                          ...(tempPrices?.jacuzzi || {}),
+                          queen: value ? parseFloat(value) : null
+                        }
+                      });
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 15px',
+                      fontSize: '14px',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      fontWeight: '600'
+                    }}
+                  />
+                </div>
+                
+                {/* King Jacuzzi */}
+                <div style={{marginBottom: '0'}}>
+                  <label style={{
+                    display: 'block',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    color: 'rgba(255,255,255,0.9)',
+                    marginBottom: '6px'
+                  }}>King with Jacuzzi</label>
+                  <input
+                    type="text"
+                    placeholder={`$${(dailyPrices.jacuzzi + 5)}.00`}
+                    value={tempPrices?.jacuzzi?.king ? `$${tempPrices.jacuzzi.king.toFixed(2)}` : ''}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9.]/g, '');
+                      setTempPrices({
+                        ...tempPrices,
+                        jacuzzi: {
+                          ...(tempPrices?.jacuzzi || {}),
+                          king: value ? parseFloat(value) : null
+                        }
+                      });
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px 15px',
+                      fontSize: '14px',
+                      border: '2px solid #e2e8f0',
+                      borderRadius: '10px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      fontWeight: '600'
+                    }}
+                  />
+                </div>
+              </div>
+              
+              {customPrices && Object.keys(customPrices).length > 0 && (customPrices.regular || customPrices.jacuzzi) && (
+                <div style={{
+                  marginTop: '15px',
+                  padding: '12px',
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
+                  borderRadius: '10px',
+                  color: 'white',
+                  textAlign: 'center',
+                  fontSize: '13px',
+                  fontWeight: '600'
+                }}>
+                  ✓ Custom prices saved and active!
+                </div>
+              )}
           </div>
         )}
         
