@@ -168,6 +168,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
     }
   });
   
+  // State to track which input is being edited (to show raw value)
+  const [editingField, setEditingField] = useState(null);
+  
   // State for saved stays
   const [savedStays, setSavedStays] = useState([]);
   // State for active tab
@@ -5269,13 +5272,29 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         {/* Price Change Tab Content */}
         {activeTab === 'pricechange' && (
           <div style={{padding: '15px', backgroundColor: '#f8f9fa'}}>
-            <h3 style={{
-              margin: '0 0 15px 0',
-              fontSize: '18px',
-              fontWeight: 'bold',
-              color: '#2d4373',
-              textAlign: 'center'
-            }}>Custom Room Prices</h3>
+            {customPrices && Object.keys(customPrices).length > 0 && (customPrices.regular || customPrices.jacuzzi) ? (
+              <div style={{
+                margin: '0 0 15px 0',
+                padding: '12px',
+                background: 'linear-gradient(135deg, #10b981, #059669)',
+                borderRadius: '12px',
+                color: 'white',
+                textAlign: 'center',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                boxShadow: '0 4px 12px rgba(16,185,129,0.3)'
+              }}>
+                ✓ Custom prices saved and active!
+              </div>
+            ) : (
+              <h3 style={{
+                margin: '0 0 15px 0',
+                fontSize: '18px',
+                fontWeight: 'bold',
+                color: '#2d4373',
+                textAlign: 'center'
+              }}>Custom Room Prices</h3>
+            )}
             
             {/* Regular Rooms Section */}
             <div style={{
@@ -5306,7 +5325,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                   <input
                     type="text"
                     placeholder={`$${dailyPrices.regular}.00`}
-                    value={tempPrices?.regular?.queen ? `$${tempPrices.regular.queen.toFixed(2)}` : ''}
+                    value={editingField === 'regular-queen' ? (tempPrices?.regular?.queen || '') : (tempPrices?.regular?.queen ? `$${tempPrices.regular.queen.toFixed(2)}` : '')}
+                    onFocus={() => setEditingField('regular-queen')}
+                    onBlur={() => setEditingField(null)}
                     onChange={(e) => {
                       const value = e.target.value.replace(/[^0-9.]/g, '');
                       setTempPrices({
@@ -5342,7 +5363,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                   <input
                     type="text"
                     placeholder={`$${(dailyPrices.regular + 5)}.00`}
-                    value={tempPrices?.regular?.king ? `$${tempPrices.regular.king.toFixed(2)}` : ''}
+                    value={editingField === 'regular-king' ? (tempPrices?.regular?.king || '') : (tempPrices?.regular?.king ? `$${tempPrices.regular.king.toFixed(2)}` : '')}
+                    onFocus={() => setEditingField('regular-king')}
+                    onBlur={() => setEditingField(null)}
                     onChange={(e) => {
                       const value = e.target.value.replace(/[^0-9.]/g, '');
                       setTempPrices({
@@ -5378,7 +5401,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                   <input
                     type="text"
                     placeholder={`$${(dailyPrices.regular + 10)}.00`}
-                    value={tempPrices?.regular?.queen2beds ? `$${tempPrices.regular.queen2beds.toFixed(2)}` : ''}
+                    value={editingField === 'regular-queen2beds' ? (tempPrices?.regular?.queen2beds || '') : (tempPrices?.regular?.queen2beds ? `$${tempPrices.regular.queen2beds.toFixed(2)}` : '')}
+                    onFocus={() => setEditingField('regular-queen2beds')}
+                    onBlur={() => setEditingField(null)}
                     onChange={(e) => {
                       const value = e.target.value.replace(/[^0-9.]/g, '');
                       setTempPrices({
@@ -5431,7 +5456,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                   <input
                     type="text"
                     placeholder={`$${dailyPrices.jacuzzi}.00`}
-                    value={tempPrices?.jacuzzi?.queen ? `$${tempPrices.jacuzzi.queen.toFixed(2)}` : ''}
+                    value={editingField === 'jacuzzi-queen' ? (tempPrices?.jacuzzi?.queen || '') : (tempPrices?.jacuzzi?.queen ? `$${tempPrices.jacuzzi.queen.toFixed(2)}` : '')}
+                    onFocus={() => setEditingField('jacuzzi-queen')}
+                    onBlur={() => setEditingField(null)}
                     onChange={(e) => {
                       const value = e.target.value.replace(/[^0-9.]/g, '');
                       setTempPrices({
@@ -5467,7 +5494,9 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                   <input
                     type="text"
                     placeholder={`$${(dailyPrices.jacuzzi + 5)}.00`}
-                    value={tempPrices?.jacuzzi?.king ? `$${tempPrices.jacuzzi.king.toFixed(2)}` : ''}
+                    value={editingField === 'jacuzzi-king' ? (tempPrices?.jacuzzi?.king || '') : (tempPrices?.jacuzzi?.king ? `$${tempPrices.jacuzzi.king.toFixed(2)}` : '')}
+                    onFocus={() => setEditingField('jacuzzi-king')}
+                    onBlur={() => setEditingField(null)}
                     onChange={(e) => {
                       const value = e.target.value.replace(/[^0-9.]/g, '');
                       setTempPrices({
@@ -5491,21 +5520,6 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                   />
                 </div>
               </div>
-              
-              {customPrices && Object.keys(customPrices).length > 0 && (customPrices.regular || customPrices.jacuzzi) && (
-                <div style={{
-                  marginTop: '15px',
-                  padding: '12px',
-                  background: 'linear-gradient(135deg, #10b981, #059669)',
-                  borderRadius: '10px',
-                  color: 'white',
-                  textAlign: 'center',
-                  fontSize: '13px',
-                  fontWeight: '600'
-                }}>
-                  ✓ Custom prices saved and active!
-                </div>
-              )}
           </div>
         )}
         
