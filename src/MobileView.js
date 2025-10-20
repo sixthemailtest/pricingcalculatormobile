@@ -690,6 +690,36 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
   // Get daily prices
   const dailyPrices = getDailyPrice();
   
+  // Get specific prices for each room type considering custom prices
+  const getSpecificRoomPrice = (roomType, bedType) => {
+    if (customPrices) {
+      if (roomType === 'jacuzzi') {
+        if (bedType === 'king') {
+          return customPrices.jacuzzi?.king || (dailyPrices.jacuzzi + 5);
+        } else {
+          return customPrices.jacuzzi?.queen || dailyPrices.jacuzzi;
+        }
+      } else {
+        if (bedType === 'king') {
+          return customPrices.regular?.king || (dailyPrices.regular + 5);
+        } else if (bedType === 'queen2beds') {
+          return customPrices.regular?.queen2beds || (dailyPrices.regular + 10);
+        } else {
+          return customPrices.regular?.queen || dailyPrices.regular;
+        }
+      }
+    }
+    
+    // Default pricing with surcharges
+    if (roomType === 'jacuzzi') {
+      return bedType === 'king' ? dailyPrices.jacuzzi + 5 : dailyPrices.jacuzzi;
+    } else {
+      if (bedType === 'king') return dailyPrices.regular + 5;
+      if (bedType === 'queen2beds') return dailyPrices.regular + 10;
+      return dailyPrices.regular;
+    }
+  };
+  
   // Show short stay price summary when total price changes
   useEffect(() => {
     if (totalPrice > 0) {
@@ -4807,18 +4837,18 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             <div style={{display: 'flex', alignItems: 'center', gap: '2px'}}>
               <span style={{width: '38px', fontWeight: 'bold', fontSize: '7px'}}>King</span>
               <div style={{width: '75px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', fontSize: '7px'}}>
-                <span style={{fontWeight: 'bold'}}>${dailyPrices.regular + 5}</span>
+                <span style={{fontWeight: 'bold'}}>${getSpecificRoomPrice('regular', 'king')}</span>
                 <span>+</span>
-                <span><span style={{fontSize: '5px'}}>tax</span> ${((dailyPrices.regular + 5) * 0.15).toFixed(0)}</span>
+                <span><span style={{fontSize: '5px'}}>tax</span> ${(getSpecificRoomPrice('regular', 'king') * 0.15).toFixed(0)}</span>
                 <span>=</span>
-                <span style={{fontWeight: 'bold', color: '#FFA500'}}>${Math.round((dailyPrices.regular + 5) * 1.15)}</span>
+                <span style={{fontWeight: 'bold', color: '#FFA500'}}>${Math.round(getSpecificRoomPrice('regular', 'king') * 1.15)}</span>
               </div>
               <div style={{width: '75px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', fontSize: '7px'}}>
-                <span style={{fontWeight: 'bold'}}>${dailyPrices.jacuzzi + 5}</span>
+                <span style={{fontWeight: 'bold'}}>${getSpecificRoomPrice('jacuzzi', 'king')}</span>
                 <span>+</span>
-                <span><span style={{fontSize: '5px'}}>tax</span> ${((dailyPrices.jacuzzi + 5) * 0.15).toFixed(0)}</span>
+                <span><span style={{fontSize: '5px'}}>tax</span> ${(getSpecificRoomPrice('jacuzzi', 'king') * 0.15).toFixed(0)}</span>
                 <span>=</span>
-                <span style={{fontWeight: 'bold', color: '#FFA500'}}>${Math.round((dailyPrices.jacuzzi + 5) * 1.15)}</span>
+                <span style={{fontWeight: 'bold', color: '#FFA500'}}>${Math.round(getSpecificRoomPrice('jacuzzi', 'king') * 1.15)}</span>
               </div>
             </div>
             
@@ -4826,11 +4856,11 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             <div style={{display: 'flex', alignItems: 'center', gap: '2px'}}>
               <span style={{width: '38px', fontWeight: 'bold', fontSize: '5.5px'}}>Queen 2 Beds</span>
               <div style={{width: '75px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', fontSize: '7px'}}>
-                <span style={{fontWeight: 'bold'}}>${dailyPrices.regular + 10}</span>
+                <span style={{fontWeight: 'bold'}}>${getSpecificRoomPrice('regular', 'queen2beds')}</span>
                 <span>+</span>
-                <span><span style={{fontSize: '5px'}}>tax</span> ${((dailyPrices.regular + 10) * 0.15).toFixed(0)}</span>
+                <span><span style={{fontSize: '5px'}}>tax</span> ${(getSpecificRoomPrice('regular', 'queen2beds') * 0.15).toFixed(0)}</span>
                 <span>=</span>
-                <span style={{fontWeight: 'bold', color: '#FFA500'}}>${Math.round((dailyPrices.regular + 10) * 1.15)}</span>
+                <span style={{fontWeight: 'bold', color: '#FFA500'}}>${Math.round(getSpecificRoomPrice('regular', 'queen2beds') * 1.15)}</span>
               </div>
               <div style={{width: '75px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px', fontSize: '7px', color: '#999'}}>
                 
@@ -5282,25 +5312,25 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
         
         {/* Price Change Tab Content */}
         {activeTab === 'pricechange' && (
-          <div style={{padding: '15px', backgroundColor: '#f8f9fa'}}>
+          <div style={{padding: '10px', backgroundColor: '#f8f9fa'}}>
             {customPrices && Object.keys(customPrices).length > 0 && (customPrices.regular || customPrices.jacuzzi) ? (
               <div style={{
-                margin: '0 0 15px 0',
-                padding: '12px',
+                margin: '0 0 8px 0',
+                padding: '8px',
                 background: 'linear-gradient(135deg, #10b981, #059669)',
-                borderRadius: '12px',
+                borderRadius: '10px',
                 color: 'white',
                 textAlign: 'center',
-                fontSize: '16px',
+                fontSize: '14px',
                 fontWeight: 'bold',
-                boxShadow: '0 4px 12px rgba(16,185,129,0.3)'
+                boxShadow: '0 3px 8px rgba(16,185,129,0.3)'
               }}>
                 ✓ Custom prices saved and active!
               </div>
             ) : (
               <h3 style={{
-                margin: '0 0 15px 0',
-                fontSize: '18px',
+                margin: '0 0 8px 0',
+                fontSize: '16px',
                 fontWeight: 'bold',
                 color: '#2d4373',
                 textAlign: 'center'
@@ -5310,28 +5340,28 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
             {/* Regular Rooms Section */}
             <div style={{
               background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
-              borderRadius: '16px',
-              padding: '20px',
-              marginBottom: '15px',
-              boxShadow: '0 4px 12px rgba(14,165,233,0.2)'
+              borderRadius: '12px',
+              padding: '12px',
+              marginBottom: '8px',
+              boxShadow: '0 3px 8px rgba(14,165,233,0.2)'
             }}>
                 <h4 style={{
-                  fontSize: '14px',
+                  fontSize: '13px',
                   fontWeight: 'bold',
                   color: '#4a69bd',
-                  marginBottom: '12px',
-                  paddingBottom: '8px',
+                  marginBottom: '8px',
+                  paddingBottom: '6px',
                   borderBottom: '2px solid #e0e7ff'
                 }}>Regular Rooms</h4>
                 
                 {/* Queen Regular */}
-                <div style={{marginBottom: '15px'}}>
+                <div style={{marginBottom: '10px'}}>
                   <label style={{
                     display: 'block',
-                    fontSize: '13px',
+                    fontSize: '12px',
                     fontWeight: '600',
                     color: '#0369a1',
-                    marginBottom: '6px'
+                    marginBottom: '4px'
                   }}>Queen</label>
                   <input
                     type="text"
@@ -5351,10 +5381,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                     }}
                     style={{
                       width: '100%',
-                      padding: '10px 15px',
-                      fontSize: '14px',
+                      padding: '8px 12px',
+                      fontSize: '13px',
                       border: '2px solid #e2e8f0',
-                      borderRadius: '10px',
+                      borderRadius: '8px',
                       outline: 'none',
                       boxSizing: 'border-box',
                       fontWeight: '600'
@@ -5363,13 +5393,13 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                 </div>
                 
                 {/* King Regular */}
-                <div style={{marginBottom: '15px'}}>
+                <div style={{marginBottom: '10px'}}>
                   <label style={{
                     display: 'block',
-                    fontSize: '13px',
+                    fontSize: '12px',
                     fontWeight: '600',
                     color: '#0369a1',
-                    marginBottom: '6px'
+                    marginBottom: '4px'
                   }}>King</label>
                   <input
                     type="text"
@@ -5389,10 +5419,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                     }}
                     style={{
                       width: '100%',
-                      padding: '10px 15px',
-                      fontSize: '14px',
+                      padding: '8px 12px',
+                      fontSize: '13px',
                       border: '2px solid #e2e8f0',
-                      borderRadius: '10px',
+                      borderRadius: '8px',
                       outline: 'none',
                       boxSizing: 'border-box',
                       fontWeight: '600'
@@ -5404,10 +5434,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                 <div style={{marginBottom: '0'}}>
                   <label style={{
                     display: 'block',
-                    fontSize: '13px',
+                    fontSize: '12px',
                     fontWeight: '600',
                     color: '#0369a1',
-                    marginBottom: '6px'
+                    marginBottom: '4px'
                   }}>Queen 2 Beds</label>
                   <input
                     type="text"
@@ -5427,10 +5457,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                     }}
                     style={{
                       width: '100%',
-                      padding: '10px 15px',
-                      fontSize: '14px',
+                      padding: '8px 12px',
+                      fontSize: '13px',
                       border: '2px solid #e2e8f0',
-                      borderRadius: '10px',
+                      borderRadius: '8px',
                       outline: 'none',
                       boxSizing: 'border-box',
                       fontWeight: '600'
@@ -5442,27 +5472,27 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               {/* Jacuzzi Rooms Section */}
               <div style={{
                 background: 'linear-gradient(135deg, #2d4373 0%, #4a69bd 100%)',
-                borderRadius: '16px',
-                padding: '20px',
-                boxShadow: '0 4px 12px rgba(45,67,115,0.3)'
+                borderRadius: '12px',
+                padding: '12px',
+                boxShadow: '0 3px 8px rgba(45,67,115,0.3)'
               }}>
                 <h4 style={{
-                  fontSize: '14px',
+                  fontSize: '13px',
                   fontWeight: 'bold',
                   color: 'white',
-                  marginBottom: '12px',
-                  paddingBottom: '8px',
+                  marginBottom: '8px',
+                  paddingBottom: '6px',
                   borderBottom: '2px solid rgba(255,255,255,0.3)'
                 }}>Jacuzzi Rooms</h4>
                 
                 {/* Queen Jacuzzi */}
-                <div style={{marginBottom: '15px'}}>
+                <div style={{marginBottom: '10px'}}>
                   <label style={{
                     display: 'block',
-                    fontSize: '13px',
+                    fontSize: '12px',
                     fontWeight: '600',
                     color: 'rgba(255,255,255,0.9)',
-                    marginBottom: '6px'
+                    marginBottom: '4px'
                   }}>Queen with Jacuzzi</label>
                   <input
                     type="text"
@@ -5482,10 +5512,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                     }}
                     style={{
                       width: '100%',
-                      padding: '10px 15px',
-                      fontSize: '14px',
+                      padding: '8px 12px',
+                      fontSize: '13px',
                       border: '2px solid #e2e8f0',
-                      borderRadius: '10px',
+                      borderRadius: '8px',
                       outline: 'none',
                       boxSizing: 'border-box',
                       fontWeight: '600'
@@ -5497,10 +5527,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                 <div style={{marginBottom: '0'}}>
                   <label style={{
                     display: 'block',
-                    fontSize: '13px',
+                    fontSize: '12px',
                     fontWeight: '600',
                     color: 'rgba(255,255,255,0.9)',
-                    marginBottom: '6px'
+                    marginBottom: '4px'
                   }}>King with Jacuzzi</label>
                   <input
                     type="text"
@@ -5520,10 +5550,10 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
                     }}
                     style={{
                       width: '100%',
-                      padding: '10px 15px',
-                      fontSize: '14px',
+                      padding: '8px 12px',
+                      fontSize: '13px',
                       border: '2px solid #e2e8f0',
-                      borderRadius: '10px',
+                      borderRadius: '8px',
                       outline: 'none',
                       boxSizing: 'border-box',
                       fontWeight: '600'
