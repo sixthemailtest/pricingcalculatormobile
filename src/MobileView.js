@@ -6212,67 +6212,135 @@ function MobileView({ currentDay, currentDate, currentDateTime, dayStyle, prices
               </div>
             )}
             
-            {/* Saved Stays Section */}
+            {/* Saved Stays Section - Unified Summary */}
             {savedStays.length > 0 && (
               <div className="saved-stays-section">
                 <h3>Saved Stays</h3>
-                {savedStays.map((stay, index) => (
-                  <div key={index} className="saved-stay-item">
-                    <div className="saved-stay-content">
-                      <button 
-                        className="remove-stay-button"
-                        onClick={() => removeSavedStay(index)}
-                      >
-                        ×
-                      </button>
-                      
-                      <div className="saved-stay-header">
-                        <div className="saved-stay-dates">
-                          <span>{new Date(stay.checkInDate).toLocaleDateString('en-US', { weekday: 'short' })}, {new Date(stay.checkInDate).toLocaleDateString()}</span>
-                          <span className="date-separator">→</span>
-                          <span>{new Date(stay.checkOutDate).toLocaleDateString('en-US', { weekday: 'short' })}, {new Date(stay.checkOutDate).toLocaleDateString()}</span>
+                <div style={{
+                  background: 'linear-gradient(135deg, #2d4373 0%, #4a69bd 100%)',
+                  borderRadius: '15px',
+                  padding: '20px',
+                  color: 'white',
+                  boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
+                }}>
+                  {savedStays.map((stay, index) => (
+                    <div key={index}>
+                      {/* Stay Row */}
+                      <div style={{
+                        background: 'rgba(255,255,255,0.15)',
+                        borderRadius: '10px',
+                        padding: '12px',
+                        marginBottom: index < savedStays.length - 1 || savedStays.length > 1 ? '12px' : '0',
+                        position: 'relative'
+                      }}>
+                        <button 
+                          onClick={() => removeSavedStay(index)}
+                          style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            background: '#ef4444',
+                            border: 'none',
+                            borderRadius: '50%',
+                            width: '24px',
+                            height: '24px',
+                            color: 'white',
+                            fontSize: '16px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          ×
+                        </button>
+                        
+                        <div style={{ marginBottom: '8px' }}>
+                          <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '4px' }}>
+                            <span>{new Date(stay.checkInDate).toLocaleDateString('en-US', { weekday: 'short' })}, {new Date(stay.checkInDate).toLocaleDateString()}</span>
+                            <span style={{ margin: '0 6px' }}>→</span>
+                            <span>{new Date(stay.checkOutDate).toLocaleDateString('en-US', { weekday: 'short' })}, {new Date(stay.checkOutDate).toLocaleDateString()}</span>
+                          </div>
+                          <div style={{ fontSize: '11px', opacity: 0.9 }}>
+                            {stay.nights} nights • {stay.bedType} • {stay.hasJacuzzi ? 'Jacuzzi' : 'No Jacuzzi'}
+                          </div>
                         </div>
-                        <div className="saved-stay-info">
-                          <span>{stay.nights} nights</span>
-                          <span>•</span>
-                          <span>{stay.bedType}</span>
-                          <span>•</span>
-                          <span>{stay.hasJacuzzi ? 'Jacuzzi' : 'No Jacuzzi'}</span>
+                        
+                        <div style={{ fontSize: '11px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                            <span>Tax (15%):</span>
+                            <span>${stay.taxAmount.toFixed(2)}</span>
+                          </div>
+                          {stay.extraHours > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                              <span>Extra Hours ({stay.extraHours} × ${stay.hourlyRate || 15}):</span>
+                              <span>${stay.extraHoursCost?.toFixed(2) || (stay.extraHours * (stay.hourlyRate || 15)).toFixed(2)}</span>
+                            </div>
+                          )}
+                          {stay.extraHoursCheckIn > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                              <span>Early Check-in ({stay.extraHoursCheckIn} hrs):</span>
+                              <span>${stay.extraHoursCheckInCost?.toFixed(2)}</span>
+                            </div>
+                          )}
+                          {stay.extraHoursCheckOut > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                              <span>Late Check-out ({stay.extraHoursCheckOut} hrs):</span>
+                              <span>${stay.extraHoursCheckOutCost?.toFixed(2)}</span>
+                            </div>
+                          )}
+                          <div style={{ 
+                            borderTop: '1px solid rgba(255,255,255,0.3)', 
+                            marginTop: '8px', 
+                            paddingTop: '8px',
+                            display: 'flex', 
+                            justifyContent: 'space-between',
+                            fontWeight: 'bold',
+                            fontSize: '13px'
+                          }}>
+                            <span>Total:</span>
+                            <span>${stay.totalPrice.toFixed(2)}</span>
+                          </div>
                         </div>
                       </div>
                       
-                      <div className="saved-stay-price-container">
-                        <div className="price-row">
-                          <span>Tax (15%):</span>
-                          <span>${stay.taxAmount.toFixed(2)}</span>
+                      {/* Divider between stays */}
+                      {index < savedStays.length - 1 && (
+                        <div style={{
+                          textAlign: 'center',
+                          margin: '0 0 12px 0',
+                          fontSize: '16px',
+                          fontWeight: 'bold',
+                          color: 'rgba(255,255,255,0.7)'
+                        }}>
+                          +
                         </div>
-                        {stay.extraHours > 0 && (
-                          <div className="price-row">
-                            <span>Extra Hours ({stay.extraHours} × ${stay.hourlyRate || 15}):</span>
-                            <span>${stay.extraHoursCost?.toFixed(2) || (stay.extraHours * (stay.hourlyRate || 15)).toFixed(2)}</span>
-                          </div>
-                        )}
-                        {stay.extraHoursCheckIn > 0 && (
-                          <div className="price-row">
-                            <span>Early Check-in ({stay.extraHoursCheckIn} hrs @ ${stay.hourlyRate || 15}/hr):</span>
-                            <span>${stay.extraHoursCheckInCost?.toFixed(2)}</span>
-                          </div>
-                        )}
-                        {stay.extraHoursCheckOut > 0 && (
-                          <div className="price-row">
-                            <span>Late Check-out ({stay.extraHoursCheckOut} hrs @ ${stay.hourlyRate || 15}/hr):</span>
-                            <span>${stay.extraHoursCheckOutCost?.toFixed(2)}</span>
-                          </div>
-                        )}
-                        <div className="price-row-divider"></div>
-                        <div className="price-row total">
-                          <span>Total:</span>
-                          <span>${stay.totalPrice.toFixed(2)}</span>
-                        </div>
-                      </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  ))}
+                  
+                  {/* Grand Total - Only show if more than 1 stay */}
+                  {savedStays.length > 1 && (
+                    <div style={{
+                      background: 'rgba(255,255,255,0.25)',
+                      borderRadius: '10px',
+                      padding: '15px',
+                      marginTop: '12px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      fontWeight: 'bold',
+                      fontSize: '18px',
+                      border: '2px solid rgba(255,255,255,0.4)'
+                    }}>
+                      <span>Total:</span>
+                      <span style={{ fontSize: '20px', color: '#FFA500' }}>
+                        ${savedStays.reduce((sum, stay) => sum + stay.totalPrice, 0).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
